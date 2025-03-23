@@ -1,0 +1,17 @@
+CKKS = [
+  invalid,
+  rotate,
+  add,
+  sub,
+  mul,
+  neg,
+  encode,
+  rescale,
+  upscale,
+  modswitch,
+  relin,
+  bootstrap,
+  scale,
+  level,
+  batch_size
+]

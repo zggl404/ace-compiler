@@ -1,0 +1,226 @@
+version: "2.0"
+
+# Check Build Options
+# -DBUILD_SHARED=OFF        # TODO: implement later
+# -DBUILD_UNITTEST=OFF
+# -DBUILD_BENCH=OFF
+# -DFHE_BUILD_TEST=OFF
+# -DFHE_BUILD_EXAMPLE=OFF
+# -DFHE_INSTALL_APP=OFF
+# -GNinja
+
+parameters:
+  image_build:  "reg.docker.alibaba-inc.com/ace/dev:ci"
+  package:      "package.tar.gz"
+
+stages:
+  - CLONE
+  - CHECK_WITH_SRC
+  - CHECK_WITH_LIB
+
+reusable:
+  components:
+    build_with_src:
+      kind: agent
+      inputs:
+        image:
+          description: "avh/avh:dev***"
+        source:
+          description: "air-infra;nn-addon;fhe-cmplr"
+        option:
+          description: "build options"
+      execute:
+        agent:
+          container:
+            image: "${{inputs.image}}"
+        steps:
+          - name: shell     # Download
+            with:
+              script: |
+                wget -q "${{inputs.source}}" -O package.tar.gz
+                tar xf package.tar.gz
+          - name: shell     # Build
+            with:
+              script: |
+                cmake -S fhe-cmplr -B build  -DFHE_WITH_SRC="air-infra;nn-addon" "${{inputs.option}}"
+                cmake --build build -- -j12
+
+    build_with_lib:
+      kind: agent
+      inputs:
+        image:
+          description: "avh/avh:dev***"
+        source:
+          description: "air-infra;nn-addon"
+        option:
+          description: "build options"
+      execute:
+        agent:
+          container:
+            image: "${{inputs.image}}"
+        steps:
+          - name: shell     # Download
+            with:
+              script: |
+                wget -q "${{inputs.source}}" -O package.tar.gz
+                tar xf package.tar.gz
+          - name: shell     # Check Build nn-addon
+            with:
+              script: |
+                cmake -S nn-addon -B build.nn -DNN_WITH_SRC="air-infra"
+                cmake --build build.nn -- -j12
+                cmake --install build.nn
+          - name: shell     # Check Build fhe-cmplr
+            with:
+              script: |
+                cmake -S fhe-cmplr -B build "${{inputs.option}}"
+                cmake --build build -- -j12
+
+
+jobs:
+  AVHC:
+    stage: CLONE
+    id: clone
+    component: ant-code-build
+    inputs:
+      name: clone
+      resources: []
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER
+        image: ${{parameters.image_build}}
+      buildTasks:
+        - name: Package
+          commands: |
+            git clone -b master git@code.alipay.com:air-infra/air-infra.git
+            git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+            git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+            tar czf ${{parameters.package}} air-infra nn-addon fhe-cmplr
+      artifacts:
+        - name: target
+          type: file
+          path: ${{parameters.package}}
+      timeout: 7200
+
+  SRC:CMAKE_BUILD_TYPE=Release:
+    stage: CHECK_WITH_SRC
+    component: build_with_src
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DCMAKE_BUILD_TYPE=Release"
+
+  SRC:BUILD_UNITTEST=OFF:
+    stage: CHECK_WITH_SRC
+    component: build_with_src
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DBUILD_UNITTEST=OFF"
+
+  SRC:BUILD_BENCH=OFF:
+    stage: CHECK_WITH_SRC
+    component: build_with_src
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DBUILD_BENCH=OFF"
+
+  SRC:FHE_BUILD_TEST=OFF:
+    stage: CHECK_WITH_SRC
+    component: build_with_src
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DFHE_BUILD_TEST=OFF"
+
+  SRC:FHE_BUILD_EXAMPLE=OFF:
+    stage: CHECK_WITH_SRC
+    component: build_with_src
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DFHE_BUILD_EXAMPLE=OFF"
+
+  SRC:FHE_INSTALL_APP=OFF:
+    stage: CHECK_WITH_SRC
+    component: build_with_src
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DFHE_INSTALL_APP=OFF"
+
+  SRC:GNinja:
+    stage: CHECK_WITH_SRC
+    component: build_with_src
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-GNinja"
+
+  LIB:CMAKE_BUILD_TYPE=Release:
+    stage: CHECK_WITH_LIB
+    component: build_with_lib
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DCMAKE_BUILD_TYPE=Release"
+
+  LIB:BUILD_UNITTEST=OFF:
+    stage: CHECK_WITH_LIB
+    component: build_with_lib
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DBUILD_UNITTEST=OFF"
+
+  LIB:BUILD_BENCH=OFF:
+    stage: CHECK_WITH_LIB
+    component: build_with_lib
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DBUILD_BENCH=OFF"
+
+  LIB:FHE_BUILD_TEST=OFF:
+    stage: CHECK_WITH_LIB
+    component: build_with_lib
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DFHE_BUILD_TEST=OFF"
+
+  LIB:FHE_BUILD_EXAMPLE=OFF:
+    stage: CHECK_WITH_LIB
+    component: build_with_lib
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DFHE_BUILD_EXAMPLE=OFF"
+
+  LIB:FHE_INSTALL_APP=OFF:
+    stage: CHECK_WITH_LIB
+    component: build_with_lib
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DFHE_INSTALL_APP=OFF"
+
+  LIB:GNinja:
+    stage: CHECK_WITH_LIB
+    component: build_with_lib
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-GNinja"
+
+notifications:
+  daily.package:
+    type: DINGTALK
+    level: PIPELINE
+    when: FAIL
+    template: ${ACI_PROJECT_NAME} Nightly_Build_Check FAILED! ${ACI_PIPELINE_URL}
+    channels:
+      - https://oapi.dingtalk.com/robot/send?access_token=7f9e24c8e58f9786e2c48efa1ee912295536636c29672dbb01a75f9221a6c76b
+    only:
+      - ^master$

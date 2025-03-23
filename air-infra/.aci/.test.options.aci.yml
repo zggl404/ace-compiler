@@ -1,0 +1,146 @@
+version: "2.0"
+
+# Check Build Options
+# -DBUILD_SHARED=OFF        # TODO: implement later
+# -DBUILD_UNITTEST=OF
+# -DBUILD_BENCH=OFF 
+# -DAIR_BUILD_TEST=OFF 
+# -DAIR_BUILD_EXAMPLE=OFF 
+# -DAIR_INSTALL_APP=OFF
+# -GNinja
+
+parameters:
+  image_build:  "reg.docker.alibaba-inc.com/ace/dev:ci"
+
+  # Test Packages
+  package:      "air-infra.tar.gz"
+
+stages:
+  - CLONE
+  - SINGLE
+  - GROUP
+
+reusable:
+  components:
+    check:
+      kind: agent
+      inputs:
+        image:
+          description: "avh/avh:dev***"
+        source:
+          description: "repo of air-infra"
+        option:
+          description: "build options"
+      execute:
+        agent:
+          container:
+            image: "${{inputs.image}}"
+        steps:
+          - name: shell
+            with:
+              script: |
+                wget -q "${{inputs.source}}" -O air-infra.tar.gz
+                tar xf air-infra.tar.gz
+          - name: shell
+            with:
+              script: |
+                cmake -S air-infra -B build "${{inputs.option}}"
+                cmake --build build -- -j12
+
+jobs:
+  AIR-INFRA:
+    stage: CLONE
+    id: clone
+    component: ant-code-build
+    inputs:
+      name: clone
+      resources: []
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER
+        image: ${{parameters.image_build}}
+      buildTasks:
+        - name: Package
+          commands: |
+            git clone -b ${{vcs.ref}} git@code.alipay.com:air-infra/air-infra.git
+            tar czf ${{parameters.package}} air-infra
+      artifacts:
+        - name: target
+          type: file
+          path: ${{parameters.package}}
+      timeout: 7200
+
+  CMAKE_BUILD_TYPE=Debug:
+    stage: SINGLE
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DCMAKE_BUILD_TYPE=Debug"
+
+  BUILD_UNITTEST=OFF:
+    stage: SINGLE
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DBUILD_UNITTEST=OFF"
+
+  BUILD_BENCH=OFF:
+    stage: SINGLE
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DBUILD_BENCH=OFF"
+
+  AIR_BUILD_TEST=OFF:
+    stage: SINGLE
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DAIR_BUILD_TEST=OFF"
+
+  AIR_BUILD_EXAMPLE=OFF:
+    stage: SINGLE
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DAIR_BUILD_EXAMPLE=OFF"
+
+  AIR_INSTALL_APP=OFF:
+    stage: SINGLE
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-DAIR_INSTALL_APP=OFF"
+
+  GNinja:
+    stage: SINGLE
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "-GNinja"
+
+  MULTI_OPTIONS_01:
+    stage: GROUP
+    component: check
+    inputs:
+      image:  ${{parameters.image_build}} 
+      source: ${{jobs.clone.outputs.artifacts.target.url}}
+      option: "\"-DBUILD_SHARED=OFF -DBUILD_UNITTEST=OFF -DBUILD_BENCH=OFF -DAIR_BUILD_TEST=OFF -DAIR_BUILD_EXAMPLE=OFF -DAIR_INSTALL_APP=OFF\""
+
+notifications:
+  daily.package:
+    type: DINGTALK
+    level: PIPELINE
+    when: FAIL
+    template: ${ACI_PROJECT_NAME} Nightly_Build_Check FAILED! ${ACI_PIPELINE_URL}
+    channels:
+      - https://oapi.dingtalk.com/robot/send?access_token=7f9e24c8e58f9786e2c48efa1ee912295536636c29672dbb01a75f9221a6c76b
+    only:
+      - ^master$

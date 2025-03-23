@@ -1,0 +1,60 @@
+version: "2.0"
+
+# Code Style Check
+
+parameters:
+  image_build:  "reg.docker.alibaba-inc.com/avh/avh:regex"
+  oss_path: "oss://antsys-fhe/aci/master"
+  air_deb: "air-infra_deb.tar.gz"
+
+  # aarch64
+  image_aarch64_build: "reg.docker.alibaba-inc.com/avh/avh:regex_aarch64"
+  air_deb_aarch64: "air-infra_deb_aarch64.tar.gz"
+
+stages:
+  - CHECK
+
+jobs:
+  code.style:
+    stage: CHECK
+    id: regex
+    component: ant-code-build
+    inputs:
+      name: check-avhc
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER
+        image: ${{parameters.image_build}}
+      buildTasks:
+        - name: Install Dependency
+          commands: |
+            echo "Install ..."
+            ossutil64 cp ${{parameters.oss_path}}/${{parameters.air_deb}} .
+        - name: Build
+          commands: |
+            tar -xf ${{parameters.air_deb}} -C /usr/local
+            cmake -S code-repo -B build -GNinja
+            cmake --build build -- -j8
+      timeout: 7200
+
+  code.style_aarch64:
+    stage: CHECK
+    id: regex_aarch64
+    component: ant-code-build
+    inputs:
+      name: check-avhc
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER_ARM64
+        image: ${{parameters.image_aarch64_build}}
+      buildTasks:
+        - name: Install Dependency
+          commands: |
+            echo "Install ..."
+            ossutil64 cp ${{parameters.oss_path}}/${{parameters.air_deb_aarch64}} .
+        - name: Build
+          commands: |
+            tar -xf ${{parameters.air_deb_aarch64}} -C /usr/local
+            cmake -S code-repo -B build -GNinja
+            cmake --build build -- -j8
+      timeout: 7200

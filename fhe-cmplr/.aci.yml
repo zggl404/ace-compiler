@@ -1,0 +1,605 @@
+version: "2.0"
+
+# Build Packages for Push/pullRequest/Merge to Master
+# oss://antsys-fhe/aci/master/fhe-cmplr_deb.tar.gz
+# oss://antsys-fhe/aci/master/fhe-cmplr_rel.tar.gz
+# oss://antsys-fhe/aci/master/fhe-cmplr_deb_aarch64.tar.gz
+# oss://antsys-fhe/aci/master/fhe-cmplr_rel_aarch64.tar.gz
+
+# oss://antsys-fhe/aci/master/fhe-cmplr_deb_omp.tar.gz
+# oss://antsys-fhe/aci/master/fhe-cmplr_rel_omp.tar.gz
+# oss://antsys-fhe/aci/master/fhe-cmplr_deb_omp_aarch64.tar.gz
+# oss://antsys-fhe/aci/master/fhe-cmplr_rel_omp_aarch64.tar.gz
+
+parameters:
+  image_base:             "reg.docker.alibaba-inc.com/ace/dev:ci"
+  image_base_aarch64:     "reg.docker.alibaba-inc.com/ace/dev:ci_aarch64"
+  # image_base_omp:         "reg.docker.alibaba-inc.com/ace/dev_omp:ci"
+  # image_base_omp_aarch64: "reg.docker.alibaba-inc.com/ace/dev_omp:ci_aarch64"
+
+  image_test:             "reg.docker.alibaba-inc.com/ace/cti:ci"
+  image_test_aarch64:     "reg.docker.alibaba-inc.com/ace/cti:ci_aarch64"
+
+  options:                "-DFHE_WITH_SRC=\"air-infra;nn-addon\" -GNinja -DCMAKE_INSTALL_PREFIX=install"
+  target:                 "target.tar.gz"
+
+  # Test Packages
+  cti:                    "cti.tar.gz"
+  oss_cti:                "oss://antsys-fhe/cti/package/cti.tar.gz"
+
+  # Build Packages
+  oss_path:               "oss://antsys-fhe/aci/master"
+  pack_deb:               "fhe-cmplr_deb.tar.gz"
+  pack_rel:               "fhe-cmplr_rel.tar.gz"
+  pack_deb_aarch64:       "fhe-cmplr_deb_aarch64.tar.gz"
+  pack_rel_aarch64:       "fhe-cmplr_rel_aarch64.tar.gz"
+
+  pack_deb_omp:           "fhe-cmplr_deb_omp.tar.gz"
+  pack_rel_omp:           "fhe-cmplr_rel_omp.tar.gz"
+  pack_deb_omp_aarch64:   "fhe-cmplr_deb_omp_aarch64.tar.gz"
+  pack_rel_omp_aarch64:   "fhe-cmplr_rel_omp_aarch64.tar.gz"
+
+triggers:
+  git:
+    push:
+      changesIgnore:
+        - ^LEGAL.md$
+        - ^README.md$
+        - ^doc/**
+    pullRequest:
+      changesIgnore:
+        - ^LEGAL.md$
+        - ^README.md$
+        - ^doc/**
+
+stages:
+  - BUILD
+  - UNIT_TEST
+  - BENCH_TEST
+  - UPLOAD
+
+jobs:
+  build.deb.x86_64:
+    stage: BUILD
+    id: build_deb_x86_64
+    component: ant-code-build
+    inputs:
+      name: build
+      resources: []
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER
+        image: ${{parameters.image_base}}
+      buildTasks:
+        - name: Dependency
+          commands: |
+            git clone -b master git@code.alipay.com:air-infra/air-infra.git
+            git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+            git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+        - name: Build
+          commands: |
+            cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build -- -j12
+            cmake --build build --target test
+            cmake --install build
+        - name: Package
+          commands: |
+            tar czf ${{parameters.target}} -C install .
+      artifacts:
+        - name: target
+          type: file
+          path: ${{parameters.target}}
+
+  build.rel.x86_64:
+    stage: BUILD
+    id: build_rel_x86_64
+    component: ant-code-build
+    inputs:
+      name: build
+      resources: []
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER
+        image: ${{parameters.image_base}}
+      buildTasks:
+        - name: Dependency
+          commands: |
+            git clone -b master git@code.alipay.com:air-infra/air-infra.git
+            git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+            git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+        - name: Build
+          commands: |
+            cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Release
+            cmake --build build -- -j12
+            cmake --build build --target test
+            cmake --install build
+        - name: Package
+          commands: |
+            tar czf ${{parameters.target}} -C install .
+      artifacts:
+        - name: target
+          type: file
+          path: ${{parameters.target}}
+
+  # build.deb.omp.x86_64:
+  #   stage: BUILD
+  #   id: build_deb_omp_x86_64
+  #   component: ant-code-build
+  #   inputs:
+  #     name: build
+  #     resources: []
+  #     resourceClass: XL
+  #     environment:
+  #       type: LINUX_CONTAINER
+  #       image: ${{parameters.image_base_omp}}
+  #     buildTasks:
+  #       - name: Dependency
+  #         commands: |
+              # git clone -b master git@code.alipay.com:air-infra/air-infra.git
+              # git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+              # git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+  #       - name: Build
+  #         commands: |
+  #           cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Debug -DBUILD_WITH_OPENMP=ON
+  #           cmake --build build -- -j12
+  #           cmake --build build --target test
+  #           cmake --install build
+  #       - name: Package
+  #         commands: |
+  #           tar czf ${{parameters.target}} -C install .
+  #     artifacts:
+  #       - name: target
+  #         type: file
+  #         path: ${{parameters.target}}
+
+  # build.rel.omp.x86_64:
+  #   stage: BUILD
+  #   id: build_rel_omp_x86_64
+  #   component: ant-code-build
+  #   inputs:
+  #     name: build
+  #     resources: []
+  #     resourceClass: XL
+  #     environment:
+  #       type: LINUX_CONTAINER
+  #       image: ${{parameters.image_base_omp}}
+  #     buildTasks:
+  #       - name: Dependency
+  #         commands: |
+              # git clone -b master git@code.alipay.com:air-infra/air-infra.git
+              # git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+              # git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+  #       - name: Build
+  #         commands: |
+  #           cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_OPENMP=ON
+  #           cmake --build build -- -j12
+  #           cmake --build build --target test
+  #           cmake --install build
+  #       - name: Package
+  #         commands: |
+  #           tar czf ${{parameters.target}} -C install .
+  #     artifacts:
+  #       - name: target
+  #         type: file
+  #         path: ${{parameters.target}}
+
+  build.deb.aarch64:
+    stage: BUILD
+    id: build_deb_aarch64
+    component: ant-code-build
+    inputs:
+      name: build
+      resources: []
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER_ARM64
+        image: ${{parameters.image_base_aarch64}}
+      buildTasks:
+        - name: Dependency
+          commands: |
+            git clone -b master git@code.alipay.com:air-infra/air-infra.git
+            git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+            git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+        - name: Build
+          commands: |
+            cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build -- -j12
+            cmake --build build --target test
+            cmake --install build
+        - name: Package
+          commands: |
+            tar czf ${{parameters.target}} -C install .
+      artifacts:
+        - name: target
+          type: file
+          path: ${{parameters.target}}
+
+  build.rel.aarch64:
+    stage: BUILD
+    id: build_rel_aarch64
+    component: ant-code-build
+    inputs:
+      name: build
+      resources: []
+      resourceClass: XL
+      environment:
+        type: LINUX_CONTAINER_ARM64
+        image: ${{parameters.image_base_aarch64}}
+      buildTasks:
+        - name: Dependency
+          commands: |
+            git clone -b master git@code.alipay.com:air-infra/air-infra.git
+            git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+            git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+        - name: Build
+          commands: |
+            cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Release
+            cmake --build build -- -j12
+            cmake --build build --target test
+            cmake --install build
+        - name: Package
+          commands: |
+            tar czf ${{parameters.target}} -C install .
+      artifacts:
+        - name: target
+          type: file
+          path: ${{parameters.target}}
+
+  # build.deb.omp.aarch64:
+  #   stage: BUILD
+  #   id: build_deb_omp_aarch64
+  #   component: ant-code-build
+  #   inputs:
+  #     name: build
+  #     resources: []
+  #     resourceClass: XL
+  #     environment:
+  #       type: LINUX_CONTAINER_ARM64
+  #       image: ${{parameters.image_base_omp_aarch64}}
+  #     buildTasks:
+  #       - name: Dependency
+  #         commands: |
+              # git clone -b master git@code.alipay.com:air-infra/air-infra.git
+              # git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+              # git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+  #       - name: Build
+  #         commands: |
+  #           cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Debug -DBUILD_WITH_OPENMP=ON
+  #           cmake --build build -- -j12
+  #           cmake --build build --target test
+  #           cmake --install build
+  #       - name: Package
+  #         commands: |
+  #           tar czf ${{parameters.target}} -C install .
+  #     artifacts:
+  #       - name: target
+  #         type: file
+  #         path: ${{parameters.target}}
+
+  # build.rel.omp.aarch64:
+  #   stage: BUILD
+  #   id: build_rel_omp_aarch64
+  #   component: ant-code-build
+  #   inputs:
+  #     name: build
+  #     resources: []
+  #     resourceClass: XL
+  #     environment:
+  #       type: LINUX_CONTAINER_ARM64
+  #       image: ${{parameters.image_base_omp_aarch64}}
+  #     buildTasks:
+  #       - name: Dependency
+  #         commands: |
+              # git clone -b master git@code.alipay.com:air-infra/air-infra.git
+              # git clone -b master git@code.alipay.com:air-infra/nn-addon.git
+              # git clone -b ${{vcs.ref}} git@code.alipay.com:fhe-cmplr/fhe-cmplr.git
+  #       - name: Build
+  #         commands: |
+  #           cmake -S fhe-cmplr -B build ${{parameters.options}} -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_OPENMP=ON
+  #           cmake --build build -- -j12
+  #           cmake --build build --target test
+  #           cmake --install build
+  #       - name: Package
+  #         commands: |
+  #           tar czf ${{parameters.target}} -C install .
+  #     artifacts:
+  #       - name: target
+  #         type: file
+  #         path: ${{parameters.target}}
+
+  unit.deb.x86_64:
+    id: unit.deb.x86_64
+    stage: UNIT_TEST
+    component: common-ut
+    inputs:
+      type: LINUX_CONTAINER
+      image: ${{parameters.image_test}}
+      resourceClass: XL
+      script: |
+        wget -q "${{jobs.build_deb_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+        mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+        ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+        mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+        cd /app/cti && pip3 install -r requirements.txt
+        pytest -m 'unittest or example or test' --type=Debug --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+      caseReportPath: "report.xml"
+      enableArtifacts: false
+    config:
+      afterExecute:
+        checkRule:
+        - ${{outputs.caseFailCount}} < 1
+
+  unit.rel.x86_64:
+    id: unit.rel.x86_64
+    stage: UNIT_TEST
+    component: common-ut
+    inputs:
+      type: LINUX_CONTAINER
+      image: ${{parameters.image_test}}
+      resourceClass: XL
+      script: |
+        wget -q "${{jobs.build_rel_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+        mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+        ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+        mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+        cd /app/cti && pip3 install -r requirements.txt
+        pytest -m 'unittest or example or test' --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+      caseReportPath: "report.xml"
+      enableArtifacts: false
+    config:
+      afterExecute:
+        checkRule:
+        - ${{outputs.caseFailCount}} < 1
+
+  # unit.deb.omp.x86_64:
+  #   id: unit.deb.omp.x86_64
+  #   stage: UNIT_TEST
+  #   component: common-ut
+  #   inputs:
+  #     type: LINUX_CONTAINER
+  #     image: ${{parameters.image_test}}
+  #     resourceClass: XL
+  #     script: |
+  #       wget -q "${{jobs.build_deb_omp_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+  #       mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+  #       ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+  #       mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+  #       cd /app/cti && cp -r /opt/avhc/test/*.yml data/
+  #       pytest -m 'unittest or example or test' --omp=on --type=Debug --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+  #     caseReportPath: "report.xml"
+  #     enableArtifacts: false
+  #   config:
+  #     afterExecute:
+  #       checkRule:
+  #       - ${{outputs.caseFailCount}} < 1
+
+  # unit.rel.omp.x86_64:
+  #   id: unit.rel.omp.x86_64
+  #   stage: UNIT_TEST
+  #   component: common-ut
+  #   inputs:
+  #     type: LINUX_CONTAINER
+  #     image: ${{parameters.image_test}}
+  #     resourceClass: XL
+  #     script: |
+  #       wget -q "${{jobs.build_rel_omp_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+  #       mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+  #       ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+  #       mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+  #       cd /app/cti && cp -r /opt/avhc/test/*.yml data/
+  #       pytest -m 'unittest or example or test' --omp=on --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+  #     caseReportPath: "report.xml"
+  #     enableArtifacts: false
+  #   config:
+  #     afterExecute:
+  #       checkRule:
+  #       - ${{outputs.caseFailCount}} < 1
+
+  unit.deb.aarch64:
+    id: unit.deb.aarch64
+    stage: UNIT_TEST
+    component: common-ut@supportArch
+    inputs:
+      arch: arm
+      image: ${{parameters.image_test_aarch64}}
+      resourceClass: XL
+      script: |
+        wget -q "${{jobs.build_deb_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+        mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+        ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+        mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+        cd /app/cti && pip3 install -r requirements.txt
+        pytest -m 'unittest or example or test' --type=Debug --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+      caseReportPath: "report.xml"
+      enableArtifacts: false
+    config:
+      afterExecute:
+        checkRule:
+        - ${{outputs.caseFailCount}} < 1
+
+  unit.rel.aarch64:
+    id: unit.rel.aarch64
+    stage: UNIT_TEST
+    component: common-ut@supportArch
+    inputs:
+      arch: arm
+      image: ${{parameters.image_test_aarch64}}
+      resourceClass: XL
+      script: |
+        wget -q "${{jobs.build_rel_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+        mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+        ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+        mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+        cd /app/cti && pip3 install -r requirements.txt
+        pytest -m 'unittest or example or test' --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+      caseReportPath: "report.xml"
+      enableArtifacts: false
+    config:
+      afterExecute:
+        checkRule:
+        - ${{outputs.caseFailCount}} < 1
+
+  # unit.deb.omp.aarch64:
+  #   id: unit.deb.aarch64
+  #   stage: UNIT_TEST
+  #   component: common-ut@supportArch
+  #   inputs:
+  #     arch: arm
+  #     image: ${{parameters.image_test_aarch64}}
+  #     resourceClass: XL
+  #     script: |
+  #       wget -q "${{jobs.build_deb_omp_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+  #       mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+  #       ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+  #       mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+  #       cd /app/cti && cp -r /opt/avhc/test/*.yml data/
+  #       pytest -m 'unittest or example or test' --omp=on --type=Debug --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+  #     caseReportPath: "report.xml"
+  #     enableArtifacts: false
+  #   config:
+  #     afterExecute:
+  #       checkRule:
+  #       - ${{outputs.caseFailCount}} < 1
+
+  # unit.rel.omp.aarch64:
+  #   id: unit.rel.aarch64
+  #   stage: UNIT_TEST
+  #   component: common-ut@supportArch
+  #   inputs:
+  #     arch: arm
+  #     image: ${{parameters.image_test_aarch64}}
+  #     resourceClass: XL
+  #     script: |
+  #       wget -q "${{jobs.build_rel_omp_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+  #       mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+  #       ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+  #       mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+  #       cd /app/cti && cp -r /opt/avhc/test/*.yml data/
+  #       pytest -m 'unittest or example or test' --omp=on --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+  #     caseReportPath: "report.xml"
+  #     enableArtifacts: false
+  #   config:
+  #     afterExecute:
+  #       checkRule:
+  #       - ${{outputs.caseFailCount}} < 1
+
+  bench.rel.x86_64:
+    id: bench.rel.x86_64
+    stage: BENCH_TEST
+    component: common-ut
+    inputs:
+      type: LINUX_CONTAINER
+      image: ${{parameters.image_test}}
+      resourceClass: XL
+      script: |
+        wget -q "${{jobs.build_rel_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+        mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+        ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+        mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+        cd /app/cti && pip3 install -r requirements.txt
+        pytest -m 'bench' --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+      caseReportPath: "report.xml"
+      enableArtifacts: false
+    config:
+      afterExecute:
+        checkRule:
+        - ${{outputs.caseFailCount}} < 1
+
+  bench.rel.aarch64:
+    id: bench.rel.aarch64
+    stage: BENCH_TEST
+    component: common-ut@supportArch
+    inputs:
+      arch: arm
+      image: ${{parameters.image_test_aarch64}}
+      resourceClass: XL
+      script: |
+        wget -q "${{jobs.build_rel_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.target}}
+        mkdir -p /opt/avhc && tar xf ${{parameters.target}} -C /opt/avhc
+        ossutil64 cp ${{parameters.oss_cti}} ${{parameters.cti}} --update
+        mkdir -p /app/cti && tar xf ${{parameters.cti}} -C /app/cti
+
+        cd /app/cti && pip3 install -r requirements.txt
+        pytest -m 'bench' --junit-xml=/home/jenkins/agent/aci/codeWorkspace/report.xml
+      caseReportPath: "report.xml"
+      enableArtifacts: false
+    config:
+      afterExecute:
+        checkRule:
+        - ${{outputs.caseFailCount}} < 1
+
+  upload.lib.x86_64:
+    stage: UPLOAD
+    component: shell
+    only:
+      - ^master$
+    inputs:
+      image: ${{parameters.image_base}}
+      script: |
+        wget -q "${{jobs.build_deb_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.pack_deb}}
+        wget -q "${{jobs.build_rel_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.pack_rel}}
+
+        ossutil64 cp ${{parameters.pack_deb}} ${{parameters.oss_path}}/${{parameters.pack_deb}} --update
+        ossutil64 cp ${{parameters.pack_rel}} ${{parameters.oss_path}}/${{parameters.pack_rel}} --update
+
+  # upload.lib.omp.x86_64:
+  #   stage: UPLOAD
+  #   component: shell
+  #   only:
+  #     - ^master$
+  #   inputs:
+  #     image: ${{parameters.image_base}}
+  #     script: |
+  #       wget -q "${{jobs.build_deb_omp_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.pack_deb_omp}}
+  #       wget -q "${{jobs.build_rel_omp_x86_64.outputs.artifacts.target.url}}" -O ${{parameters.pack_rel_omp}}
+
+  #       ossutil64 cp ${{parameters.pack_deb_omp}} ${{parameters.oss_path}}/${{parameters.pack_deb_omp}} --update
+  #       ossutil64 cp ${{parameters.pack_rel_omp}} ${{parameters.oss_path}}/${{parameters.pack_rel_omp}} --update
+
+  upload.lib.aarch64:
+    stage: UPLOAD
+    component: shell
+    only:
+      - ^master$
+    inputs:
+      image: ${{parameters.image_base}}
+      script: |
+        wget -q "${{jobs.build_deb_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.pack_deb_aarch64}}
+        wget -q "${{jobs.build_rel_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.pack_rel_aarch64}}
+
+        ossutil64 cp ${{parameters.pack_deb_aarch64}} ${{parameters.oss_path}}/${{parameters.pack_deb_aarch64}} --update
+        ossutil64 cp ${{parameters.pack_rel_aarch64}} ${{parameters.oss_path}}/${{parameters.pack_rel_aarch64}} --update
+
+  # upload.lib.omp.aarch64:
+  #   stage: UPLOAD
+  #   component: shell
+  #   only:
+  #     - ^master$
+  #   inputs:
+  #     image: ${{parameters.image_base}}
+  #     script: |
+  #       wget -q "${{jobs.build_deb_omp_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.pack_deb_omp_aarch64}}
+  #       wget -q "${{jobs.build_rel_omp_aarch64.outputs.artifacts.target.url}}" -O ${{parameters.pack_rel_omp_aarch64}}
+
+  #       ossutil64 cp ${{parameters.pack_deb_omp_aarch64}} ${{parameters.oss_path}}/${{parameters.pack_deb_omp_aarch64}} --update
+  #       ossutil64 cp ${{parameters.pack_rel_omp_aarch64}} ${{parameters.oss_path}}/${{parameters.pack_rel_omp_aarch64}} --update
+
+notifications:
+  daily.package:
+    type: DINGTALK
+    level: PIPELINE
+    when: FAIL
+    template: ${ACI_PROJECT_NAME} Merge_To_Master FAILED! ${ACI_PIPELINE_URL}
+    channels:
+      - https://oapi.dingtalk.com/robot/send?access_token=7f9e24c8e58f9786e2c48efa1ee912295536636c29672dbb01a75f9221a6c76b
+    only:
+      - ^master$
