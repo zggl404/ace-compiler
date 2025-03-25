@@ -95,7 +95,7 @@ public:
 
   template <typename RETV, typename VISITOR>
   RETV Handle_relu(VISITOR* visitor, air::base::NODE_PTR node) {
-    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+    TENSOR2VECTOR_CTX& ctx    = visitor->Context();
     NODE_PTR           new_ld = visitor->template Visit<RETV>(node->Child(0));
     NODE_PTR           op = visitor->Context().Container()->Clone_node(node);
     op->Set_child(0, new_ld->Id());
@@ -104,7 +104,7 @@ public:
 
   template <typename RETV, typename VISITOR>
   RETV Handle_flatten(VISITOR* visitor, air::base::NODE_PTR node) {
-    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+    TENSOR2VECTOR_CTX& ctx  = visitor->Context();
     CONTAINER*         cntr = ctx.Container();
     TENSOR2VECTOR_UTIL vgen(ctx);
     GLOB_SCOPE*        gscope     = cntr->Glob_scope();
@@ -142,7 +142,7 @@ public:
       AIR_ASSERT(res != NULL_PTR());
     }
 
-    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+    TENSOR2VECTOR_CTX& ctx  = visitor->Context();
     CONTAINER*         cntr = ctx.Container();
     TENSOR2VECTOR_UTIL vgen(ctx);
     GLOB_SCOPE*        gscope   = cntr->Glob_scope();
@@ -415,8 +415,9 @@ public:
                                        conv1_im2col_kernel[index].begin(),
                                        conv1_im2col_kernel[index].end());
               if (num_block > 1)
-                weight_im2col_vec.insert(weight_im2col_vec.end(),
-                                         block_pad.begin(), block_pad.end());
+                weight_im2col_vec.insert(
+                    weight_im2col_vec.end(), conv1_im2col_kernel[index].begin(),
+                    conv1_im2col_kernel[index].begin() + width_block_pad);
             }
           }
         }
@@ -541,7 +542,7 @@ public:
 
   template <typename RETV, typename VISITOR>
   RETV Handle_gemm(VISITOR* visitor, air::base::NODE_PTR node) {
-    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+    TENSOR2VECTOR_CTX& ctx  = visitor->Context();
     CONTAINER*         cntr = ctx.Container();
     TENSOR2VECTOR_UTIL vgen(ctx);
     // TODO: Assuming GEMM:: transB = 1
@@ -746,7 +747,7 @@ public:
   //! @deprecated: will delete later
   template <typename RETV, typename VISITOR>
   RETV Handle_average_pool(VISITOR* visitor, air::base::NODE_PTR node) {
-    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+    TENSOR2VECTOR_CTX& ctx  = visitor->Context();
     CONTAINER*         cntr = ctx.Container();
     TENSOR2VECTOR_UTIL vgen(ctx);
     // TODO: pad for shape consistence.
@@ -850,8 +851,8 @@ public:
   //! @deprecated: will delete later
   template <typename RETV, typename VISITOR>
   RETV Handle_global_average_pool(VISITOR* visitor, air::base::NODE_PTR node) {
-    TENSOR2VECTOR_CTX& ctx = visitor->Context();
-    CONTAINER*  cntr = ctx.Container();
+    TENSOR2VECTOR_CTX& ctx  = visitor->Context();
+    CONTAINER*         cntr = ctx.Container();
     TENSOR2VECTOR_UTIL vgen(ctx);
 
     AIR_ASSERT_MSG(node->Num_child() == 1,

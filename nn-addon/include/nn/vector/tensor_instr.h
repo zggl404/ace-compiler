@@ -43,7 +43,8 @@ public:
       if (_config.Rt_timing()) {
         // instrument for runtime timing
         uint32_t event = Rtt_event(val->Opcode());
-        AIR_ASSERT_MSG(event != air::base::RTM_NONE, "TODO: RTT event for %s", val->Name());
+        AIR_ASSERT_MSG(event != air::base::RTM_NONE, "TODO: RTT event for %s",
+                       val->Name());
         air::base::TIMING_GEN gen(cntr, event, 0, node->Spos());
         Prepend(gen.New_tm_start());
         Append(gen.New_tm_end());

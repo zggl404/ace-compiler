@@ -990,6 +990,18 @@ NODE_PTR TENSOR2VECTOR_UTIL::New_conv_metakernel_fast(
   _ctx.Prepend(grid_loop);
 
   STMT_PTR vadd_bias_stmt;
+  if (num_block > 1) {
+    _ctx.Trace(TF_LOWER, "Reduce_add_intra: Ps=", num_block, "\n");
+    result_var     = Reduce_add_intra(result_var, num_block, width_block_data,
+                                      width_block_pad, spos);
+    vadd_bias_stmt = _cntr->New_st(
+        New_add(_cntr->New_ld(result_var, spos), bias, spos), result_var, spos);
+    _ctx.Prepend(vadd_bias_stmt);
+
+    NODE_PTR ld_result = _cntr->New_ld(result_var, spos);
+    return ld_result;
+  }
+
   if (((channel_in > 1) && (group != channel_in) && !is_cyclic) ||
       (num_slots == output_size)) {
     // Here we get results of all blocks in a vecotr. Reduce it.
