@@ -1,0 +1,328 @@
+
+Starting processing of 9 case(s)
+
+Processing case 1/9: metak_fhelipe_fc_512x512
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_fc_512x512
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 512 +m 512 --root /root/fhelipe_experiments/metak_fhelipe_fc tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/512_512/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::1.21::305984::
+
+TIMING: 1.21s | MEMORY: 298 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_fc_512x512
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 512 +m 512 --root /root/fhelipe_experiments/metak_fhelipe_fc init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 512 +m 512 --root /root/fhelipe_experiments/metak_fhelipe_fc in-shared
+TIME_STATS::2.13::306136::
+
+TIMING: 2.13s | MEMORY: 298 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_fc_512x512 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 512 +m 512 --root /root/fhelipe_experiments/metak_fhelipe_fc init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 512 +m 512 --root /root/fhelipe_experiments/metak_fhelipe_fc in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 512 +m 512 --root /root/fhelipe_experiments/metak_fhelipe_fc backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 512 +m 512 --root /root/fhelipe_experiments/metak_fhelipe_fc out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/512_512/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/512_512/ds/0
+Runtime 35.393537759780884
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/512_512/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/512_512/ds/0 --no_complain
+TIME_STATS::41.14::7452068::
+
+TIMING: 41.14s | MEMORY: 7277 MB
+
+Renamed timing file to metak_fhelipe_fc_512x512_ops_timing.txt
+--------------------------------------------------
+
+Processing case 2/9: metak_fhelipe_fc_1024x4096
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_fc_1024x4096
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 1024 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/1024_4096/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::2.93::312392::
+
+TIMING: 2.93s | MEMORY: 305 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_fc_1024x4096
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 1024 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 1024 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc in-shared
+TIME_STATS::2.14::306032::
+
+TIMING: 2.14s | MEMORY: 298 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_fc_1024x4096 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 1024 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 1024 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 1024 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 1024 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/1024_4096/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/1024_4096/ds/0
+Runtime 414.5941905975342
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/1024_4096/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/1024_4096/ds/0 --no_complain
+TIME_STATS::427.73::13474440::
+
+TIMING: 427.73s | MEMORY: 13158 MB
+
+Renamed timing file to metak_fhelipe_fc_1024x4096_ops_timing.txt
+--------------------------------------------------
+
+Processing case 3/9: metak_fhelipe_fc_4096x4096
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_fc_4096x4096
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/4096_4096/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::10.48::1292672::
+
+TIMING: 10.48s | MEMORY: 1262 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_fc_4096x4096
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc in-shared
+TIME_STATS::2.19::306156::
+
+TIMING: 2.19s | MEMORY: 298 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_fc_4096x4096 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 4096 --root /root/fhelipe_experiments/metak_fhelipe_fc out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/4096_4096/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/4096_4096/ds/0
+Runtime 3060.601247549057
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/4096_4096/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/4096_4096/ds/0 --no_complain
+TIME_STATS::3097.30::22980948::
+
+TIMING: 3097.30s | MEMORY: 22442 MB
+
+Renamed timing file to metak_fhelipe_fc_4096x4096_ops_timing.txt
+--------------------------------------------------
+
+Processing case 4/9: metak_fhelipe_conv_16x16x32x3
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_conv_16x16x32x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 16 +w 32 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_16_32_3_1/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::3.06::306908::
+
+TIMING: 3.06s | MEMORY: 299 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_conv_16x16x32x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 16 +w 32 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 16 +w 32 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-shared
+TIME_STATS::2.16::307276::
+
+TIMING: 2.16s | MEMORY: 300 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_conv_16x16x32x3 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 16 +w 32 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 16 +w 32 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 16 +w 32 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 16 +w 32 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_16_32_3_1/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_16_32_3_1/ds/0
+Runtime 42.25117015838623
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_16_32_3_1/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_16_32_3_1/ds/0 --no_complain
+TIME_STATS::48.87::9438916::
+
+TIMING: 48.87s | MEMORY: 9217 MB
+
+Renamed timing file to metak_fhelipe_conv_16x16x32x3_ops_timing.txt
+--------------------------------------------------
+
+Processing case 5/9: metak_fhelipe_conv_16x32x16x3
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_conv_16x32x16x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_32_16_3_1/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::2.04::307344::
+
+TIMING: 2.04s | MEMORY: 300 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_conv_16x32x16x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-shared
+TIME_STATS::2.18::307388::
+
+TIMING: 2.18s | MEMORY: 300 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_conv_16x32x16x3 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 16 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_32_16_3_1/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_32_16_3_1/ds/0
+Runtime 33.73195457458496
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_32_16_3_1/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/16_32_16_3_1/ds/0 --no_complain
+TIME_STATS::39.65::7941272::
+
+TIMING: 39.65s | MEMORY: 7755 MB
+
+Renamed timing file to metak_fhelipe_conv_16x32x16x3_ops_timing.txt
+--------------------------------------------------
+
+Processing case 6/9: metak_fhelipe_conv_32x32x16x3
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_conv_32x32x16x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_32_16_3_1/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::2.88::307192::
+
+TIMING: 2.88s | MEMORY: 299 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_conv_32x32x16x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-shared
+TIME_STATS::2.16::307324::
+
+TIMING: 2.16s | MEMORY: 300 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_conv_32x32x16x3 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_32_16_3_1/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_32_16_3_1/ds/0
+Runtime 43.85229730606079
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_32_16_3_1/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_32_16_3_1/ds/0 --no_complain
+TIME_STATS::50.40::10395628::
+
+TIMING: 50.40s | MEMORY: 10151 MB
+
+Renamed timing file to metak_fhelipe_conv_32x32x16x3_ops_timing.txt
+--------------------------------------------------
+
+Processing case 7/9: metak_fhelipe_conv_32x64x8x3
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_conv_32x64x8x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_64_8_3_1/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::1.96::307368::
+
+TIMING: 1.96s | MEMORY: 300 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_conv_32x64x8x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-shared
+TIME_STATS::2.20::307252::
+
+TIMING: 2.20s | MEMORY: 300 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_conv_32x64x8x3 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 32 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_64_8_3_1/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_64_8_3_1/ds/0
+Runtime 35.22748064994812
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_64_8_3_1/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/32_64_8_3_1/ds/0 --no_complain
+TIME_STATS::41.14::8322640::
+
+TIMING: 41.14s | MEMORY: 8127 MB
+
+Renamed timing file to metak_fhelipe_conv_32x64x8x3_ops_timing.txt
+--------------------------------------------------
+
+Processing case 8/9: metak_fhelipe_conv_64x64x8x3
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_conv_64x64x8x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 64 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/64_64_8_3_1/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::2.72::307232::
+
+TIMING: 2.72s | MEMORY: 300 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_conv_64x64x8x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 64 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 64 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-shared
+TIME_STATS::2.15::307236::
+
+TIMING: 2.15s | MEMORY: 300 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_conv_64x64x8x3 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 64 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 64 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 64 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 64 +k 64 +w 8 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/64_64_8_3_1/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/64_64_8_3_1/ds/0
+Runtime 45.00810647010803
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/64_64_8_3_1/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/64_64_8_3_1/ds/0 --no_complain
+TIME_STATS::51.52::9433024::
+
+TIMING: 51.52s | MEMORY: 9211 MB
+
+Renamed timing file to metak_fhelipe_conv_64x64x8x3_ops_timing.txt
+--------------------------------------------------
+
+Processing case 9/9: metak_fhelipe_conv_3x32x16x3
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_conv_3x32x16x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 3 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/3_32_16_3_1/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::1.33::307428::
+
+TIMING: 1.33s | MEMORY: 300 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_conv_3x32x16x3
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 3 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 3 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-shared
+TIME_STATS::2.14::307388::
+
+TIMING: 2.14s | MEMORY: 300 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_conv_3x32x16x3 --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 3 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 3 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 3 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/base/conv.py +c 3 +k 32 +w 16 +r 3 --root /root/fhelipe_experiments/metak_fhelipe_conv out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/3_32_16_3_1/ds/0 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/3_32_16_3_1/ds/0
+Runtime 30.919970273971558
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/3_32_16_3_1/ds/0
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/metak_fhelipe_conv/3_32_16_3_1/ds/0 --no_complain
+TIME_STATS::36.36::8038916::
+
+TIMING: 36.36s | MEMORY: 7850 MB
+
+Renamed timing file to metak_fhelipe_conv_3x32x16x3_ops_timing.txt
+
+Processing Summary:
+Successfully processed: 9/9

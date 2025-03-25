@@ -1,0 +1,31 @@
++ python scripts/compile.py --program ace_fhelipe_alexnet
+python /home/fhelipe/fhelipe/frontend/fheapps/alexnet/alexnet.py --root /root/fhelipe_experiments/ace_fhelipe_alexnet tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/ace_fhelipe_alexnet/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+
+real	4m43.550s
+user	4m36.983s
+sys	0m12.959s
++ '[' 0 -ne 0 ']'
++ python scripts/in_shared.py --program ace_fhelipe_alexnet
+python /home/fhelipe/fhelipe/frontend/fheapps/alexnet/alexnet.py --root /root/fhelipe_experiments/ace_fhelipe_alexnet init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/alexnet/alexnet.py --root /root/fhelipe_experiments/ace_fhelipe_alexnet in-shared
+
+real	0m13.979s
+user	0m18.678s
+sys	0m11.617s
++ '[' 0 -ne 0 ']'
++ python scripts/run.py --program ace_fhelipe_alexnet --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/alexnet/alexnet.py --root /root/fhelipe_experiments/ace_fhelipe_alexnet init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/alexnet/alexnet.py --root /root/fhelipe_experiments/ace_fhelipe_alexnet in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/alexnet/alexnet.py --root /root/fhelipe_experiments/ace_fhelipe_alexnet backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/alexnet/alexnet.py --root /root/fhelipe_experiments/ace_fhelipe_alexnet out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_alexnet/ds/0000 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_alexnet/ds/0000
+Runtime 11794.988687753677
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_alexnet/ds/0000
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/ace_fhelipe_alexnet/ds/0000 --no_complain
+
+real	198m32.682s
+user	190m52.895s
+sys	9m49.634s
++ '[' 0 -ne 0 ']'

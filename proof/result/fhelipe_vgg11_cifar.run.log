@@ -1,0 +1,31 @@
++ python scripts/compile.py --program ace_fhelipe_vgg
+python /home/fhelipe/fhelipe/frontend/fheapps/vgg/vgg.py --root /root/fhelipe_experiments/ace_fhelipe_vgg tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/ace_fhelipe_vgg/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+
+real	0m53.692s
+user	0m53.489s
+sys	0m6.755s
++ '[' 0 -ne 0 ']'
++ python scripts/in_shared.py --program ace_fhelipe_vgg
+python /home/fhelipe/fhelipe/frontend/fheapps/vgg/vgg.py --root /root/fhelipe_experiments/ace_fhelipe_vgg init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/vgg/vgg.py --root /root/fhelipe_experiments/ace_fhelipe_vgg in-shared
+
+real	0m7.677s
+user	0m11.457s
+sys	0m11.183s
++ '[' 0 -ne 0 ']'
++ python scripts/run.py --program ace_fhelipe_vgg --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/vgg/vgg.py --root /root/fhelipe_experiments/ace_fhelipe_vgg init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/vgg/vgg.py --root /root/fhelipe_experiments/ace_fhelipe_vgg in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/vgg/vgg.py --root /root/fhelipe_experiments/ace_fhelipe_vgg backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/vgg/vgg.py --root /root/fhelipe_experiments/ace_fhelipe_vgg out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_vgg/ds/0000 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_vgg/ds/0000
+Runtime 4687.1434552669525
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_vgg/ds/0000
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/ace_fhelipe_vgg/ds/0000 --no_complain
+
+real	79m34.204s
+user	76m54.239s
+sys	4m43.641s
++ '[' 0 -ne 0 ']'

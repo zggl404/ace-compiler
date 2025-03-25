@@ -1,0 +1,110 @@
++ export RTLIB_TIMING_OUTPUT=-
++ RTLIB_TIMING_OUTPUT=-
++ export OMP_NUM_THREADS=1
++ OMP_NUM_THREADS=1
++ export RTLIB_BTS_EVEN_POLY=1
++ RTLIB_BTS_EVEN_POLY=1
++ TEST=vgg11_imagenet
++ ID=ace
+++ pwd
++ WRK_DIR=/app/release
++ VEC_OPT=-VEC:ms=32768:gemmf:convf:ssf:conv_parl:sharding:rtt
++ SIHE_OPT=-SIHE:relu_vr_def=100:rtt
++ CKKS_OPT=-CKKS:hw=192:q0=60:sf=56:N=65536:icl=4:pots:rtt
++ POLY_OPT=-POLY:rtt
++ P2C_OPT=-P2C:df=/app/release/vgg11_imagenet.ace.bin:fp
++ timed_run ./driver/fhe_cmplr -VEC:ms=32768:gemmf:convf:ssf:conv_parl:sharding:rtt -SIHE:relu_vr_def=100:rtt -CKKS:hw=192:q0=60:sf=56:N=65536:icl=4:pots:rtt -POLY:rtt -P2C:df=/app/release/vgg11_imagenet.ace.bin:fp ../metak/vgg11_imagenet.onnx
++ '[' -e /usr/bin/time ']'
++ ./driver/fhe_cmplr -VEC:ms=32768:gemmf:convf:ssf:conv_parl:sharding:rtt -SIHE:relu_vr_def=100:rtt -CKKS:hw=192:q0=60:sf=56:N=65536:icl=4:pots:rtt -POLY:rtt -P2C:df=/app/release/vgg11_imagenet.ace.bin:fp ../metak/vgg11_imagenet.onnx
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:534: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+/app/air-infra/base/src/node.cxx:524: Assertion Failure: Do not call this API to change rtype.
+
+real	13m31.039s
+user	4m4.542s
+sys	8m27.387s
++ RET=0
++ return 0
++ '[' 0 -ne 0 ']'
++ mv vgg11_imagenet.t vgg11_imagenet.ace.ckks.log
++ cp vgg11_imagenet.onnx.c vgg11_imagenet.ace.onnx.c
++ HOST_DEF=-DRTLIB_SUPPORT_LINUX
++ HOST_INC='-I../fhe-cmplr/rtlib/include -I../fhe-cmplr/rtlib/ant/include -Irtlib/build/_deps/uthash-src/src -I../air-infra/include -I../nn-addon/include -I../fhe-cmplr/include'
++ HOST_LIBS='-L./rtlib/build/common -L./rtlib/build/ant -lFHErt_ant -lFHErt_common -lgmp -lm'
++ HOST_SRCS='../metak/vgg11_imagenet.main.c vgg11_imagenet.onnx.c'
++ timed_run gcc -DRTLIB_SUPPORT_LINUX -I../fhe-cmplr/rtlib/include -I../fhe-cmplr/rtlib/ant/include -Irtlib/build/_deps/uthash-src/src -I../air-infra/include -I../nn-addon/include -I../fhe-cmplr/include ../metak/vgg11_imagenet.main.c vgg11_imagenet.onnx.c -L./rtlib/build/common -L./rtlib/build/ant -lFHErt_ant -lFHErt_common -lgmp -lm -o vgg11_imagenet.ace
++ '[' -e /usr/bin/time ']'
++ gcc -DRTLIB_SUPPORT_LINUX -I../fhe-cmplr/rtlib/include -I../fhe-cmplr/rtlib/ant/include -Irtlib/build/_deps/uthash-src/src -I../air-infra/include -I../nn-addon/include -I../fhe-cmplr/include ../metak/vgg11_imagenet.main.c vgg11_imagenet.onnx.c -L./rtlib/build/common -L./rtlib/build/ant -lFHErt_ant -lFHErt_common -lgmp -lm -o vgg11_imagenet.ace
+
+real	0m1.102s
+user	0m1.020s
+sys	0m0.076s
++ RET=0
++ return 0
++ '[' 0 -ne 0 ']'
++ timed_run ./vgg11_imagenet.ace

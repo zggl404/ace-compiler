@@ -1,0 +1,31 @@
++ python scripts/compile.py --program ace_fhelipe_resnet
+python /home/fhelipe/fhelipe/frontend/fheapps/resnet/ace_resnet.py --root /root/fhelipe_experiments/ace_fhelipe_resnet tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/ace_fhelipe_resnet/20_40/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+
+real	0m39.508s
+user	0m37.640s
+sys	0m6.367s
++ '[' 0 -ne 0 ']'
++ python scripts/in_shared.py --program ace_fhelipe_resnet
+python /home/fhelipe/fhelipe/frontend/fheapps/resnet/ace_resnet.py --root /root/fhelipe_experiments/ace_fhelipe_resnet init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/resnet/ace_resnet.py --root /root/fhelipe_experiments/ace_fhelipe_resnet in-shared
+
+real	0m2.685s
+user	0m4.364s
+sys	0m10.784s
++ '[' 0 -ne 0 ']'
++ python scripts/run.py --program ace_fhelipe_resnet --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/resnet/ace_resnet.py --root /root/fhelipe_experiments/ace_fhelipe_resnet init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/resnet/ace_resnet.py --root /root/fhelipe_experiments/ace_fhelipe_resnet in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/resnet/ace_resnet.py --root /root/fhelipe_experiments/ace_fhelipe_resnet backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/resnet/ace_resnet.py --root /root/fhelipe_experiments/ace_fhelipe_resnet out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_resnet/20_40/ds/0000 --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_resnet/20_40/ds/0000
+Runtime 1905.050575017929
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_resnet/20_40/ds/0000
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/ace_fhelipe_resnet/20_40/ds/0000 --no_complain
+
+real	99m54.894s
+user	32m3.238s
+sys	2m36.663s
++ '[' 0 -ne 0 ']'

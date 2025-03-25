@@ -1,0 +1,31 @@
++ python scripts/compile.py --program ace_fhelipe_squeezenet
+python /home/fhelipe/fhelipe/frontend/fheapps/squeezenet/squeezenet_relu.py --root /root/fhelipe_experiments/ace_fhelipe_squeezenet tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/ace_fhelipe_squeezenet/shared --bootstrapping_precision 19 --log_scale 35 --usable_levels 10
+
+real	0m39.074s
+user	0m38.946s
+sys	0m6.289s
++ '[' 0 -ne 0 ']'
++ python scripts/in_shared.py --program ace_fhelipe_squeezenet
+python /home/fhelipe/fhelipe/frontend/fheapps/squeezenet/squeezenet_relu.py --root /root/fhelipe_experiments/ace_fhelipe_squeezenet init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/squeezenet/squeezenet_relu.py --root /root/fhelipe_experiments/ace_fhelipe_squeezenet in-shared
+
+real	0m2.897s
+user	0m5.015s
+sys	0m10.921s
++ '[' 0 -ne 0 ']'
++ python scripts/run.py --program ace_fhelipe_squeezenet --lattigo
+python /home/fhelipe/fhelipe/frontend/fheapps/squeezenet/squeezenet_relu.py --root /root/fhelipe_experiments/ace_fhelipe_squeezenet init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/squeezenet/squeezenet_relu.py --root /root/fhelipe_experiments/ace_fhelipe_squeezenet in-ds --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/squeezenet/squeezenet_relu.py --root /root/fhelipe_experiments/ace_fhelipe_squeezenet backend-in --ds 0
+python /home/fhelipe/fhelipe/frontend/fheapps/squeezenet/squeezenet_relu.py --root /root/fhelipe_experiments/ace_fhelipe_squeezenet out-tfhe --ds 0
+/home/fhelipe/fhelipe/backend/release/encrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_squeezenet/ds/0000 --bootstrapping_precision 19 --log_scale 35 --usable_levels 10
+/home/fhelipe/fhelipe/backend/release/run --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_squeezenet/ds/0000
+Runtime 2377.2492365837097
+/home/fhelipe/fhelipe/backend/release/decrypt --ct_type lattigo --exe_folder /root/fhelipe_experiments/ace_fhelipe_squeezenet/ds/0000
+/home/fhelipe/fhelipe/backend/release/cross_check --exe_folder /root/fhelipe_experiments/ace_fhelipe_squeezenet/ds/0000 --no_complain
+
+real	40m9.343s
+user	38m37.940s
+sys	3m3.345s
++ '[' 0 -ne 0 ']'
