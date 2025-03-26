@@ -1,0 +1,23 @@
+
+Starting processing of 1 case(s)
+
+Processing case 1/1: metak_fhelipe_fc_4096x25088
+
+[PHASE] Source Compilation
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/compile.py --program metak_fhelipe_fc_4096x25088
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 25088 --root /root/fhelipe_experiments/metak_fhelipe_fc tdf
+/home/fhelipe/fhelipe/backend/release/compile --sched_dfg --exe_folder /root/fhelipe_experiments/metak_fhelipe_fc/4096_25088/shared --bootstrapping_precision 19 --log_scale 45 --usable_levels 10
+TIME_STATS::882.63::15682736::
+
+TIMING: 882.63s | MEMORY: 15315 MB
+
+[PHASE] Shared Memory Initialization
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/in_shared.py --program metak_fhelipe_fc_4096x25088
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 25088 --root /root/fhelipe_experiments/metak_fhelipe_fc init-shared
+python /home/fhelipe/fhelipe/frontend/fheapps/base/fc.py +n 4096 +m 25088 --root /root/fhelipe_experiments/metak_fhelipe_fc in-shared
+TIME_STATS::2.23::305936::
+
+TIMING: 2.23s | MEMORY: 298 MB
+
+[PHASE] Execution with Lattigo
+Executing: stdbuf -o0 /usr/bin/time -f TIME_STATS::%e::%M:: python -u scripts/run.py --program metak_fhelipe_fc_4096x25088 --lattigo
