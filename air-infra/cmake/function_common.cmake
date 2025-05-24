@@ -50,7 +50,7 @@ function(check_program PROGRAM_NAME VARIABLE_NAME)
   if(NOT ${VARIABLE_NAME})
     message(FATAL_ERROR "${PROGRAM_NAME} not found!")
   else()
-    message(STATUS "Found ${PROGRAM_NAME}                 : ${${VARIABLE_NAME}}")
+    message(STATUS "Found ${PROGRAM_NAME}                  : ${${VARIABLE_NAME}}")
     set(PYTHON_EXECUTABLE ${PYTHON_EXECUTABLE} CACHE STRING "Global common execute of python")
   endif()
 endfunction()
@@ -144,7 +144,7 @@ function(gen_errmsg program)
     WORKING_DIRECTORY ${USER_MSG_PATH}
     COMMAND ${program} err_msg.py -i ${INC_H_DIR}  -s ${INC_C_DIR}
     DEPENDS ${USER_MSG_PATH}/err_msg.yml ${USER_MSG_PATH}/user_define.yml
-    COMMENT "Generate a customized error message file ..."
+    COMMENT "Generating files for 'customized error message'"
   )
   include_directories(${CMAKE_BINARY_DIR}/include)
 
@@ -173,7 +173,7 @@ function(gen_option program target OUTPUT_DIR INPUT_DIR)
     WORKING_DIRECTORY ${INC_CXX_DIR}
     COMMAND ${program} ${OPTION_PATH}/option_generator.py -ip ${OPTION_CONFIG_PATH}/option.yml
     DEPENDS ${OPTION_CONFIG_PATH}/option.yml
-    COMMENT "Generate option file ..."
+    COMMENT "Generating files for 'customized option'"
   )
 
   add_custom_target(${target} ALL DEPENDS ${INC_H_DIR}/option_config.h ${INC_CXX_DIR}/option_config.inc)
@@ -188,7 +188,7 @@ function(gen_domain_od GENERATE_SCRIPT INPUT_FILE OUTPUT_DIR DOMAIN)
   assert("${INPUT_FILE}" "INPUT_FILE can't be empty")
   assert("${OUTPUT_DIR}" "OUTPUT_DIR can't be empty")
 
-  set(OUTPUT_FILE "${OUTPUT_DIR}/opcode.cxx;${OUTPUT_DIR}/opcode.h")
+  set(OUTPUT_FILE "${OUTPUT_DIR}/opcode.cxx;${OUTPUT_DIR}/opcode.h;${OUTPUT_DIR}/${DOMAIN}_binding.h")
   string(REPLACE ";" " " VAR_OUTPUT "${OUTPUT_FILE}")
 
   add_custom_command(
@@ -199,7 +199,7 @@ function(gen_domain_od GENERATE_SCRIPT INPUT_FILE OUTPUT_DIR DOMAIN)
       DEPENDS ${INPUT_FILE} ${GENERATE_SCRIPT}
       COMMENT "Running customized domain opcode generation script for ${DOMAIN}"
   )
-  add_custom_target(${DOMAIN} ALL DEPENDS "${OUTPUT_FILE}")
+  add_custom_target(${DOMAIN}_od ALL DEPENDS "${OUTPUT_FILE}")
 
   install(DIRECTORY ${CMAKE_BINARY_DIR}/include/ DESTINATION include)
 endfunction()

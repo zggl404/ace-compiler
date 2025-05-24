@@ -98,6 +98,10 @@ public:
         _os << ", 0, sizeof(";
         Emit_preg_id((*it)->Id());
         _os << "));" << std::endl;
+      } else if (Is_poly_type(type)) {
+        _os << "  Alloc_lpoly_data(&";
+        Emit_preg_id((*it)->Id());
+        _os << ", degree);" << std::endl;
       }
     }
   }

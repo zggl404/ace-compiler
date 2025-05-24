@@ -793,6 +793,8 @@ void AIRSTMTGEN::Parse_attributes_for_max_pool(onnx::NodeProto* node) {
   for (const auto& a : node->attribute()) {
     if (a.name() == "ceil_mode" || a.name() == "count_include_pad")
       _attributes_for_int[a.name()] = Parse_attribute_int(a);
+    else if (a.name() == "dilations")
+      _attributes_for_ints[a.name()] = Parse_attribute_ints(a);
     else if (a.name() == "kernel_shape")
       _attributes_for_ints[a.name()] = Parse_attribute_ints(a);
     else if (a.name() == "pads")

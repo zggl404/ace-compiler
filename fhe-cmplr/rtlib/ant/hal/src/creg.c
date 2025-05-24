@@ -80,3 +80,10 @@ int64_t Gen_autou_creg(int32_t rot_idx, uint64_t poly_degree, bool mode) {
   uint64_t k  = mode ? 0 : (g >> 1);
   return DSA_CR_AUTOU_TO_LONG_LONG(g, k, mode);
 }
+
+MODULUS* Ldmod(uint64_t* qmuk_data, size_t idx) {
+  size_t   q_cnt = Get_q_cnt();
+  MODULUS* mod = idx < q_cnt ? Q_modulus() + idx : P_modulus() + (idx - q_cnt);
+  FMT_ASSERT(qmuk_data[0] == Get_mod_val(mod), "mod_val mismatch");
+  return mod;
+}

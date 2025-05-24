@@ -153,7 +153,7 @@ public:
     Emit_type(type->Elem_type(), true);
     _os << " ";
     Emit_constant_id(cst->Id());
-    _os << "[" << Emit_arb(type, true) << "]";
+    Emit_arb(type, false);
     if (decl_only) {
       _os << ";" << std::endl;
       return;

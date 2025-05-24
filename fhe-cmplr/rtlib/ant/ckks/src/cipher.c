@@ -446,3 +446,122 @@ CIPHER Encrypt(CIPHER res, PLAIN plain) {
   Encrypt_msg(res, (CKKS_ENCRYPTOR*)Context->_encryptor, plain);
   return res;
 }
+
+L_POLY Lpoly_from_ciph(CIPHER ciph, size_t idx) {
+  size_t num_pq = Get_ciph_num_pq(ciph);
+  FMT_ASSERT(idx < 2 * num_pq, "invalid idx");
+  POLY   tmp_poly;
+  size_t poly_idx;
+  if (idx < num_pq) {
+    // get lpoly from c0
+    tmp_poly = Get_c0(ciph);
+    poly_idx = idx;
+  } else {
+    // get lpoly from c1
+    tmp_poly = Get_c1(ciph);
+    poly_idx = idx - num_pq;
+  }
+  // init lpoly from rns_poly of ciph
+  L_POLY poly;
+  size_t degree = Degree();
+  Init_lpoly_data(&poly, degree, Coeffs(tmp_poly, poly_idx, degree));
+  Set_lpoly_ntt(&poly, Is_ntt(tmp_poly));
+  return poly;
+}
+
+L_POLY Lpoly_from_ciph3(CIPHER3 ciph, size_t idx) {
+  size_t num_pq = Get_ciph3_num_pq(ciph);
+  FMT_ASSERT(idx < 3 * num_pq, "invalid idx");
+  POLY   tmp_poly;
+  size_t poly_idx;
+  if (idx < num_pq) {
+    tmp_poly = Get_ciph3_c0(ciph);
+    poly_idx = idx;
+  } else if (idx < 2 * num_pq) {
+    tmp_poly = Get_ciph3_c1(ciph);
+    poly_idx = idx - num_pq;
+  } else {
+    tmp_poly = Get_ciph3_c2(ciph);
+    poly_idx = idx - 2 * num_pq;
+  }
+  // init lpoly from rns_poly of ciph
+  L_POLY poly;
+  size_t degree = Degree();
+  Init_lpoly_data(&poly, degree, Coeffs(tmp_poly, poly_idx, degree));
+  Set_lpoly_ntt(&poly, Is_ntt(tmp_poly));
+  return poly;
+}
+
+void Set_ciph_data(CIPHER ciph, L_POLY poly, size_t idx) {
+  size_t num_pq = Get_ciph_num_pq(ciph);
+  FMT_ASSERT(idx < 2 * num_pq, "invalid idx");
+  POLY   tmp_poly;
+  size_t poly_idx;
+  if (idx < num_pq) {
+    tmp_poly = Get_c0(ciph);
+    poly_idx = idx;
+  } else {
+    tmp_poly = Get_c1(ciph);
+    poly_idx = idx - num_pq;
+  }
+  FMT_ASSERT(Get_poly_coeffs(tmp_poly), "invalid coeffs");
+  Set_coeffs(tmp_poly, poly_idx, Degree(), Get_lpoly_coeffs(&poly));
+  Set_is_ntt(tmp_poly, Is_lpoly_ntt(&poly));
+}
+
+void Set_ciph3_data(CIPHER3 ciph, L_POLY poly, size_t idx) {
+  size_t num_pq = Get_ciph3_num_pq(ciph);
+  FMT_ASSERT(idx < 3 * num_pq, "invalid idx");
+  POLY   tmp_poly;
+  size_t poly_idx;
+  if (idx < num_pq) {
+    tmp_poly = Get_ciph3_c0(ciph);
+    poly_idx = idx;
+  } else if (idx < 2 * num_pq) {
+    tmp_poly = Get_ciph3_c1(ciph);
+    poly_idx = idx - num_pq;
+  } else {
+    tmp_poly = Get_ciph3_c2(ciph);
+    poly_idx = idx - 2 * num_pq;
+  }
+  FMT_ASSERT(Get_poly_coeffs(tmp_poly), "invalid coeffs");
+  Set_coeffs(tmp_poly, poly_idx, Degree(), Get_lpoly_coeffs(&poly));
+  Set_is_ntt(tmp_poly, Is_lpoly_ntt(&poly));
+}
+
+void Reset_ciph(CIPHER ciph, size_t level) {
+  FMT_ASSERT(Get_ciph_prime_p_cnt(ciph) == 0, "unsupport ciph with expanded");
+  size_t q_cnt = Get_ciph_prime_cnt(ciph);
+  FMT_ASSERT(level <= q_cnt, "level overflow");
+  if (level == q_cnt) return;
+  // step1: perform memory rearrangement of c0 & c1
+  size_t   degree      = Get_ciph_degree(ciph);
+  size_t   cur_level   = Get_ciph_num_pq(ciph);
+  size_t   copy_size   = sizeof(int64_t) * degree;
+  int64_t* c0_data     = (int64_t*)malloc(copy_size * level);
+  int64_t* c1_data     = (int64_t*)malloc(copy_size * level);
+  int64_t* old_c0_data = Get_poly_coeffs(Get_c0(ciph));
+  int64_t* old_c1_data = Get_poly_coeffs(Get_c1(ciph));
+  bool     is_ntt      = Is_ntt(Get_c0(ciph));
+  // copy poly data to c0
+  memcpy(c0_data, old_c0_data, copy_size * level);
+  // copy poly data to c1
+  if (2 * level <= cur_level) {
+    memcpy(c1_data, old_c0_data + level * degree, copy_size * level);
+  } else {
+    memcpy(c1_data, old_c0_data + level * degree,
+           (cur_level - level) * copy_size);
+    memcpy(c1_data + (cur_level - level) * degree, old_c1_data,
+           (2 * level - cur_level) * copy_size);
+  }
+  free(old_c0_data);
+  free(old_c1_data);
+  Init_poly_data(Get_c0(ciph), degree, level, 0, c0_data);
+  Init_poly_data(Get_c1(ciph), degree, level, 0, c1_data);
+  Set_is_ntt(Get_c0(ciph), is_ntt);
+  Set_is_ntt(Get_c1(ciph), is_ntt);
+  // step2: modswtich ciph to the final level
+  for (size_t i = Get_ciph_prime_cnt(ciph); i > level; i--) {
+    Modswitch_ciph(ciph);
+  }
+}

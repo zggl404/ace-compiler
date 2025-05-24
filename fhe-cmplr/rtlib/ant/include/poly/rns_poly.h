@@ -10,6 +10,7 @@
 #define RTLIB_INCLUDE_POLY_EVAL_H
 
 #include "context/ckks_context.h"
+#include "lpoly/poly.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -115,6 +116,24 @@ static inline void Alloc_poly_data(POLY poly, uint32_t ring_degree,
   poly->_data       = (int64_t*)malloc(alloc_size);
   poly->_is_ntt     = FALSE;
   memset(poly->_data, 0, alloc_size);
+}
+
+//! @brief Initialize polynomial with given parameters
+//! @param poly polynomial to be initialized
+//! @param ring_degree ring degree of polynomial
+//! @param num_primes number of q primes
+//! @param num_primes_p number of p primes
+//! @param data init value
+static inline void Init_poly_data(POLYNOMIAL* poly, uint32_t ring_degree,
+                                  size_t num_primes, size_t num_primes_p,
+                                  int64_t* data) {
+  poly->_ring_degree  = ring_degree;
+  poly->_num_primes   = num_primes;
+  poly->_num_primes_p = num_primes_p;
+  poly->_data         = data;
+  if (poly->_num_alloc_primes == 0)
+    poly->_num_alloc_primes = num_primes + num_primes_p;
+  poly->_is_ntt = FALSE;
 }
 
 //! @brief Cleanup data of polynomial
@@ -435,6 +454,18 @@ void Print_poly_rawdata(FILE* fp, POLY poly);
 //! @param fp output
 //! @param poly given polynomial
 void Print_poly(FILE* fp, POLY poly);
+
+// APIs for lpoly2c
+//! @brief Get lpoly from rns_poly at given idx
+//! need free data by Free_lpoly_data().
+L_POLY Lpoly_from_poly(POLY poly, size_t idx);
+
+//! @brief Get lpoly from array of rns_poly at given idx
+//! need free data by Free_lpoly_data().
+L_POLY Lpoly_from_poly_arr(size_t size, POLY_ARR poly_arr, size_t idx);
+
+//! @brief Set poly data with given lpoly & idx
+void Set_poly_data(POLY poly, L_POLY lpoly, size_t idx);
 
 #ifdef __cplusplus
 }

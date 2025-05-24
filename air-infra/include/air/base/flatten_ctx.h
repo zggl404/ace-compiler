@@ -17,6 +17,7 @@ namespace air {
 namespace base {
 
 //! @brief Context for flatten pass
+template <typename TU>
 class FLATTEN_CTX : public TRANSFORM_CTX {
 public:
   //! @brief Construct a new FLATTEN CTX object with container for new NODE
@@ -42,7 +43,7 @@ public:
       NODE_PTR child = Get_node_ptr(retv);
       if (!(node->Is_st() && (node->Has_sym() || node->Has_preg())) &&
           node->Num_child() > 0 && _flatten_func(child)) {
-        TRANSFORM_UTIL util;
+        TU util;
         child = util.Flatten_node(visitor, child);
       }
       n_node->Set_child(i, child);

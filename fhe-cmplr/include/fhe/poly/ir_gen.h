@@ -425,6 +425,9 @@ public:
   //! @brief Create a new polynomial preg
   CONST_VAR New_poly_preg();
 
+  //! @brief Create a new ciphertext preg
+  CONST_VAR New_ciph_preg();
+
   //! @brief Get poly field from var at given field id
   //! @param var CIPHER/CIPHER3/PLAIN variable
   //! @param fld_id field id
@@ -503,6 +506,9 @@ public:
   //! @brief Get start RNS basis index
   uint32_t Get_sbase(air::base::NODE_PTR node);
 
+  //! @brief Get scaling factor degree
+  uint32_t Get_sf_deg(air::base::NODE_PTR node);
+
   //! @brief Check if the RNS_POLY/POLY with coefficient mode
   //! RNS_POLY/POLY can hold either NTT or COEFF MODE.
   //! The MODE switching happens at at NTT/INTT operations
@@ -516,6 +522,9 @@ public:
 
   //! @brief Set node SBASE attribute
   void Set_sbase(air::base::NODE_PTR node, uint32_t idx);
+
+  //! @brief Set node SCALE attribute
+  void Set_sf_deg(air::base::NODE_PTR node, uint32_t sf_deg);
 
   //! @brief Set node COEFF_MODE attribute
   void Set_coeff_mode(air::base::NODE_PTR node, uint32_t value);

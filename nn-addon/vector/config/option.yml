@@ -14,9 +14,6 @@ group:
   separator: ":"
   value_maker: "="
   option:
-    - name: conv_fast
-      abbrev_name: convf
-      description: enable conv fast lowering strategy
     - name: conv_parallel
       abbrev_name: conv_parl
       description: enable conv parallel lowering strategy
@@ -29,12 +26,9 @@ group:
     - name: mask_fuse
       abbrev_name: mf
       description: enable mask fusion optimization strategy
-    - name: gemm_fast
-      abbrev_name: gemmf
-      description: enable gemm fast lowering strategy
     - name: improve_ss_insert
       abbrev_name: issi
-      description: improve stride slice insert
+      description: improve stride slice test
     - name: max_slots
       abbrev_name: ms
       description: set max available slots
@@ -52,10 +46,10 @@ group:
       description: Opeartor sharding
     - name: selective_ss
       abbrev_name: sss
-      description: fuse strided_slice
+      description: improve stride slice test
     - name: stride_slice_fast
       abbrev_name: ssf
-      description: enable strided_slice fast
+      description: enable fast version strided_slice
     - name: two_level_ss
       abbrev_name: tlss
       description: enable 2 level strided_slice which is suitable for scenarios where the input height and width are small

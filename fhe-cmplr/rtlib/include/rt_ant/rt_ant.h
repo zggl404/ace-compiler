@@ -16,8 +16,8 @@
 
 #include "common/pt_mgr.h"
 #include "common/rt_stat.h"
-#include "common/tensor.h"
 #include "common/rtlib_timing.h"
+#include "common/tensor.h"
 #include "rt_ant/ant_api.h"
 #include "rt_ant/rt_api.h"
 #include "rt_ant/rt_def.h"

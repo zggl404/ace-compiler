@@ -1,0 +1,112 @@
+version: "2.0"
+
+stages:
+  - META
+  - CHECK_SINGLE
+  - CHECK_GROUP
+
+components:
+  ace-check:
+    kind: agent
+    inputs:
+      arch:
+        description: 'arch'
+        defaultValue: x86_64
+      image:
+        description: 'imageBuild'
+        defaultValue: ${{jobs.meta.outputs.metadata.imageBuild}}
+      branch:
+        description: 'branch'
+        defaultValue: ${{vcs.ref}}
+      token:
+        description: 'tokenCI'
+        defaultValue: ${{secrets.ciToken}}
+      option:
+        description: 'buildOptions'
+        defaultValue: ''
+      parall:
+        description: 'parallNum'
+        defaultValue: 40
+    execute:
+      agent:
+        arch: ${{inputs.arch}}
+        container:
+          image: ${{inputs.image}}
+        resourceClass: L
+      steps:
+        - name: shell
+          displayName: 'CLONE'
+          with:
+            script: |
+              git clone -b ${{inputs.branch}} https://git:${{inputs.token}}@code.alipay.com/air-infra/air-infra.git
+        - name: shell
+          displayName: 'BUILD'
+          with:
+            script: |
+              cmake -S air-infra -B build ${{inputs.option}}
+              cmake --build build -- -j ${{inputs.parall}}
+        # - name: shell
+        #   displayName: 'CTEST'
+        #   with:
+        #     script: |
+        #       cmake --build build --target test
+        - name: shell
+          displayName: 'INSTALL'
+          with:
+            script: |
+              cmake --install build --prefix install
+
+
+jobs:
+  meta:
+    stage: META
+    id: meta
+    component: aci-metadata
+  config:
+    stage: META
+    id: config
+    component: aci-metadata
+    inputs:
+      key: app
+
+  CMAKE_BUILD_TYPE=Debug:
+    stage: CHECK_SINGLE
+    component: ace-check
+    inputs:
+      option: -DCMAKE_BUILD_TYPE=Debug
+  BUILD_UNITTEST=OFF:
+    stage: CHECK_SINGLE
+    component: ace-check
+    inputs:
+      option: -DBUILD_UNITTEST=OFF
+  BUILD_BENCH=OFF:
+    stage: CHECK_SINGLE
+    component: ace-check
+    inputs:
+      option: -DBUILD_BENCH=OFF
+  AIR_BUILD_TEST=OFF:
+    stage: CHECK_SINGLE
+    component: ace-check
+    inputs:
+      option: -DAIR_BUILD_TEST=OFF
+  AIR_BUILD_EXAMPLE=OFF:
+    stage: CHECK_SINGLE
+    component: ace-check
+    inputs:
+      option: -DAIR_BUILD_EXAMPLE=OFF
+  AIR_INSTALL_APP=OFF:
+    stage: CHECK_SINGLE
+    component: ace-check
+    inputs:
+      option: -DAIR_INSTALL_APP=OFF
+  GNinja:
+    stage: CHECK_SINGLE
+    component: ace-check
+    inputs:
+      option: -GNinja
+
+  GROUP_OPTIONS_01:
+    stage: CHECK_GROUP
+    component: ace-check
+    inputs:
+      option: -DBUILD_SHARED=OFF -DBUILD_UNITTEST=OFF -DBUILD_BENCH=OFF -DAIR_BUILD_TEST=OFF -DAIR_BUILD_EXAMPLE=OFF -DAIR_INSTALL_APP=OFF

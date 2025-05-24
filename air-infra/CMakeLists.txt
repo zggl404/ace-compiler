@@ -43,8 +43,8 @@ list(APPEND CMAKE_MODULE_PATH
 read_package_config(${PROJECT_SOURCE_DIR})
 set(PACKAGE_VERSION
   ${PACKAGE_VERSION_MAJOR}.${PACKAGE_VERSION_MINOR}.${PACKAGE_VERSION_PATCH})
-message(STATUS "PACKAGE_NAME                  : ${PACKAGE_NAME}")
-message(STATUS "PACKAGE_VERION                : ${PACKAGE_VERSION}")
+message(STATUS "PACKAGE_NAME                   : ${PACKAGE_NAME}")
+message(STATUS "PACKAGE_VERION                 : ${PACKAGE_VERSION}")
 
 set_package_env(${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
     ${PROJECT_SOURCE_DIR}/devtools)
@@ -82,20 +82,20 @@ else()
 endif()
 
 ### Print options
-message(STATUS "PROJECT_SOURCE_DIR            : ${PROJECT_SOURCE_DIR}")
-message(STATUS "CMAKE_BUILD_TYPE              : ${CMAKE_BUILD_TYPE}")
-message(STATUS "BUILD_STATIC                  : ${BUILD_STATIC}")
-message(STATUS "BUILD_SHARED                  : ${BUILD_SHARED}")
-message(STATUS "BUILD_UNITTEST                : ${BUILD_UNITTEST}")
-message(STATUS "BUILD_BENCH                   : ${BUILD_BENCH}")
-message(STATUS "BUILD_DOC                     : ${BUILD_DOC}")
-message(STATUS "AIR_CODE_CHECK                : ${AIR_CODE_CHECK}")
-message(STATUS "AIR_BUILD_TEST                : ${AIR_BUILD_TEST}")
-message(STATUS "AIR_BUILD_EXAMPLE             : ${AIR_BUILD_EXAMPLE}")
-message(STATUS "AIR_INSTALL_APP               : ${AIR_INSTALL_APP}")
-message(STATUS "BUILD_TCM                     : ${BUILD_TCM}")
-message(STATUS "BUILD_TIMESTAMP               : ${BUILD_TIMESTAMP}")
-message(STATUS "BUILD_GIT_COMMIT              : ${BUILD_GIT_COMMIT}")
+message(STATUS "PROJECT_SOURCE_DIR             : ${PROJECT_SOURCE_DIR}")
+message(STATUS "CMAKE_BUILD_TYPE               : ${CMAKE_BUILD_TYPE}")
+message(STATUS "BUILD_STATIC                   : ${BUILD_STATIC}")
+message(STATUS "BUILD_SHARED                   : ${BUILD_SHARED}")
+message(STATUS "BUILD_UNITTEST                 : ${BUILD_UNITTEST}")
+message(STATUS "BUILD_BENCH                    : ${BUILD_BENCH}")
+message(STATUS "BUILD_DOC                      : ${BUILD_DOC}")
+message(STATUS "AIR_CODE_CHECK                 : ${AIR_CODE_CHECK}")
+message(STATUS "AIR_BUILD_TEST                 : ${AIR_BUILD_TEST}")
+message(STATUS "AIR_BUILD_EXAMPLE              : ${AIR_BUILD_EXAMPLE}")
+message(STATUS "AIR_INSTALL_APP                : ${AIR_INSTALL_APP}")
+message(STATUS "BUILD_TCM                      : ${BUILD_TCM}")
+message(STATUS "BUILD_TIMESTAMP                : ${BUILD_TIMESTAMP}")
+message(STATUS "BUILD_GIT_COMMIT               : ${BUILD_GIT_COMMIT}")
 
 #--------------------------------------------------------------------
 # Logic: Configure
@@ -163,7 +163,8 @@ set_air_lib()
 # add glob depends for allair
 add_custom_target(allair DEPENDS air_depend)
 
-if(AIR_BUILD_TEST)
+# enable ctest
+if(AIR_BUILD_TEST OR AIR_BUILD_EXAMPLE OR BUILD_UNITTEST OR BUILD_BENCH)
   enable_testing()
 endif()
 

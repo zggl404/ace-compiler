@@ -170,8 +170,8 @@ public:
     int              group  = groups[0];
     // Only support depthwise convolution for group>1
     if (group > 1) {
-      AIR_ASSERT_MSG((channel_in == group) && ctx.Conv_fast(),
-                     "depthwise convolution: channel_in == group && Conv_fast");
+      AIR_ASSERT_MSG((channel_in == group),
+                     "depthwise convolution: channel_in == group");
     } else {
       AIR_ASSERT_MSG(channel_in == channel_in_kernel,
                      "channel_in == channel_in_kernel");
@@ -339,7 +339,7 @@ public:
     // conv1 = input[input_size] "X" conv1_im2col_kernel[channel_in*kernel_size,
     // output_size] with "ra" rotation alignment.
 
-    bool    flag_conv_fast = (ctx.Conv_fast() && (channel_out >= channel_in));
+    bool    flag_conv_fast = (channel_out >= channel_in);
     int64_t output_size    = channel_out * input_height * input_width;
     int64_t input_size     = channel_in * input_height * input_width;
 
@@ -415,9 +415,8 @@ public:
                                        conv1_im2col_kernel[index].begin(),
                                        conv1_im2col_kernel[index].end());
               if (num_block > 1)
-                weight_im2col_vec.insert(
-                    weight_im2col_vec.end(), conv1_im2col_kernel[index].begin(),
-                    conv1_im2col_kernel[index].begin() + width_block_pad);
+                weight_im2col_vec.insert(weight_im2col_vec.end(),
+                                         block_pad.begin(), block_pad.end());
             }
           }
         }
@@ -570,7 +569,7 @@ public:
     NODE_PTR new_bias = visitor->template Visit<RETV>(node->Child(2));
     ctx.Trace_cmd(TF_LOWER, Trace_float_array, new_bias->Const(), "new_bias");
 
-    bool flag_gemm_fast = ctx.Gemm_fast();
+    bool flag_gemm_fast = true;
     ctx.Trace(TF_LOWER, "flag_gemm_fast=", flag_gemm_fast, "\n");
     if (!flag_gemm_fast) {
       NODE_PTR new_node =

@@ -3,9 +3,6 @@ domain:
   name: CKKS
 
 opcodes:
-  - name: invalid
-    prop: [NONE]
-    desc: Invalid operator
   - name: rotate
     args:
       - name: a
@@ -131,6 +128,41 @@ opcodes:
         desc: Input ciphertext
     prop: [EXPR, ATTR]
     desc: Get the ciphertext's slot size
+  - name: raise_mod
+    args:
+      - name: a
+        type: CIPHER
+        desc: Input ciphertext
+      - name: b
+        type: int
+        desc: Level after raise
+    prop: [EXPR, ATTR]
+    desc: Raise ciphertext modulus to specialized level
+  - name: mul_mono
+    args:
+      - name: a
+        type: CIPHER
+        desc: Input ciphertext
+      - name: b
+        type: int
+        desc: power value
+    prop: [EXPR, ATTR]
+    desc: Multiplies a ciphertext with monomial
+  - name: conjugate
+    args:
+      - name: a
+        type: CIPHER
+        desc: Input ciphertext
+    prop: [EXPR, ATTR]
+    desc: Conjugates a ciphertext
+  - name: free
+    args:
+      - name: a
+        type: CIPHER
+        desc: Input ciphertext
+    prop: [STMT, LIB_CALL]
+    desc: Frees the ciphertext
+
 
 namespace:
   decl: ckks,fhe

@@ -16,7 +16,7 @@ function(build_external_unittest)
     set(REPO_UNITTEST_URL ${UNITTEST_URL})
   endif()
 
-  message(STATUS "Cloning External Repository   : ${REPO_UNITTEST_URL}")
+  message(STATUS "Cloning External Repository    : ${REPO_UNITTEST_URL}")
 
   include(ExternalProject)
   ExternalProject_Add(

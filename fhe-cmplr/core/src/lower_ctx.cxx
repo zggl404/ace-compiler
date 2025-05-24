@@ -31,6 +31,47 @@ CONSTANT_PTR CRT_CST::Get_q(GLOB_SCOPE* gs) {
   return cst;
 }
 
+air::base::CONSTANT_PTR CRT_CST::Get_p(GLOB_SCOPE* gs) {
+  if (_p != CONSTANT_ID()) {
+    return gs->Constant(_p);
+  }
+  // build p primes constants
+  std::vector<uint64_t> p_primes;
+  fhe::rt_context::Fetch_p_primes(p_primes);
+  CONSTANT_PTR cst =
+      Create_array_cst(gs, PPRIMES_NAME, p_primes.data(), p_primes.size());
+  Set_p(cst);
+  return cst;
+}
+
+uint64_t CRT_CST::Get_prime(GLOB_SCOPE* gs, uint32_t idx) {
+  CONSTANT_PTR q     = Get_q(gs);
+  size_t       q_len = q->Array_byte_len() / sizeof(uint64_t);
+  if (idx < q_len) {
+    return q->Array_elem<uint64_t>(idx);
+  } else {
+    // Get from P primes
+    idx            = idx - q_len;
+    CONSTANT_PTR p = Get_p(gs);
+    return p->Array_elem<uint64_t>(idx);
+  }
+}
+
+uint64_t CRT_CST::Get_prime(GLOB_SCOPE* gs, uint32_t idx) const {
+  CONSTANT_PTR q = Get_q(gs);
+  AIR_ASSERT(q != Null_ptr);
+  size_t q_len = q->Array_byte_len() / sizeof(uint64_t);
+  if (idx < q_len) {
+    return q->Array_elem<uint64_t>(idx);
+  } else {
+    // Get from P primes
+    CONSTANT_PTR p = Get_p(gs);
+    AIR_ASSERT(p != Null_ptr);
+    idx = idx - q_len;
+    return p->Array_elem<uint64_t>(idx);
+  }
+}
+
 CONSTANT_PTR CRT_CST::Get_qlhinvmodq(GLOB_SCOPE* gs, uint32_t part_idx,
                                      uint32_t part_size_idx) {
   uint64_t key = ((uint64_t)part_idx << 32) + (uint64_t)part_size_idx;
@@ -124,6 +165,33 @@ CONSTANT_PTR CRT_CST::Get_qlhalfmodq(air::base::GLOB_SCOPE* gs, uint32_t idx) {
   std::stringstream ss;
   ss << QLHALFMODQ_NAME << "_" << std::to_string(idx);
   CONSTANT_PTR cst = Create_array_cst(gs, ss.str(), vl.Data(), vl.Len());
+  Add_qlhalfmodq_map(idx, cst);
+  return cst;
+}
+
+CONSTANT_PTR CRT_CST::Get_q0halfmodq(air::base::GLOB_SCOPE* gs) {
+  // use the UINT16_MAX as hash idx for q0
+  // Since the rtlib does not provide the constant value, (need rtlib
+  // enhancement), we calculate them at compile time by iterate the
+  // q primes, and use the max value of uint16 as the hash idx, the number
+  // of q won't exceed UINT16_MAX in FHE
+  uint32_t idx = UINT16_MAX;
+  if (_qlhalfmodq_map.find(idx) != _qlhalfmodq_map.end()) {
+    CONSTANT_ID id = _qlhalfmodq_map[idx];
+    AIR_ASSERT_MSG(id != air::base::CONSTANT_ID(), "null constant");
+    return gs->Constant(id);
+  }
+  CONSTANT_PTR          q_cst = Get_q(gs);
+  size_t                q_len = q_cst->Array_byte_len() / sizeof(uint64_t);
+  uint64_t              q0    = q_cst->Array_elem<uint64_t>(0);
+  std::vector<uint64_t> data;
+  for (size_t idx = 0; idx < q_len; idx++) {
+    uint64_t val = (q0 / 2) % q_cst->Array_elem<uint64_t>(idx);
+    data.push_back(val);
+  }
+  std::stringstream ss;
+  ss << Q0HALFMODQ_NAME << "_" << std::to_string(idx);
+  CONSTANT_PTR cst = Create_array_cst(gs, ss.str(), data.data(), data.size());
   Add_qlhalfmodq_map(idx, cst);
   return cst;
 }

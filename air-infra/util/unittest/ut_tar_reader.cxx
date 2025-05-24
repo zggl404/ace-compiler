@@ -107,7 +107,10 @@ TEST(tar_reader, TAR_READER) {
   unlink("ut_tar_f2.txt");
   unlink("ut_tar_f3.txt");
   unlink("ut_tar.tar");
-  chdir(cwd);
+  int result = chdir(cwd);
+  if (result == -1) {
+    CMPLR_ASSERT(false, "chdir failed");
+  }
 }
 
 }  // namespace

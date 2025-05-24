@@ -1,5 +1,4 @@
 CKKS = [
-  invalid,
   rotate,
   add,
   sub,
@@ -13,5 +12,9 @@ CKKS = [
   bootstrap,
   scale,
   level,
-  batch_size
+  batch_size,
+  raise_mod,
+  mul_mono,
+  conjugate,
+  free
 ]

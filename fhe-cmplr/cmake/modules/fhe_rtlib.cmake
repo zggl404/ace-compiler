@@ -90,6 +90,7 @@ endfunction()
 if(NOT TARGET fhe_rtlib)
   build_rtlib()
   add_dependencies(fhe_depend fhe_rtlib)
+  add_dependencies(fhe_rtlib ${NN_LIBS})
 
   find_library(M_LIBRARY NAMES m)
   find_library(GMP_LIBRARY NAMES gmp libgmp)

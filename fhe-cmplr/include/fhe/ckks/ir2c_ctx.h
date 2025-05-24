@@ -84,7 +84,7 @@ public:
         Emit_st_var<RETV, VISITOR>(visitor, dest);
         if (Rt_validate()) {
           _os << " = *(PLAIN)Pt_get_validate(";
-          visitor->template Visit<RETV>(node->Child(0));  // buffer address
+          Emit_buffer_address<RETV, VISITOR>(visitor, node->Child(0));
           _os << ", ";
         } else {
           _os << " = *(PLAIN)Pt_get(";
@@ -98,7 +98,7 @@ public:
           _os << "Pt_from_msg_validate(&";
           Emit_st_var<RETV, VISITOR>(visitor, dest);
           _os << ", ";
-          visitor->template Visit<RETV>(node->Child(0));  // buffer address
+          Emit_buffer_address<RETV, VISITOR>(visitor, node->Child(0));
         } else {
           _os << "Pt_from_msg(&";
           Emit_st_var<RETV, VISITOR>(visitor, dest);
@@ -133,7 +133,7 @@ public:
         _os << "Pt_from_msg_ofst_validate(&";
         Emit_st_var<RETV, VISITOR>(visitor, dest);
         _os << ", ";
-        visitor->template Visit<RETV>(node->Child(0));  // buffer address
+        Emit_buffer_address<RETV, VISITOR>(visitor, node->Child(0));
       } else {
         _os << "Pt_from_msg_ofst(&";
         Emit_st_var<RETV, VISITOR>(visitor, dest);
@@ -196,7 +196,7 @@ public:
             Emit_st_var<RETV, VISITOR>(visitor, dest);
             if (Rt_validate()) {
               _os << " = *(PLAIN)Pt_get_validate(";
-              visitor->template Visit<RETV>(node->Child(0));  // buffer address
+              Emit_buffer_address<RETV, VISITOR>(visitor, node->Child(0));
               _os << ", ";
             } else {
               _os << " = *(PLAIN)Pt_get(";
@@ -213,7 +213,7 @@ public:
               _os << "Pt_from_msg_validate(&";
               Emit_st_var<RETV, VISITOR>(visitor, dest);
               _os << ", ";
-              visitor->template Visit<RETV>(node->Child(0));  // buffer address
+              Emit_buffer_address<RETV, VISITOR>(visitor, node->Child(0));
             } else {
               _os << "Pt_from_msg(&";
               Emit_st_var<RETV, VISITOR>(visitor, dest);
@@ -285,7 +285,31 @@ public:
 
     Emit_st_var<RETV, VISITOR>(visitor, dest);
     _os << ", ";
-    visitor->template Visit<RETV>(cst);  // buffer address
+    Emit_buffer_address<RETV, VISITOR>(visitor, cst);
+  }
+
+  template <typename RETV, typename VISITOR>
+  void Emit_buffer_address(VISITOR* visitor, air::base::NODE_PTR node) {
+    if (node->Opcode() == air::core::LDC && node->Rtype()->Is_array() &&
+        visitor->Parent(0)->Opcode() == OPC_ENCODE) {
+      air::base::CONSTANT_PTR cst = node->Const();
+      AIR_ASSERT(cst->Kind() == air::base::CONSTANT_KIND::ARRAY);
+      AIR_ASSERT(cst->Type()->Is_array());
+      air::base::CONST_ARRAY_TYPE_PTR arr_ty = cst->Type()->Cast_to_arr();
+      AIR_ASSERT(arr_ty->Elem_type()->Is_prim());
+      uint32_t dims = arr_ty->Dim();
+      if (dims == 1) {
+        visitor->template Visit<RETV>(node);
+      } else {
+        _os << "&";
+        visitor->template Visit<RETV>(node);
+        for (size_t i = 0; i < dims; i++) {
+          _os << "[0]";
+        }
+      }
+    } else {
+      visitor->template Visit<RETV>(node);
+    }
   }
 
   const char* Data_file_uuid() const { return _data_file_uuid.c_str(); }

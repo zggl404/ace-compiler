@@ -6,8 +6,8 @@
 //
 //=============================================================================
 
-#ifndef FHE_CKKS_INVALID_HANDLER_H
-#define FHE_CKKS_INVALID_HANDLER_H
+#ifndef FHE_CKKS_NULL_HANDLER_H
+#define FHE_CKKS_NULL_HANDLER_H
 
 #include "air/base/container.h"
 #include "air/base/container_decl.h"

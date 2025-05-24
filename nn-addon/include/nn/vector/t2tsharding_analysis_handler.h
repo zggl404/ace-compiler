@@ -574,6 +574,82 @@ private:
   }
 };
 
+//! @brief T2TSHARDING_ANA_CORE_HANDLER handler
+class T2TSHARDING_ANALYSIS_CORE_HANDLER : public air::core::DEFAULT_HANDLER {
+public:
+  T2TSHARDING_ANALYSIS_CORE_HANDLER() {}
+
+  template <typename RETV, typename VISITOR>
+  RETV Handle_retv(VISITOR* visitor, air::base::NODE_PTR node) {
+    // validate types
+    AIR_ASSERT(node->Num_child() == 1);
+    NODE_PTR child_node = node->Child(0);
+    AIR_ASSERT(child_node->Rtype()->Is_array());
+
+    // get shape and count from Rtype
+    T2TSHARDING_ANALYSIS_CTX& ctx   = visitor->Context();
+    int64_t                   slots = ctx.Max_slots();
+    std::vector<int64_t> shape = child_node->Rtype()->Cast_to_arr()->Shape();
+
+    // When the reshape op appears in the middle of the model, the shape reduces
+    // to 2 dims in all current models. The temporary solution is to insert two
+    // 1 in the front of shapes to make shape size to 4.
+    AIR_ASSERT((shape.size() == 4 || shape.size() == 2) && shape[0] == 1);
+    if (shape.size() == 2) {
+      shape.insert(shape.begin(), {1, 1});
+    }
+    int64_t count = child_node->Rtype()->Cast_to_arr()->Elem_count();
+    AIR_ASSERT(count == shape[0] * shape[1] * shape[2] * shape[3]);
+    ctx.Trace(TF_SHARDING, ">> Sharding analysis: ", node->Name(),
+              " slot=", slots, " count=", count, " shape=[", shape[0], ", ",
+              shape[1], ", ", shape[2], ", ", shape[3], "]\n");
+
+    // check if sharding is needed
+    if (count < slots) {
+      ctx.Trace(TF_SHARDING, "No sharding is needed!\n");
+      return RETV(node);
+    }
+
+    // analyze shape to get suitable sharding scheme
+    SHARDING_MAP*        shmap = ctx.Sharding_map();
+    std::vector<int64_t> pspec =
+        shmap->Analyze_conv(slots, shape[1], shape[1], shape[2], shape[3]);
+    DIM3           mesh = {pspec[0], pspec[1], pspec[2]};
+    ARRAY_SHARDING input_shard(mesh);
+    input_shard.Set_spec({1, pspec[1], pspec[2], 1});
+    ARRAY_SHARDING output_shard(mesh);
+    output_shard.Set_spec({1, pspec[0], pspec[2], 1});
+    OP_SHARDING shard(mesh);
+    for (uint32_t i = 0; i < node->Num_child(); ++i) {
+      shard.Set_imap(i, input_shard);
+    }
+    shard.Set_omap(0, output_shard);
+    shmap->Set_op_sharding(node, shard);
+    std::vector<int64_t> shard_info{pspec[0], pspec[1], pspec[2], 0};
+    node->Set_attr(core::ATTR::SHARDING, shard_info.data(), shard_info.size());
+    ctx.Trace_cmd(TF_SHARDING, Trace_op_sharding, shard, node->Name());
+
+    // check and validate expected and actual sharding on input
+    FUNC_ID scope = node->Container()->Parent_func_scope()->Id();
+    for (uint32_t i = 0; i < node->Num_child(); ++i) {
+      AIR_ASSERT(node->Child(i)->Opcode() == air::core::OPC_LD ||
+                 node->Child(i)->Opcode() == air::core::OPC_LDP);
+      const ARRAY_SHARDING* actual =
+          (node->Child(i)->Opcode() == air::core::OPC_LD)
+              ? shmap->Get_data_sharding(scope, node->Child(i)->Addr_datum_id())
+              : shmap->Get_data_sharding(scope, node->Child(i)->Preg_id());
+      AIR_ASSERT(actual != nullptr);
+
+      ctx.Trace(TF_SHARDING, "Input ", i, " expected: ", input_shard);
+      ctx.Trace(TF_SHARDING, "Input ", i, " actual: ", *actual);
+    }
+
+    shmap->Set_data_sharding(scope, child_node->Addr_datum_id(), output_shard);
+
+    return RETV(node);
+  }
+};
+
 }  // namespace vector
 }  // namespace nn
 

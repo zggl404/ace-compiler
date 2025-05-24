@@ -71,6 +71,10 @@ public:
   template <typename RETV, typename VISITOR>
   POLY_LOWER_RETV Handle_modswitch(VISITOR* visitor, air::base::NODE_PTR node);
 
+  //! @brief Handle CKKS_OPERATOR::RAISE_MOD
+  template <typename RETV, typename VISITOR>
+  POLY_LOWER_RETV Handle_raise_mod(VISITOR* visitor, air::base::NODE_PTR node);
+
 private:
   //! @brief Handle binary arithmetic operations for CKKS_OPERATOR::ADD/SUB/MUL:
   //! cc_op_handler: handle operations between ciphertexts.
@@ -408,6 +412,43 @@ POLY_LOWER_RETV CKKS2HPOLY::Handle_modswitch(VISITOR*            visitor,
   return retv;
 }
 
+//! @brief Lowering for CKKS::Raise_mod
+//! Raise_mod is the first step of Bootstrap, which raise the modulus of input
+//! level to the required target level
+//! v_res = CKKS.Raise_mod(v_input, raised_level)
+//! Lowered to:
+//! v_res.c0 = HPOLY.Raise_mod(v_input.c0, raised_level)
+//! v_res.c1 = HPOLY.Raise_mod(v_input.c1, raised_level)
+template <typename RETV, typename VISITOR>
+POLY_LOWER_RETV CKKS2HPOLY::Handle_raise_mod(VISITOR*            visitor,
+                                             air::base::NODE_PTR node) {
+  POLY_LOWER_CTX&       ctx       = visitor->Context();
+  fhe::core::LOWER_CTX* lower_ctx = ctx.Lower_ctx();
+  air::base::NODE_PTR   opnd0     = node->Child(0);
+  air::base::NODE_PTR   opnd1     = node->Child(1);
+  POLY_LOWER_RETV       retv;
+
+  AIR_ASSERT_MSG(lower_ctx->Is_cipher_type(opnd0->Rtype_id()),
+                 "raise_mod opnd is not ciphertext");
+  AIR_ASSERT_MSG(opnd1->Opcode() == air::core::OPC_INTCONST,
+                 "raise_mod opnd 1 is not a const");
+
+  POLY_LOWER_RETV opnd0_retv = visitor->template Visit<RETV>(opnd0);
+  POLY_LOWER_RETV opnd1_retv = visitor->template Visit<RETV>(opnd1);
+
+  if (opnd0_retv.Kind() == RK_CIPH_POLY) {
+    air::base::NODE_PTR n_c0 = ctx.Poly_gen().New_raise_mod(
+        opnd0_retv.Node1(), opnd1_retv.Node1(), node->Spos());
+    air::base::NODE_PTR n_c1 = ctx.Poly_gen().New_raise_mod(
+        opnd0_retv.Node2(),
+        ctx.Container()->Clone_node_tree(opnd1_retv.Node1()), node->Spos());
+    retv = POLY_LOWER_RETV(RETV_KIND::RK_CIPH_POLY, n_c0, n_c1);
+  } else {
+    AIR_ASSERT_MSG(false, "unexpected retv");
+  }
+  return retv;
+}
+
 template <typename RETV, typename VISITOR>
 POLY_LOWER_RETV CORE2HPOLY::Handle_ld(VISITOR*            visitor,
                                       air::base::NODE_PTR node) {
@@ -467,7 +508,8 @@ POLY_LOWER_RETV CORE2HPOLY::Handle_ld_var(VISITOR*            visitor,
       return POLY_LOWER_RETV();
     }
   } else {
-    // for load node do not lower to poly domain, clone the whole tree
+    // for load node do not lower to poly domain, clone the whole
+    // tree
     air::base::NODE_PTR n_clone = ctx.Container()->Clone_node_tree(node);
     return POLY_LOWER_RETV(n_clone);
   }
@@ -639,8 +681,8 @@ POLY_LOWER_RETV CORE2HPOLY::Handle_st_var(VISITOR*            visitor,
     ctx.Prepend(s_plain);
     return POLY_LOWER_RETV(RETV_KIND::RK_BLOCK, air::base::Null_ptr);
   } else {
-    // clone the tree for ciph/plain/ciph3 that not lowered to polys
-    // such as CKKS.encode
+    // clone the tree for ciph/plain/ciph3 that not lowered to
+    // polys such as CKKS.encode
     air::base::STMT_PTR s_new =
         ctx.Poly_gen().New_var_store(rhs.Node(), var, node->Spos());
     return POLY_LOWER_RETV(s_new->Node());
@@ -659,7 +701,8 @@ POLY_LOWER_RETV CORE2HPOLY::Handle_zero(VISITOR*            visitor,
   air::base::TYPE_PTR   t_rns_poly =
       lower_ctx->Get_rns_poly_type(cntr->Glob_scope());
   uint32_t num_q = irgen.Get_num_q(parent);
-  // lower zero to multiple rns poly type zero based on parent type
+  // lower zero to multiple rns poly type zero based on parent
+  // type
   if (lower_ctx->Is_cipher_type(tid)) {
     air::base::NODE_PTR n_zero_c0 = cntr->New_zero(t_rns_poly, node->Spos());
     air::base::NODE_PTR n_zero_c1 = cntr->New_zero(t_rns_poly, node->Spos());

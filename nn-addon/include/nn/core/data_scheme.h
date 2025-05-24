@@ -57,30 +57,19 @@ private:
   uint32_t _val[6];
 };
 
-//! @brief Set attribute for input data scheme
-//! @param input: new input parameter, which must be an IDNAME node with
+//! @brief Set attribute for input/ouput data scheme
+//! @param node: new input/output parameter, which must be an IDNAME/RETV node
+//! with
 //!               vector of vector type
-//! @param type:  original tensor type, must be a 4D tensor (NCHW)
+//! @param type:  original tensor type, must be a 4D(NCHW) or 2D(HW) tensor
 //! @param n_n:   number of pieces partitioned from batch size. 1 means 1 chunk
 //! for 1 batch
 //! @param n_c:   number of pieces partitioned from channel size.
 //! @param n_h:   number of chunks partitioned from height
 //! @param n_w:   number of chunks partitioned from width
-void Set_input_scheme_attr(air::base::NODE_PTR input, air::base::TYPE_PTR type,
-                           uint32_t n_n = 1, uint32_t n_c = 1, uint32_t n_h = 1,
-                           uint32_t n_w = 1, uint32_t o_h = 0,
-                           uint32_t o_w = 0);
-
-//! @brief Set attribute for output data scheme
-//! @param input: new output statement, which must be an RETV node with vector
-//!               of vector type
-//! @param type:  original matrix type, must be a 2D matrix (HW)
-//! @param n_h:   number of chunks partitioned from height
-//! @param n_w:   number of chunks partitioned from width
-void Set_output_scheme_attr(air::base::NODE_PTR output,
-                            air::base::TYPE_PTR type, uint32_t n_h = 1,
-                            uint32_t n_w = 1, uint32_t o_h = 0,
-                            uint32_t o_w = 0);
+void Set_scheme_attr(air::base::NODE_PTR node, air::base::TYPE_PTR type,
+                     uint32_t n_n = 1, uint32_t n_c = 1, uint32_t n_h = 1,
+                     uint32_t n_w = 1, uint32_t o_h = 0, uint32_t o_w = 0);
 
 //! @brief Get number of data chunk from attr on input parameter or retv
 //!        statement

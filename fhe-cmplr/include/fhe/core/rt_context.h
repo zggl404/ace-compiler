@@ -41,6 +41,9 @@ void Release_context();
 //! @brief Fetch the q prime values from runtime context
 void Fetch_q_primes(std::vector<uint64_t>& q_primes);
 
+//! @brief Fetch the p prime values from runtime context
+void Fetch_p_primes(std::vector<uint64_t>& q_primes);
+
 //! @brief Get qlhmodp at specified index
 void Get_qlhmodp_at(std::vector<VL>& vals, uint32_t dim1_idx,
                     uint32_t dim2_idx);

@@ -10,25 +10,11 @@
 
 #include <iostream>
 
-#include "air/base/container.h"
 #include "air/base/flatten_ctx.h"
 #include "air/base/st.h"
-#include "air/base/visitor.h"
-#include "air/core/handler.h"
 #include "air/core/opcode.h"
 #include "air/util/debug.h"
-#include "fhe/ckks/ckks_handler.h"
-#include "fhe/ckks/ir2c_core.h"
-#include "fhe/ckks/ir2c_handler.h"
-#include "fhe/poly/handler.h"
-#include "fhe/poly/ir2c_core.h"
-#include "fhe/poly/ir2c_handler.h"
-#include "fhe/poly/poly2c_mfree.h"
-#include "fhe/sihe/ir2c_handler.h"
-#include "fhe/sihe/sihe_handler.h"
 #include "nn/core/data_scheme.h"
-#include "nn/vector/handler.h"
-#include "nn/vector/ir2c_vector.h"
 
 using namespace air::base;
 
@@ -55,10 +41,10 @@ GLOB_SCOPE* POLY2C_DRIVER::Flatten(GLOB_SCOPE* glob) {
       }
       return true;
     };
-    FLATTEN_CTX          trav_ctx(&cntr, std::move(flatten_func));
-    VISITOR<FLATTEN_CTX> trav(trav_ctx);
-    NODE_PTR             entry = func->Container().Entry_node();
-    NODE_PTR             retv  = trav.Visit<NODE_PTR>(entry);
+    FLATTEN_CTX<TRANSFORM_UTIL> trav_ctx(&cntr, std::move(flatten_func));
+    VISITOR<FLATTEN_CTX<TRANSFORM_UTIL>> trav(trav_ctx);
+    NODE_PTR                             entry = func->Container().Entry_node();
+    NODE_PTR                             retv  = trav.Visit<NODE_PTR>(entry);
     AIR_ASSERT(retv->Is_entry());
     new_func->Set_entry_stmt(retv->Stmt());
   }
@@ -66,79 +52,6 @@ GLOB_SCOPE* POLY2C_DRIVER::Flatten(GLOB_SCOPE* glob) {
   // delete old glob
   delete glob;
   return new_glob;
-}
-
-void POLY2C_DRIVER::Run(GLOB_SCOPE* glob) {
-  _ctx.Emit_global_include();
-  _ctx.Emit_global_constants(glob, true);
-
-  // emit function prototype
-  for (FUNC_ITER it = glob->Begin_func(); it != glob->End_func(); ++it) {
-    if ((*it)->Entry_point()->Is_program_entry()) {
-      continue;
-    }
-    _ctx.Emit_func_sig((*it));
-    _ctx << ";\n";
-  }
-  _ctx << "\n";
-
-  for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
-       it != glob->End_func_scope(); ++it) {
-    FUNC_SCOPE* func = &(*it);
-    NODE_PTR    body = func->Container().Stmt_list().Block_node();
-
-    if (_ctx.Provider() == core::PROVIDER::ANT && _ctx.Free_poly()) {
-      // insert free before emit C code
-      fhe::poly::MFREE_PASS mfree(_ctx.Lower_ctx());
-      mfree.Perform(body);
-    }
-
-    // emit C code
-    _ctx.Emit_func_def(func);
-    _ctx.Begin_func_body(body);
-    // Trace runtime of rotate and relin operations
-    const core::LOWER_CTX& lower_ctx = _ctx.Lower_ctx();
-    if (func->Id() ==
-        lower_ctx.Get_func_info(core::FHE_FUNC::ROTATE).Get_func_id()) {
-      _ctx << "  RTLIB_TM_START(" << (uint32_t)(core::RTM_FHE_ROTATE)
-           << ", rtm);\n";
-    } else if (func->Id() ==
-               lower_ctx.Get_func_info(core::FHE_FUNC::RELIN).Get_func_id()) {
-      _ctx << "  RTLIB_TM_START(" << (uint32_t)(core::RTM_FHE_RELIN)
-           << ", rtm);\n";
-    }
-    _ctx.Emit_local_var(func);
-
-    if (_ctx.Provider() == core::PROVIDER::ANT) {
-      air::base::VISITOR<fhe::poly::IR2C_CTX,
-                         air::core::HANDLER<fhe::poly::IR2C_CORE>,
-                         nn::vector::HANDLER<nn::vector::IR2C_VECTOR>,
-                         fhe::sihe::HANDLER<fhe::sihe::IR2C_HANDLER>,
-                         fhe::ckks::HANDLER<fhe::ckks::IR2C_HANDLER>,
-                         fhe::poly::HANDLER<fhe::poly::IR2C_HANDLER> >
-          visitor(_ctx);
-      visitor.template Visit<void>(body);
-    } else {
-      air::base::VISITOR<fhe::poly::IR2C_CTX,
-                         air::core::HANDLER<fhe::ckks::IR2C_CORE>,
-                         nn::vector::HANDLER<nn::vector::IR2C_VECTOR>,
-                         fhe::sihe::HANDLER<fhe::sihe::IR2C_HANDLER>,
-                         fhe::ckks::HANDLER<fhe::ckks::IR2C_HANDLER> >
-          visitor(_ctx);
-      visitor.template Visit<void>(body);
-    }
-    _ctx.End_func_body(body);
-    _ctx << "\n";
-
-    if (func->Owning_func()->Entry_point()->Is_program_entry()) {
-      Emit_helper_function(func);
-    }
-  }
-
-  Emit_get_context_params();
-
-  _ctx.Emit_need_bts();
-  _ctx.Emit_global_constants(glob, false);
 }
 
 void POLY2C_DRIVER::Emit_get_context_params() {

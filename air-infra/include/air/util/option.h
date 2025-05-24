@@ -28,6 +28,7 @@ namespace util {
 #define TFILE_SUFFIX ".t"
 #define SFILE_SUFFIX ".s"
 #define PFILE_SUFFIX ".json"
+#define DFILE_PREFIX "out"
 
 uint32_t constexpr INDENT_SPACE = 2;
 

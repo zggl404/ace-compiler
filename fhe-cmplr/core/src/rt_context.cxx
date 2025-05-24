@@ -31,6 +31,14 @@ void Fetch_q_primes(std::vector<uint64_t>& q_primes) {
   AIR_ASSERT_MSG(num_primes == num_q, "unmatched size");
 }
 
+void Fetch_p_primes(std::vector<uint64_t>& p_primes) {
+  size_t num_p = ::Get_p_cnt();
+  p_primes.resize(num_p);
+  // call rtlib Fetch_p_primes
+  size_t num_primes = ::Fetch_p_primes(p_primes.data());
+  AIR_ASSERT_MSG(num_primes == num_p, "unmatched size");
+}
+
 void Get_qlhmodp_at(std::vector<VL>& vals, uint32_t dim1_idx,
                     uint32_t dim2_idx) {
   size_t num_dim3 = ::Get_qlhmodp_dim3_cnt(dim1_idx, dim2_idx);

@@ -16,7 +16,7 @@ function(build_external_benchmark)
     set(REPO_BENCH_URL ${BENCH_URL})
   endif()
 
-  message(STATUS "Cloning External Repository   : ${REPO_BENCH_URL}")
+  message(STATUS "Cloning External Repository    : ${REPO_BENCH_URL}")
 
   include(ExternalProject)
   ExternalProject_Add(

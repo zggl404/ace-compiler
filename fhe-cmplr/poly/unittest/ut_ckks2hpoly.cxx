@@ -112,6 +112,14 @@ TEST_P(TEST_CKKS2HPOLY, Handle_encode) {
   Lower();
 }
 
+TEST_P(TEST_CKKS2HPOLY, Handle_raise_mod) {
+  STMT_PTR stmt = Ckks_ir_gen().Gen_raise_mod(
+      Container(), Ckks_ir_gen().Output_var(), Ckks_ir_gen().Input_var(), 0);
+  Set_level_attr(stmt->Node()->Child(0)->Child(0), 1);
+  Set_sf_degree(stmt->Node()->Child(0)->Child(0), 1);
+  Lower();
+}
+
 TEST_P(TEST_CKKS2HPOLY, Handle_all) {
   Config()._inline_relin  = true;
   Config()._inline_rotate = true;

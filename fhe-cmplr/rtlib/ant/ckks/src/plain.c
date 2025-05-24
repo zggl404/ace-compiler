@@ -235,3 +235,14 @@ bool Compare_plain_buffer(const struct PLAINTEXT_BUFFER* pb_x,
 uint64_t Max_plain_buffer_length() {
   return sizeof(struct PLAINTEXT_BUFFER) + Get_plaintext_length(0);
 }
+
+L_POLY Lpoly_from_plain(PLAIN plain, size_t idx) {
+  FMT_ASSERT(idx < Get_num_pq(Get_plain_poly(plain)), "invalid idx");
+  // init lpoly from rns poly of plain
+  POLY   c0 = Get_plain_poly(plain);
+  L_POLY poly;
+  size_t degree = Get_rdgree(Get_plain_poly(plain));
+  Init_lpoly_data(&poly, degree, Coeffs(c0, idx, degree));
+  Set_lpoly_ntt(&poly, Is_ntt(c0));
+  return poly;
+}

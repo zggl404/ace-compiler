@@ -156,6 +156,16 @@ MODULUS* Q_modulus() { return Get_q_modulus_head(Get_crt_context()); }
 
 MODULUS* P_modulus() { return Get_p_modulus_head(Get_crt_context()); }
 
+NTT_CONTEXT* Get_ntt_ctx(size_t idx) {
+  size_t num_q = Get_q_cnt();
+  FMT_ASSERT(idx < num_q + Get_p_cnt(), "idx overflow");
+  CRT_CONTEXT* crt = Get_crt_context();
+  NTT_CONTEXT* ntt = idx < num_q
+                         ? Get_ntt(Get_prime_at(Get_q(crt), idx))
+                         : Get_ntt(Get_prime_at(Get_p(crt), idx - num_q));
+  return ntt;
+}
+
 void Bootstrap_precom(uint32_t num_slots) {
   VL_UI32* level_budget          = Alloc_value_list(UI32_TYPE, 2);
   UI32_VALUE_AT(level_budget, 0) = 3;

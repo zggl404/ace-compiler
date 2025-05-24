@@ -44,7 +44,8 @@ protected:
     size_t idx = 0;
     for (size_t dim1_idx = 0; dim1_idx < expected.size(); dim1_idx++) {
       EXPECT_EQ(shape[1], expected[dim1_idx].size());
-      for (size_t dim2_idx = 0; dim2_idx < expected[dim1_idx].size(); dim2_idx++) {
+      for (size_t dim2_idx = 0; dim2_idx < expected[dim1_idx].size();
+           dim2_idx++) {
         EXPECT_EQ(cst->Array_elem<uint64_t>(idx++),
                   expected[dim1_idx][dim2_idx]);
       }
@@ -100,6 +101,46 @@ TEST_F(TEST_CRT_CST, get_q) {
                                     72057594037928897, 72057594037927073,
                                     72057594037928033};
   Check_1d_array(expected, cst);
+}
+
+TEST_F(TEST_CRT_CST, get_p) {
+  CRT_CST               crt_cst;
+  CONSTANT_PTR          cst      = crt_cst.Get_p(Glob());
+  std::vector<uint64_t> expected = {1152921504606844513, 1152921504606844417};
+  Check_1d_array(expected, cst);
+}
+
+TEST_F(TEST_CRT_CST, Get_prime) {
+  CRT_CST               crt_cst;
+  std::vector<uint64_t> expected = {1152921504606845473, 72057594037926529,
+                                    72057594037928897,   72057594037927073,
+                                    72057594037928033,   1152921504606844513,
+                                    1152921504606844417};
+  for (size_t idx = 0; idx < expected.size(); idx++) {
+    EXPECT_EQ(crt_cst.Get_prime(Glob(), idx), expected[idx]);
+  }
+}
+
+TEST_F(TEST_CRT_CST, Get_prime_const) {
+  std::vector<uint64_t> expected = {1152921504606845473, 72057594037926529,
+                                    72057594037928897,   72057594037927073,
+                                    72057594037928033,   1152921504606844513,
+                                    1152921504606844417};
+  CRT_CST               crt_cst_base;
+  const CRT_CST         crt_cst1 = crt_cst_base;
+
+  // q and p primes not yet setup, expected failure
+  for (size_t idx = 0; idx < expected.size(); idx++) {
+    EXPECT_DEATH(crt_cst1.Get_prime(Glob(), idx), "");
+  }
+
+  // setup the q and p primes
+  crt_cst_base.Get_q(Glob());
+  crt_cst_base.Get_p(Glob());
+  const CRT_CST crt_cst2 = crt_cst_base;
+  for (size_t idx = 0; idx < expected.size(); idx++) {
+    EXPECT_EQ(crt_cst2.Get_prime(Glob(), idx), expected[idx]);
+  }
 }
 
 TEST_F(TEST_CRT_CST, get_qlhinvmodq) {
@@ -159,17 +200,14 @@ TEST_F(TEST_CRT_CST, get_qlhmodp) {
       uint32_t num_p1 = per_part_size * dim2_idx;
       uint32_t num_p2 = Param().Get_part2_size(num_q, dim2_idx);
       uint32_t num_p3 = num_q + num_p - num_p1 - num_p2;
-      std::cout << dim1_idx << " "<< dim2_idx << " " << num_p1 << std::endl;
       if (num_p1 > 0) {
         CONSTANT_PTR cst_part1 =
             crt_cst.Get_qlhmodp(Glob(), dim1_idx, dim2_idx, 0, num_p1);
         std::vector<std::vector<uint64_t>> expected_p1;
         Sub_transpose(expected_p1, expected[dim1_idx][dim2_idx], 0, num_p1);
-        std::cout << "check p1" << std::endl;
         Check_2d_array(expected_p1, cst_part1);
       }
       // check for decompose part III
-        std::cout << "check p2" << std::endl;
       CONSTANT_PTR cst_part3 =
           crt_cst.Get_qlhmodp(Glob(), dim1_idx, dim2_idx, num_p1, num_p3);
       std::vector<std::vector<uint64_t>> expected_p3;

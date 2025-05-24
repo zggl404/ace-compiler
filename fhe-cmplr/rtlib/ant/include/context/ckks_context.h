@@ -113,6 +113,9 @@ MODULUS* P_modulus();
 //! @return double
 double Get_default_sc();
 
+//! @brief Get NTT_CONTEXT at given idx
+NTT_CONTEXT* Get_ntt_ctx(size_t idx);
+
 //! @brief Generate precom for bootstrapping with input slots
 void Bootstrap_precom(uint32_t num_slots);
 

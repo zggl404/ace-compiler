@@ -12,6 +12,7 @@
 #include "ckks/encoder.h"
 #include "ckks/plaintext.h"
 #include "context/ckks_context.h"
+#include "lpoly/poly.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +69,10 @@ double* Get_msg_from_plain(PLAIN plain);
 //! @brief Get the DCMPLX message(with imag part) content obtained by decoding
 //! plaintext
 DCMPLX* Get_dcmplx_msg_from_plain(PLAIN plain);
+
+//! @brief Get lpoly from PLAINTEXT at given idx
+//! need free data by Free_lpoly_data().
+L_POLY Lpoly_from_plain(PLAIN plain, size_t idx);
 
 #ifdef __cplusplus
 }

@@ -16,7 +16,7 @@ function(build_external_jsoncpp)
     set(REPO_JSONCPP_URL ${JSONCPP_URL})
   endif()
 
-  message(STATUS "Cloning External Repository   : ${REPO_JSONCPP_URL}")
+  message(STATUS "Cloning External Repository    : ${REPO_JSONCPP_URL}")
 
   include(FetchContent)
   FetchContent_Declare(

@@ -56,13 +56,7 @@ void GLOBAL_CONFIG::Register_options(DRIVER_CTX* ctx) {
   ctx->Register_top_level_option(&Global_option_handle);
 }
 
-void GLOBAL_CONFIG::Update_options(const char* ifile) {
-  *this = Global_config;
-  // update _ofile according to ifile if it's not set
-  if ((ifile != nullptr) && (_ofile.size() == 0)) {
-    _ofile = std::filesystem::path(ifile).filename().string() + CFILE_SUFFIX;
-  }
-}
+void GLOBAL_CONFIG::Update_options(const char* ifile) { *this = Global_config; }
 
 void GLOBAL_CONFIG::Print(std::ostream& os) const {
   os << "  Help: " << (_help ? "Yes" : "No") << std::endl;

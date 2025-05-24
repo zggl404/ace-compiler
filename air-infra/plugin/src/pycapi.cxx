@@ -71,6 +71,7 @@ NODE_PTR CALL_PYCAPI::Callback(const std::vector<std::any>& cntr,
   PyObject* py_entry  = PyUnicode_FromString(_entry.c_str());
   PyObject* py_module = PyImport_Import(py_entry);
   Py_DECREF(py_entry);
+  NODE* node_ptr;
 
   if (py_module != nullptr) {
     PyObject* py_func = PyObject_GetAttrString(py_module, _func.c_str());
@@ -95,6 +96,7 @@ NODE_PTR CALL_PYCAPI::Callback(const std::vector<std::any>& cntr,
       Py_DECREF(py_param);
 
       if (py_value != nullptr) {
+        node_ptr = static_cast<NODE*>(PyCapsule_GetPointer(py_value, "NODE"));
         Py_DECREF(py_value);
       } else {
         PyErr_Print();
@@ -106,6 +108,9 @@ NODE_PTR CALL_PYCAPI::Callback(const std::vector<std::any>& cntr,
     PyErr_Print();
   }
   Py_Finalize();
+
+  NODE_PTR new_node;
+  return new_node;
 }
 
 }  // namespace plugin

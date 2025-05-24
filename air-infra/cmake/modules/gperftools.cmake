@@ -16,7 +16,7 @@ function(build_external_gperf)
     set(REPO_GPERF_URL ${GPERF_URL})
   endif()
 
-  message(STATUS "Cloning External Repository   : ${REPO_GPERF_URL}")
+  message(STATUS "Cloning External Repository    : ${REPO_GPERF_URL}")
 
   include(ExternalProject)
   ExternalProject_Add(

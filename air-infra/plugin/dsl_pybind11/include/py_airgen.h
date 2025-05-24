@@ -53,7 +53,10 @@ public:
   void           Set_cur_func_scope(FUNC_SCOPE& fs);
   ADDR_DATUM_PTR New_var(std::string name, TYPE_PTR ty, const SPOS& spos);
   ADDR_DATUM_PTR Formal(int idx);
+  ADDR_DATUM_PTR Ld_var(NODE_PTR node);
 
+  NODE_PTR New_call(FUNC_SCOPE* fs, std::vector<NODE_PTR> args,
+                    const SPOS& spos);
   NODE_PTR New_zero(TYPE_PTR ty, const SPOS& spos);
   NODE_PTR New_intconst(PRIMITIVE_TYPE type, uint64_t val, const SPOS& spos);
   NODE_PTR New_ld(ADDR_DATUM_PTR addr, const SPOS& spos);
@@ -68,6 +71,10 @@ public:
                                      CONST_TYPE_PTR       elem_type,
                                      std::vector<int64_t> shape,
                                      py::array_t<float> buf, const SPOS& spos);
+  CONSTANT_PTR New_int_array_const(const std::string& name, int asize,
+                                   TYPE_PTR             elem_type,
+                                   std::vector<int64_t> shape,
+                                   py::array_t<int32_t> buf, const SPOS& spos);
 
   void Block_append(NODE_PTR block, STMT_PTR stmt);
 
@@ -83,6 +90,9 @@ public:
   void     Print(NODE_PTR a);
   void     Print_glob();
   NODE_PTR New_array(CONSTANT_PTR cst, NODE_PTR& offset, const SPOS& spos);
+  NODE_PTR New_array(ADDR_DATUM_PTR addr_datum, NODE_PTR& offset,
+                     const SPOS& spos);
+  STMT_PTR New_ist(NODE_PTR& ra_array, NODE_PTR& val, const SPOS& spos);
   NODE_PTR New_ild(NODE_PTR& ra_array, const SPOS& spos);
   void     Append_block(NODE_PTR body);
 

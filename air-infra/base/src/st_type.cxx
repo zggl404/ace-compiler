@@ -861,13 +861,28 @@ void SIGNATURE_TYPE::Set_last_param_id(PARAM_ID id) {
   _type->Cast_type_data<TYPE_TRAIT::SIGNATURE>().Set_last_param_id(id);
 }
 
-PARAM_PTR SIGNATURE_TYPE::Ret_param() const {
+PARAM_ID SIGNATURE_TYPE::Ret_param_id() const {
   PARAM_ITER iter = Begin_param();
   PARAM_ITER end  = End_param();
   for (; iter != end; ++iter) {
-    if ((*iter)->Is_ret()) return *iter;
+    if ((*iter)->Is_ret()) return (*iter)->Id();
   }
-  return PARAM_PTR();
+  return PARAM_ID();
+}
+
+PARAM_PTR SIGNATURE_TYPE::Ret_param() const {
+  PARAM_ID id = Ret_param_id();
+  if (id.Is_null())
+    return PARAM_PTR();
+  else
+    return Glob_scope().Param(id);
+}
+
+bool SIGNATURE_TYPE::Has_non_void_ret() const {
+  PARAM_ID id = Ret_param_id();
+  if (id.Is_null()) return false;
+  TYPE_PTR rtype = Glob_scope().Param(id)->Type();
+  return (!rtype->Is_prim() || !rtype->Cast_to_prim()->Is_void());
 }
 
 TYPE_PTR

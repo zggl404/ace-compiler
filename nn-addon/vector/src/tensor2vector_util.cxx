@@ -392,19 +392,39 @@ void TENSOR2VECTOR_UTIL::Gen_clear_data_stmt(NODE_PTR    input_node,
   _ctx.Prepend(cz_result_stmt);
 }
 
-ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(std::string var_name,
-                                                        TYPE_PTR    vtype,
-                                                        const SPOS& spos) {
+ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_var(std::string var_name, TYPE_PTR vtype,
+                                           const SPOS& spos) {
   FUNC_SCOPE* fscope = _cntr->Parent_func_scope();
 
   std::string    var_str    = var_name + std::to_string(_ctx.Get_num_vloop());
   ADDR_DATUM_PTR result_var = fscope->New_var(vtype, var_str.c_str(), spos);
+  return result_var;
+}
 
-  NODE_PTR zero_node = _cntr->New_zero(vtype, spos);
-  STMT_PTR st_stmt   = _cntr->New_st(zero_node, result_var, spos);
+ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(std::string var_name,
+                                                        TYPE_PTR    vtype,
+                                                        const SPOS& spos) {
+  NODE_PTR       zero_node  = _cntr->New_zero(vtype, spos);
+  ADDR_DATUM_PTR result_var = Gen_var(var_name, vtype, spos);
+  STMT_PTR       st_stmt    = _cntr->New_st(zero_node, result_var, spos);
   _ctx.Prepend(st_stmt);
 
   return result_var;
+}
+
+void TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(ADDR_DATUM_PTR var,
+                                              const SPOS&    spos) {
+  NODE_PTR zero_node = _cntr->New_zero(var->Type(), spos);
+  STMT_PTR st_stmt   = _cntr->New_st(zero_node, var, spos);
+  _ctx.Prepend(st_stmt);
+}
+
+ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_var(
+    std::string var_name, std::string ty_name, ARRAY_TYPE_PTR ty_arr,
+    const std::vector<int64_t>& var_shape, const SPOS& spos) {
+  TYPE_PTR arr_type = New_array_type(_cntr->Glob_scope(), ty_name,
+                                     ty_arr->Elem_type(), var_shape, spos);
+  return Gen_var(var_name, arr_type, spos);
 }
 
 ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(
@@ -492,6 +512,7 @@ void TENSOR2VECTOR_UTIL::Gen_loop_combine_stmt(
     ADDR_DATUM_PTR result_var, const SPOS& spos) {
   CONST_TYPE_PTR s32_type =
       _cntr->Glob_scope()->Prim_type(PRIMITIVE_TYPE::INT_S32);
+  Gen_st_0_to_var_stmt(result_var, spos);
 
   STMT_PTR  loop_stmt = New_loop(loop_name, 0, loop_ub, spos);
   STMT_LIST body_sl =
@@ -990,18 +1011,6 @@ NODE_PTR TENSOR2VECTOR_UTIL::New_conv_metakernel_fast(
   _ctx.Prepend(grid_loop);
 
   STMT_PTR vadd_bias_stmt;
-  if (num_block > 1) {
-    _ctx.Trace(TF_LOWER, "Reduce_add_intra: Ps=", num_block, "\n");
-    result_var     = Reduce_add_intra(result_var, num_block, width_block_data,
-                                      width_block_pad, spos);
-    vadd_bias_stmt = _cntr->New_st(
-        New_add(_cntr->New_ld(result_var, spos), bias, spos), result_var, spos);
-    _ctx.Prepend(vadd_bias_stmt);
-
-    NODE_PTR ld_result = _cntr->New_ld(result_var, spos);
-    return ld_result;
-  }
-
   if (((channel_in > 1) && (group != channel_in) && !is_cyclic) ||
       (num_slots == output_size)) {
     // Here we get results of all blocks in a vecotr. Reduce it.
@@ -1450,8 +1459,8 @@ ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Comb_in_row(
     // 1. combine in row
     // 1.1 prepare combine row result variaable, make it = 0
     std::vector<int64_t> ret_shape{channel * ih * iw};
-    ADDR_DATUM_PTR       ret_var = Gen_st_0_to_var_stmt(
-        "comb_row_result", "comb_row_float", ty_arr, ret_shape, spos);
+    ADDR_DATUM_PTR       ret_var =
+        Gen_var("comb_row_result", "comb_row_float", ty_arr, ret_shape, spos);
 
     if (enb_row_fast) {
       if (_ctx.Stride_slice_exp()) {
@@ -1748,8 +1757,8 @@ ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Comb_cross_row_col(
   // 2. combine by rows and columns
   // 2.1 prepare combine row and column result, VECTOR result = 0
   std::vector<int64_t> ret_shape{channel * ih * iw};
-  ADDR_DATUM_PTR       ret_var = Gen_st_0_to_var_stmt(
-      "comb_rc_result", "comb_rc_float", ty_arr, ret_shape, spos);
+  ADDR_DATUM_PTR       ret_var =
+      Gen_var("comb_rc_result", "comb_rc_float", ty_arr, ret_shape, spos);
 
   if (enable_rc_fast) {
     Gen_comb_rc_fast(input_var, ret_var, ty_arr, stride, interval, spos);
@@ -1780,7 +1789,7 @@ NODE_PTR TENSOR2VECTOR_UTIL::Comb_cross_channel(
 
   NODE_PTR load_ret_node;
   if (need_comb_cc) {
-    ADDR_DATUM_PTR ret_var = Gen_st_0_to_var_stmt("ss_result", ret_type, spos);
+    ADDR_DATUM_PTR ret_var = Gen_var("ss_result", ret_type, spos);
 
     if (Enable_log_cc_comb(channel, ih, iw, oh, ow)) {
       Gen_log_based_comb_cc(input_var, ret_var, ty_arr, stride, spos);

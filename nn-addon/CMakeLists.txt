@@ -121,11 +121,12 @@ endif()
 find_nn_extralib(EXTRA_LIBS)
 
 # generate domain opcodes for NN
+# the target `nn_od` will be created
 gen_domain_od(
   "$ENV{PACKAGE_BASE_DIR}/irgen/od/odgen.py"
   "${PROJECT_SOURCE_DIR}/core/od/opcode_def.yml"
   "${CMAKE_BINARY_DIR}/include/nn/core"
-  nn_od
+  nn
 )
 add_dependencies(nn_depend nn_od)
 

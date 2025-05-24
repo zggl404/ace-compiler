@@ -13,18 +13,21 @@ set(CMAKE_CXX_STANDARD 17)
 # Find the Pybind11 library
 find_package(pybind11 REQUIRED)
 
-find_path(NN_INCLUDE_DIR nn/core/nn_ops.h
-    PATHS /usr/local/include
-    NO_DEFAULT_PATH
-)
+function(include_path dirname filename)
+    find_path(${dirname} ${filename}
+        PATHS /usr/local/include
+        NO_DEFAULT_PATH
+    )
+    if(${dirname})
+        message(STATUS "Found include dir for ${filename}: ${${dirname}}")
+        include_directories(${${dirname}})
+    else()
+        message(FATAL_ERROR "Include dir for ${filename} not found!")
+    endif()
+endfunction()
 
-if (NN_INCLUDE_DIR)
-    message(STATUS "Found NN include dir: ${NN_INCLUDE_DIR}")
-else()
-    message(FATAL_ERROR "NN include dir not found!")
-endif()
-
-include_directories(${NN_INCLUDE_DIR})
+include_path(CKKS_INCLUDE_DIR "fhe/ckks/ckks_ops.h")
+include_path(NN_INCLUDE_DIR "nn/core/nn_ops.h")
 
 # Build C++ code as a shared library
 pybind11_add_module(air_dsl 
@@ -32,6 +35,7 @@ pybind11_add_module(air_dsl
     src/py_airgen.cxx
     src/pycontext.cxx
     src/vector/vector_ops.cxx
+    ${CKKS_INCLUDE_DIR}/fhe/ckks/ckks_ops.cxx
     ${NN_INCLUDE_DIR}/nn/core/nn_ops.cxx
 )
 
@@ -75,5 +79,4 @@ target_link_libraries(add_vector_demo PRIVATE ${AIR_LIBS} ${NN_LIBS} ${pybind11_
 # file(COPY ${CMAKE_BINARY_DIR}/air_dsl.cpython-38-aarch64-linux-gnu.so DESTINATION ${CMAKE_BINARY_DIR}/../)
 
 #install(TARGETS air_dsl  DESTINATION ../)
-
 install(FILES ${CMAKE_BINARY_DIR}/air_dsl.cpython-38-x86_64-linux-gnu.so DESTINATION ${CMAKE_BINARY_DIR}/../)

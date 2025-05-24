@@ -54,10 +54,14 @@ public:
   const fhe::poly::POLY_CONFIG& Config() const { return _config; }
   const char*                   Fname() const { return _fname; }
   uint32_t                      Input_level() const { return _input_level; }
+  uint32_t                      Mul_level() const { return _mul_level; }
+  void Set_input_level(uint32_t l) { _input_level = l; }
+  void Set_mul_level(uint32_t l) { _mul_level = l; }
 
 private:
   fhe::poly::POLY_CONFIG _config;
   const char*            _fname;
+  uint32_t               _mul_level   = 21;
   uint32_t               _input_level = 3;
 };
 
@@ -66,8 +70,7 @@ class TEST_LOWER_CKKS : public ::testing::TestWithParam<CONFIG> {
 protected:
   TEST_LOWER_CKKS() : _ckks_ir_gen(_fhe_ctx) {
     Fhe_ctx().Get_ctx_param().Set_poly_degree(16, false);
-    Fhe_ctx().Get_ctx_param().Set_mul_level(this->GetParam().Input_level(),
-                                            true);
+    Fhe_ctx().Get_ctx_param().Set_mul_level(this->GetParam().Mul_level(), true);
     Fhe_ctx().Get_ctx_param().Set_q_part_num(2);
   }
 
@@ -79,6 +82,7 @@ protected:
       air::base::NODE_PTR child = func_entry->Child(id);
       AIR_ASSERT(child->Opcode() == air::core::OPC_IDNAME);
       Set_level_attr(child, this->GetParam().Input_level());
+      Set_sf_degree(child, 1);
     }
   }
 
@@ -154,6 +158,10 @@ public:
 
   void Set_level_attr(air::base::NODE_PTR node, uint32_t l) {
     node->Set_attr<uint32_t>(fhe::core::FHE_ATTR_KIND::LEVEL, &l, 1);
+  }
+
+  void Set_sf_degree(air::base::NODE_PTR node, uint32_t l) {
+    node->Set_attr<uint32_t>(fhe::core::FHE_ATTR_KIND::SCALE, &l, 1);
   }
 
   void Set_rot_idx_attr(air::base::NODE_PTR  node,

@@ -14,6 +14,12 @@ from ace_util import *  # noqa F403
 def run_single(exec_cmd, indent_size, log, trace):
     '''
     Run single encrypted computation
+
+    Args:
+        exec_cmd(list[str]): command to run
+        indent_size(int): size of indent to write in log
+        log(file): log file
+        trace(bool): if runtime trace is enabled
     '''
     indent = ' ' * indent_size
     os.environ["RTLIB_BTS_EVEN_POLY"] = "1"
@@ -55,6 +61,15 @@ def run_single(exec_cmd, indent_size, log, trace):
 def run_perf(exec_files, cifar10_dir, cifar100_dir, index, debug, trace, log):
     '''
     Main function to run encrypted computations in serial
+
+    Args:
+        exec_files(list[str]): encrypted executables to run
+        cifar10_dir(str): path of the dir that holds the cifar10 data file
+        cifar100_dir(str): path of the dir that holds the cifar100 data file
+        index(int): starting index in the cifar data set
+        debug(bool): print out debug info
+        trace(bool): if runtime trace is enabled
+        log(file): log file
     '''
     info = '-------- ACE Performance --------\n'
     write_log(info, log)

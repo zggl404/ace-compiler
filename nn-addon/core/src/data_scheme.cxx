@@ -33,53 +33,43 @@ std::string DATA_CHUNK::To_str() const {
   return buf.str();
 }
 
-void Set_input_scheme_attr(air::base::NODE_PTR input, air::base::TYPE_PTR type,
-                           uint32_t n_n, uint32_t n_c, uint32_t n_h,
-                           uint32_t n_w, uint32_t o_h, uint32_t o_w) {
-  AIR_ASSERT(input->Opcode() == air::core::OPC_IDNAME);
-  AIR_ASSERT(input->Rtype()->Is_array());
+void Set_scheme_attr(air::base::NODE_PTR node, air::base::TYPE_PTR type,
+                     uint32_t n_n, uint32_t n_c, uint32_t n_h, uint32_t n_w,
+                     uint32_t o_h, uint32_t o_w) {
+  AIR_ASSERT(node->Opcode() == air::core::OPC_IDNAME ||
+             node->Opcode() == air::core::OPC_RETV);
+  if (node->Has_rtype()) {
+    AIR_ASSERT(node->Rtype()->Is_array());
+  }
   AIR_ASSERT(type->Is_array());
-  AIR_ASSERT(type->Cast_to_arr()->Dim() == 4);
+  AIR_ASSERT(type->Cast_to_arr()->Dim() == 4 ||
+             type->Cast_to_arr()->Dim() == 2);
   AIR_ASSERT_MSG(n_w == 1 && o_w == 0, "TODO: n_w != 1");
   std::vector<int64_t> shape     = type->Cast_to_arr()->Shape();
-  uint32_t             tot_count = shape[0] * shape[1] * shape[2] * shape[3];
-  uint32_t             num_chunk = n_n * n_c * n_h * n_w;
+  uint32_t             tot_count = 0;
+  int64_t              iw        = 0;
+  if (shape.size() == 4) {
+    tot_count = shape[0] * shape[1] * shape[2] * shape[3];
+    iw        = shape[3];
+  } else if (shape.size() == 2) {
+    tot_count = shape[0] * shape[1];
+    iw        = shape[1];
+  } else {
+    AIR_ASSERT(false);
+  }
+  uint32_t num_chunk = n_n * n_c * n_h * n_w;
   AIR_ASSERT(tot_count % num_chunk == 0);
   DATA_CHUNK chunk[num_chunk];
   uint32_t   count = tot_count / num_chunk;
   for (int i = 0; i < num_chunk; ++i) {
-    uint32_t length = count;
-    uint32_t start  = i * count;
-    uint32_t pad    = o_h * shape[3];
-    chunk[i].Init(DATA_CHUNK_KIND::BLOCK, i, length, start, pad, 1);
+    uint32_t start = i * count;
+    uint32_t pad   = o_h * iw;
+    chunk[i].Init(DATA_CHUNK_KIND::BLOCK, i, count, start, pad, 1);
   }
-  input->Set_attr(ATTR::SHAPE, shape.data(), shape.size());
-  input->Set_attr(ATTR::NUM_CHUNK, &num_chunk, 1);
-  input->Set_attr(ATTR::DATA_SCHEME, chunk[0].Data(),
-                  chunk[0].Size() * num_chunk);
-}
-
-void Set_output_scheme_attr(air::base::NODE_PTR output,
-                            air::base::TYPE_PTR type, uint32_t n_h,
-                            uint32_t n_w, uint32_t o_h, uint32_t o_w) {
-  AIR_ASSERT(output->Opcode() == air::core::OPC_RETV);
-  AIR_ASSERT(output->Child(0)->Rtype()->Is_array());
-  AIR_ASSERT(type->Is_array());
-  AIR_ASSERT(type->Cast_to_arr()->Dim() == 2);
-  std::vector<int64_t> shape     = type->Cast_to_arr()->Shape();
-  uint32_t             tot_count = shape[0] * shape[1];
-  uint32_t             num_chunk = n_h * n_w;
-  AIR_ASSERT(tot_count % num_chunk == 0);
-  DATA_CHUNK chunk[num_chunk];
-  uint32_t   count = tot_count / num_chunk;
-  for (int i = 0; i < num_chunk; ++i) {
-    chunk[i].Init(DATA_CHUNK_KIND::BLOCK, i, count, i * count, o_h * shape[1],
-                  1);
-  }
-  output->Set_attr(ATTR::SHAPE, shape.data(), shape.size());
-  output->Set_attr(ATTR::NUM_CHUNK, &num_chunk, 1);
-  output->Set_attr(ATTR::DATA_SCHEME, chunk[0].Data(),
-                   chunk[0].Size() * num_chunk);
+  node->Set_attr(ATTR::SHAPE, shape.data(), shape.size());
+  node->Set_attr(ATTR::NUM_CHUNK, &num_chunk, 1);
+  node->Set_attr(ATTR::DATA_SCHEME, chunk[0].Data(),
+                 chunk[0].Size() * num_chunk);
 }
 
 uint32_t Num_data_chunk(air::base::NODE_PTR node) {

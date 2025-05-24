@@ -50,6 +50,10 @@ public:
   //! @brief Handle HPOLY_OPERATOR::RESCALE
   template <typename RETV, typename VISITOR>
   POLY_LOWER_RETV Handle_rescale(VISITOR* visitor, air::base::NODE_PTR node);
+
+  //! @brief Handle HPOLY_OPERATOR::RAISE_MOD
+  template <typename RETV, typename VISITOR>
+  POLY_LOWER_RETV Handle_raise_mod(VISITOR* visitor, air::base::NODE_PTR node);
 };
 
 class CORE2HP2 : public air::core::DEFAULT_HANDLER {
@@ -433,10 +437,10 @@ POLY_LOWER_RETV HP1TOHP2::Handle_rescale(VISITOR*            visitor,
 
   // change from flooring to rounding
   // v_rs2 = Add(v_rs1, q_last/2)
-  CONST_VAR               v_rs2 = irgen.New_poly_preg();
-  air::base::CONSTANT_PTR q_cst =
-      lower_ctx->Get_crt_cst().Get_q(irgen.Glob_scope());
-  uint64_t            q_last_half = q_cst->Array_elem<uint64_t>(num_q - 1) / 2;
+  CONST_VAR v_rs2 = irgen.New_poly_preg();
+  uint64_t  q_last_half =
+      lower_ctx->Get_crt_cst().Get_prime(irgen.Glob_scope(), (num_q - 1)) / 2;
+
   air::base::NODE_PTR n_half =
       cntr->New_intconst(irgen.Get_type(UINT64), q_last_half, spos);
   air::base::NODE_PTR n_rs2 =
@@ -477,6 +481,100 @@ POLY_LOWER_RETV HP1TOHP2::Handle_rescale(VISITOR*            visitor,
       irgen.New_poly_mul(irgen.New_var_load(v_rs5, spos), n_qlinvmodq, spos);
   air::base::STMT_PTR s_res = irgen.New_var_store(n_res, v_res, spos);
   ctx.Prepend(s_res);
+  return POLY_LOWER_RETV();
+}
+
+//! @brief Lowering for HPOLY::Raise_mod
+//! Raise_mod is the first step of Bootstrap, which raise the modulus of input
+//! level to the required target level
+//! v_res = HPOLY.Raise_mod(v_input, raised_level)
+//! Lowered to:
+//! // unrolled
+//! while(v_input.sf_degree > 1) {
+//!   v_input = Rescale(v_input)
+//! }
+//! v_input   = INTT(v_input)
+//! v_switch1 = ADD(v_input, q0/2)
+//! v_switch2 = BSWITCH(v_input, q0halfmodq, 1, raised_level - 1)
+//! v_switch3 = CONCAT(v_input, v_switch2)
+//! v_res     = NTT(v_switch3)
+template <typename RETV, typename VISITOR>
+POLY_LOWER_RETV HP1TOHP2::Handle_raise_mod(VISITOR*            visitor,
+                                           air::base::NODE_PTR node) {
+  POLY_LOWER_CTX&       ctx       = visitor->Context();
+  fhe::core::LOWER_CTX* lower_ctx = ctx.Lower_ctx();
+  POLY_IR_GEN&          irgen     = ctx.Poly_gen();
+  air::base::SPOS       spos      = node->Spos();
+  air::base::CONTAINER* cntr      = ctx.Container();
+  air::base::NODE_PTR   opnd0     = node->Child(0);
+  air::base::NODE_PTR   opnd1     = node->Child(1);
+  CONST_VAR&            v_res     = irgen.Node_var(node);
+  CONST_VAR&            v_input   = irgen.Node_var(opnd0);
+  uint32_t              num_q     = irgen.Get_num_q(opnd0);
+
+  CMPLR_ASSERT(irgen.Is_type_of(opnd0->Rtype_id(), POLY),
+               "raisemod opnd is not RNS_POLY type");
+  AIR_ASSERT(opnd1->Opcode() == air::core::OPC_INTCONST);
+  AIR_ASSERT_MSG(num_q == 1, "bootstrap raisemod input level should be 1");
+
+  uint32_t raised_level = opnd1->Intconst();
+  if (raised_level == 0) {
+    raised_level = lower_ctx->Get_ctx_param().Get_mul_level();
+  }
+  air::base::NODE_PTR opnd0_retv = visitor->template Visit<RETV>(opnd0).Node();
+
+  // Step 1: Rescale the ciphertext if scaling factor greater than 1
+  uint32_t sf_degree = irgen.Get_sf_deg(opnd0);
+  while (sf_degree > 1) {
+    air::base::NODE_PTR n_rs = irgen.New_rescale(opnd0_retv, spos);
+    air::base::STMT_PTR s_rs = irgen.New_var_store(n_rs, v_input, spos);
+    ctx.Prepend(s_rs);
+    sf_degree = sf_degree - 1;
+  }
+
+  // Step 2: Perform intt
+  air::base::NODE_PTR n_input = irgen.New_var_load(v_input, spos);
+  air::base::NODE_PTR n_intt  = irgen.New_intt(n_input, spos);
+  air::base::STMT_PTR s_intt  = irgen.New_var_store(n_intt, v_input, spos);
+  ctx.Prepend(s_intt);
+
+  // Step3: Switch modulus from q0 to {q0...q_level}
+  // change from flooring to rounding
+  CONST_VAR v_bswitch1 = irgen.New_poly_preg();
+  uint64_t  q0_half =
+      lower_ctx->Get_crt_cst().Get_prime(irgen.Glob_scope(), 0) / 2;
+  air::base::NODE_PTR n_half =
+      cntr->New_intconst(irgen.Get_type(UINT64), q0_half, spos);
+  n_input                        = irgen.New_var_load(v_input, spos);
+  air::base::NODE_PTR n_bswitch1 = irgen.New_poly_add(n_input, n_half, spos);
+  air::base::STMT_PTR s_bswitch1 =
+      irgen.New_var_store(n_bswitch1, v_bswitch1, spos);
+  ctx.Prepend(s_bswitch1);
+
+  CONST_VAR v_bswitch2           = irgen.New_poly_preg();
+  uint32_t  s_idx                = 1;  // start from q1
+  uint32_t  e_idx                = raised_level - 1;
+  n_bswitch1                     = irgen.New_var_load(v_bswitch1, spos);
+  air::base::NODE_PTR n_bswitch2 = irgen.New_bswitch(
+      n_bswitch1, irgen.New_q0halfmodq(spos), s_idx, e_idx, spos);
+  air::base::STMT_PTR s_bswitch2 =
+      irgen.New_var_store(n_bswitch2, v_bswitch2, spos);
+  ctx.Prepend(s_bswitch2);
+
+  // Step4: Concat q0 and {q1...q_level}
+  CONST_VAR v_concat           = irgen.New_poly_preg();
+  n_input                      = irgen.New_var_load(v_input, spos);
+  n_bswitch2                   = irgen.New_var_load(v_bswitch2, spos);
+  air::base::NODE_PTR n_concat = irgen.New_concat(n_input, n_bswitch2, spos);
+  air::base::STMT_PTR s_concat = irgen.New_var_store(n_concat, v_concat, spos);
+  ctx.Prepend(s_concat);
+
+  // Step5: Perform ntt
+  n_concat                  = irgen.New_var_load(v_concat, spos);
+  air::base::NODE_PTR n_ntt = irgen.New_ntt(n_concat, spos);
+  air::base::STMT_PTR s_res = irgen.New_var_store(n_ntt, v_res, spos);
+  ctx.Prepend(s_res);
+
   return POLY_LOWER_RETV();
 }
 

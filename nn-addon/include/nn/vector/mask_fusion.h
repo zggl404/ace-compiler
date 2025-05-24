@@ -284,8 +284,7 @@ public:
     int64_t output_size = channel_out * input_height * input_width;
 
     // generate worklist which contains all op that generate mask
-    if (ctx.Conv_fast() && (channel_out >= channel_in) &&
-        (ctx.Get_slot() != output_size)) {
+    if ((channel_out >= channel_in) && (ctx.Get_slot() != output_size)) {
       ctx.Register_node_mask_len(node->Id(), (uint32_t)output_size);
     }
 

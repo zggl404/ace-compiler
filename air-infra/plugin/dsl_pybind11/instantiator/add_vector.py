@@ -18,7 +18,7 @@ def kernel_impl():
     '''
     implementation of the kernel
     '''
-    def add_vector_impl(input_a, input_b):
+    def __main__(input_a, input_b):  # noqa N807
         '''
         implementation of the add
         '''

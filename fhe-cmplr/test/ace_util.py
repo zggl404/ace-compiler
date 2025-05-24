@@ -16,11 +16,18 @@ REQUIRED_MEMORY = {
     'resnet32_cifar100': 60,
     'resnet44_cifar10': 50,
     'resnet56_cifar10': 50,
-    'resnet110_cifar10': 50
+    'resnet110_cifar10': 50,
+    'conv_3x16x32x3': 10,
+    'conv_16x16x32x3': 10,
+    'conv_32x32x16x3': 10,
+    'conv_64x64x8x3': 10,
+    'conv_64x64x56x3': 10,
+    'conv_128x128x28x3': 10,
+    'conv_256x256x14x3': 10,
+    'conv_512x512x7x3': 15,
 }
 # Default options, supposed to be the fastest options
 DEFAULT_OPTION = [
-    '-VEC:conv_fast',
     '-CKKS:hw=192:q0=60:sf=56',
     '-P2C:fp'
 ]
@@ -36,7 +43,6 @@ CGO25_MODEL = [
 ]
 # ACE compilation options for performance tests
 CGO25_PERF_OPTION = [
-    '-VEC:conv_fast',
     '-SIHE:relu_vr_def=2:relu_mul_depth=13',
     '-CKKS:hw=192:q0=60:sf=56',
     '-P2C:fp'
@@ -321,10 +327,41 @@ CGO25_CONFIG = {
 ASPLOS25_MODEL = []
 ASPLOS25_CONFIG = {}
 
+# OPSLA25 test configurations
+OOPSLA25_MODEL = [
+    'conv_3x16x32x3',
+    'conv_16x16x32x3',
+    'conv_32x32x16x3',
+    'conv_64x64x8x3',
+    'conv_64x64x56x3',
+    'conv_128x128x28x3',
+    'conv_256x256x14x3',
+    'conv_512x512x7x3',
+    # 'gemv_4096x4096',   # 64M size onnx file
+    # 'gemv_4096x25088'   # 392M size onnx file
+]
+
+# ACE compilation options for performance tests
+OOPSLA25_PERF_OPTION = [
+    '-VEC:ms=32768:gemmf:convf:ssf:conv_parl:sharding:rtt',
+    '-SIHE:relu_vr_def=100:rtt',
+    '-CKKS:hw=192:q0=60:sf=56:N=65536:pots:rtt',
+    '-POLY:rtt',
+    '-P2C:fp'           # df option is enabled in the ace_compile_and_link method
+]
+
+OOPSLA25_CONFIG = {
+    'test': OOPSLA25_MODEL,
+    'perf': OOPSLA25_PERF_OPTION
+}
 
 def write_log(info, log):
     '''
     Print out info and write to log file if exists
+
+    Args:
+        info(str): message to print out
+        log(file): log file
     '''
     print(info[:-1])
     if log is not None:
@@ -336,6 +373,12 @@ def write_log(info, log):
 def time_and_memory(outputs):
     '''
     Identify time and memory info from time output
+
+    Args:
+        outputs(str): 'time -f "%e %M"' outputs
+
+    Returns:
+        (time, memory)(float, float): execution time & memory
     '''
     result = outputs.strip('"').split(' ')
     return float(result[0]), float(result[1]) / 1000000
@@ -345,6 +388,12 @@ def get_test_name(onnx_file):
     '''
     Return test name according to onnx_file name
     e.g. return resnet20_cifar10 for resnet20_cifar10_pre.onnx
+
+    Args:
+        onnx_file(str): path of the onnx file
+
+    Returns:
+        test(str): name of the test
     '''
     for idx in REQUIRED_MEMORY:
         idx_start = onnx_file.find(idx)
@@ -363,6 +412,12 @@ def get_test_name(onnx_file):
 def get_exec_mem(onnx_file):
     '''
     Return memory requirement for the test in Gigabytes
+
+    Args:
+        onnx_file(str): path of the onnx file
+
+    Returns:
+        mem(int): memory required in Gigabytes to run the test
     '''
     idx = get_test_name(onnx_file)
     if idx is not None:
@@ -374,6 +429,12 @@ def get_exec_mem(onnx_file):
 def get_ace_cmplr(cmplr_dir):
     '''
     Find out the executable of ACE compiler
+
+    Args:
+        cmplr_dir(str): path of the dir that the ACE compiler is built or installed
+
+    Returns:
+        cmplr(str): path of the 'fhe_cmplr' executable
     '''
     for root, _, files in os.walk(cmplr_dir):
         for f in files:
@@ -385,6 +446,14 @@ def get_ace_cmplr(cmplr_dir):
 def get_cifar_option(test, cifar10_dir, cifar100_dir):
     '''
     Return the cifar data file required to run the test
+
+    Args:
+        test(str): name of the test, e.g. resnet20_cifar10
+        cifar10_dir(str): path of the dir that holds the cifar10 data file
+        cifar100_dir(str): path of the dir that holds the cifar100 data file
+
+    Returns:
+        res(str): path of the cifar data file
     '''
     res = None
     if test.find('cifar100') != -1:
@@ -409,6 +478,12 @@ def get_cifar_option(test, cifar10_dir, cifar100_dir):
 def check_required_memory(rq_mem):
     '''
     Check if the system has enough memory to run performance tests
+
+    Args:
+        rq_mem(int): memory required in Gigabytes
+
+    Returns:
+        pass(bool): if memory is enough
     '''
     mem = psutil.virtual_memory()
     total_mem = mem.total / 1000000
@@ -420,6 +495,14 @@ def check_required_memory(rq_mem):
 def calculate_process_num(image_num, test_set, log):
     '''
     Calculate parallel process number
+
+    Args:
+        image_num(int): number of images to test
+        test_set(list[str]): tests to run
+        log(file): log file
+
+    Returns:
+        (num_cpus, num_process)(int, int): number of cpu required and process to run in parallel
     '''
     num_cpus = 1
     num_process = 1
@@ -461,6 +544,12 @@ def calculate_process_num(image_num, test_set, log):
 def run_cmd(cmd):
     '''
     Function used in multiprocessing
+
+    Args:
+        cmd(list[str]): command line to run
+
+    Returns:
+        ret(CompletedProcess[bytes]): execution results of the command
     '''
     ret = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return ret
@@ -469,6 +558,14 @@ def run_cmd(cmd):
 def get_test_onnx_files(onnx_file, model_dir, paper):
     '''
     Collect onnx model files that are to run in the test
+
+    Args:
+        onnx_file(str): path of the onnx file
+        model_dir(str): path of the dir that holds onnx files to test
+        paper(str): conference paper configuration
+
+    Returns:
+        ret(list[str]): onnx files to run
     '''
     ret = []
     if onnx_file is not None:
@@ -486,6 +583,8 @@ def get_test_onnx_files(onnx_file, model_dir, paper):
             test_set = CGO25_MODEL
             if paper == 'asplos25':
                 test_set = ASPLOS25_MODEL
+            elif paper == 'oopsla25':
+                test_set = OOPSLA25_MODEL
             for test in test_set:
                 found = False
                 for model_file in model_files:
@@ -505,6 +604,14 @@ def get_test_onnx_files(onnx_file, model_dir, paper):
 def check_compile_env(build_dir, cmplr_dir, src_dir):
     '''
     Check ACE compilation environment
+
+    Args:
+        build_dir(str): path of the build dir of the ACE compiler
+        cmplr_dir(str): path of the install dir of the ACE compiler
+        src_dir(str): path that holds air-infra, nn-addon & fhe-cmplr
+
+    Returns:
+        (cmplr_dir, installed)(str, bool): path of the ACE compiler & if it is an installed one
     '''
     # check ACE compiler
     installed = False
@@ -533,6 +640,17 @@ def check_compile_env(build_dir, cmplr_dir, src_dir):
 def get_ace_option(test, paper, lib, extra, acc, trace):
     '''
     Return compilation options for ACE compiler according to tests selected
+
+    Args:
+        test(str): name of the test
+        paper(str): conference paper configuration
+        lib(str): target library to link
+        extra(list[str]): extra ACE compilation options
+        acc(bool): compile for accuracy test
+        trace(bool): if ACE trace is enabled
+
+    Returns:
+        res(list[str]): ACE compilation options
     '''
     res = []
     config = DEFAULT_CONFIG
@@ -541,6 +659,8 @@ def get_ace_option(test, paper, lib, extra, acc, trace):
         config = CGO25_CONFIG
     elif paper == 'asplos25':
         config = ASPLOS25_CONFIG
+    elif paper == 'oopsla25':
+        config = OOPSLA25_CONFIG
     if acc:
         res.extend(config['accuracy'])
     else:
@@ -565,6 +685,13 @@ def get_ace_option(test, paper, lib, extra, acc, trace):
 def get_onnx_inc_file(test, src_dir):
     '''
     Return the onnx.inc file to be replaced with ACE generated onnx.c
+
+    Args:
+        test(str): name of the test
+        src_dir(str): path that holds air-infra, nn-addon & fhe-cmplr
+
+    Returns:
+        file(str): corresponding onnx.c file for the input test
     '''
     inc_file = test + '_pre.onnx.inc'
     src_path = os.path.abspath(os.path.join(src_dir, 'fhe-cmplr'))
@@ -575,9 +702,18 @@ def get_onnx_inc_file(test, src_dir):
     return None
 
 
-def get_cpp_option(cmplr_dir, installed, src_dir, acc):
+def get_cpp_option(cmplr_dir, installed, src_dir, omp):
     '''
-    Return include & link options used to generate executable
+    Return compile & link c++ options to generate executable
+
+    Args:
+        cmplr_dir(str): path of the dir that the ACE compiler is built or installed
+        installed(bool): if the ACE compiler is installed or located in build dir
+        src_dir(str): path that holds air-infra, nn-addon & fhe-cmplr
+        omp(bool): if OpenMP is enabled
+
+    Returns:
+        res(list[str]): c++ options
     '''
     res = []
     ace_lib_to_link = ['libAIRutil.a', 'libFHErt_ant.a', 'libFHErt_common.a']
@@ -598,7 +734,7 @@ def get_cpp_option(cmplr_dir, installed, src_dir, acc):
         res.extend(['-I', os.path.join(src_dir, 'fhe-cmplr/rtlib/include/')])
     # append link options
     res.extend(['-O3', '-DNDEBUG', '-std=gnu++17'])
-    if acc:
+    if omp:
         res.append('-fopenmp')
     for root, _, files in os.walk(cmplr_dir):
         for f in files:

@@ -184,7 +184,10 @@ public:
   STMT_PTR New_entry(CONST_ENTRY_PTR entry, const SPOS& spos);
   STMT_PTR New_ret(const SPOS& spos);
   STMT_PTR New_retv(CONST_NODE_PTR retv, const SPOS& spos);
-  //! New statement of a direct call
+  //! @brief New statement of a direct call,
+  //! if its signature has a return parameter,
+  //! retv must not be null and retv's type must match the type of the
+  //! signature's return parameter, otherwise, retv must be null
   STMT_PTR New_call(CONST_ENTRY_PTR entry, CONST_PREG_PTR retv,
                     uint32_t num_args, const SPOS& spos);
   NODE_PTR New_intrn_op(const char* fname, TYPE_ID rtype, uint32_t num_args,
