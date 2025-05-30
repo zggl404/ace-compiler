@@ -37,7 +37,7 @@ public:
       ctx << "Add_ciph(&";
     } else {
       AIR_ASSERT(node->Child(1)->Rtype()->Is_prim());
-      ctx << "Add_const(&";
+      ctx << "Add_scalar(&";
     }
     ctx.Emit_st_var(parent);
     ctx << ", ";
@@ -61,7 +61,7 @@ public:
       ctx << "Mul_ciph(&";
     } else {
       AIR_ASSERT(node->Child(1)->Rtype()->Is_prim());
-      ctx << "Mul_ciph(&";
+      ctx << "Mul_scalar(&";
     }
 
     ctx.Emit_st_var(parent);

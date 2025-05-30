@@ -108,7 +108,7 @@ public:
 
   void Emit_need_bts() {
     if (this->Provider() == core::PROVIDER::SEAL) {
-      _os << "bool need_bts() {"
+      _os << "bool Need_bts() {"
           << "\n";
       if (this->_need_bts) {
         _os << "  return true;\n";

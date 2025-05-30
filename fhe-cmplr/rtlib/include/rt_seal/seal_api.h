@@ -49,8 +49,10 @@ double* Seal_handle_output(const char* name);
 //! @brief Seal API for evaluation
 void Seal_add_ciph(CIPHER res, CIPHER op1, CIPHER op2);
 void Seal_add_plain(CIPHER res, CIPHER op1, PLAIN op2);
+void Seal_add_scalar(CIPHER res, CIPHER op1, double op2);
 void Seal_mul_ciph(CIPHER res, CIPHER op1, CIPHER op2);
 void Seal_mul_plain(CIPHER res, CIPHER op1, PLAIN op2);
+void Seal_mul_scalar(CIPHER res, CIPHER op1, double op2);
 void Seal_rotate(CIPHER res, CIPHER op, int step);
 void Seal_rescale(CIPHER res, CIPHER op);
 void Seal_mod_switch(CIPHER res, CIPHER op);

@@ -28,7 +28,7 @@ REQUIRED_MEMORY = {
 }
 # Default options, supposed to be the fastest options
 DEFAULT_OPTION = [
-    '-CKKS:hw=192:q0=60:sf=56',
+    '-CKKS:hw=192:q0=60:sf=56:sbm',
     '-P2C:fp'
 ]
 # CGO25 test configurations
