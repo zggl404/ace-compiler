@@ -61,14 +61,20 @@ function(build_rtlib)
   )
 
   # for seal & openfhe
-  add_library(FHErt_seal STATIC IMPORTED GLOBAL)
-  set_target_properties(FHErt_seal PROPERTIES
-    IMPORTED_LOCATION "${BINARY_DIR}/seal/libFHErt_seal.a"
-  )
-  add_library(FHErt_openfhe STATIC IMPORTED GLOBAL)
-  set_target_properties(FHErt_openfhe PROPERTIES
-    IMPORTED_LOCATION "${BINARY_DIR}/openfhe/libFHErt_openfhe.a"
-  )
+  if(FHE_ENABLE_SEAL)
+    add_library(FHErt_seal STATIC IMPORTED GLOBAL)
+    set_target_properties(FHErt_seal PROPERTIES
+      IMPORTED_LOCATION "${BINARY_DIR}/seal/libFHErt_seal.a"
+    )
+    install(FILES ${BINARY_DIR}/seal/libFHErt_seal.a DESTINATION rtlib/lib)
+  endif()
+  if(FHE_ENABLE_OPENFHE)
+    add_library(FHErt_openfhe STATIC IMPORTED GLOBAL)
+    set_target_properties(FHErt_openfhe PROPERTIES
+      IMPORTED_LOCATION "${BINARY_DIR}/openfhe/libFHErt_openfhe.a"
+    )
+    install(FILES ${BINARY_DIR}/openfhe/libFHErt_openfhe.a DESTINATION rtlib/lib)
+  endif()
 
   add_test(NAME test_fhe_rtlib COMMAND ${CMAKE_COMMAND} --build ${BINARY_DIR} --target test)
 
@@ -81,10 +87,6 @@ function(build_rtlib)
   install(FILES ${BINARY_DIR}/common/libFHErt_common.a DESTINATION rtlib/lib)
   install(FILES ${BINARY_DIR}/ant/libFHErt_ant.a DESTINATION rtlib/lib)
   install(FILES ${BINARY_DIR}/ant/libFHErt_ant_encode.a DESTINATION rtlib/lib)
-
-  # for seal & openfhe
-  install(FILES ${BINARY_DIR}/seal/libFHErt_seal.a DESTINATION rtlib/lib)
-  install(FILES ${BINARY_DIR}/openfhe/libFHErt_openfhe.a DESTINATION rtlib/lib)
 endfunction()
 
 if(NOT TARGET fhe_rtlib)

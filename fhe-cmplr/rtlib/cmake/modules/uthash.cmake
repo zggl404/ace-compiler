@@ -7,14 +7,7 @@
 
 function(fetch_uthash)
 
-  set(UTHASH_URL      "https://code.alipay.com/fhe-cmplr/uthash.git")
-  set(UTHASH_URL_SSH  "git@code.alipay.com:fhe-cmplr/uthash.git")
-  if(EXTERNAL_URL_SSH)
-    set(REPO_UTHASH_URL ${UTHASH_URL_SSH})
-  else()
-    set(REPO_UTHASH_URL ${UTHASH_URL})
-  endif()
-
+  set(REPO_UTHASH_URL      "https://github.com/troydhanson/uthash.git")
   message(STATUS "Cloning External Repository   : ${REPO_UTHASH_URL}")
 
   include(FetchContent)

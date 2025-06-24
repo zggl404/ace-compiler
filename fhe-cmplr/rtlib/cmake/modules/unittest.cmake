@@ -8,14 +8,7 @@
 # Build external unittest project dependent function
 function(build_external_unittest)
   
-  set(UNITTEST_URL      "https://code.alipay.com/opencc/googletest.git")
-  set(UNITTEST_URL_SSH  "git@code.alipay.com:opencc/googletest.git")
-  if(EXTERNAL_URL_SSH)
-    set(REPO_UNITTEST_URL ${UNITTEST_URL_SSH})
-  else()
-    set(REPO_UNITTEST_URL ${UNITTEST_URL})
-  endif()
-
+  set(REPO_UNITTEST_URL      "https://github.com/google/googletest.git")
   message(STATUS "Cloning External Repository   : ${REPO_UNITTEST_URL}")
 
   include(ExternalProject)

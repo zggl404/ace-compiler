@@ -8,14 +8,7 @@
 # Build external jsoncpp project dependent function
 function(build_external_jsoncpp)
 
-  set(JSONCPP_URL      "https://code.alipay.com/air-infra/jsoncpp.git")
-  set(JSONCPP_URL_SSH  "git@code.alipay.com:air-infra/jsoncpp.git")
-  if(EXTERNAL_URL_SSH)
-    set(REPO_JSONCPP_URL ${JSONCPP_URL_SSH})
-  else()
-    set(REPO_JSONCPP_URL ${JSONCPP_URL})
-  endif()
-
+  set(REPO_JSONCPP_URL      "https://github.com/open-source-parsers/jsoncpp.git")
   message(STATUS "Cloning External Repository   : ${REPO_JSONCPP_URL}")
 
   include(FetchContent)

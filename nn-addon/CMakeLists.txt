@@ -33,11 +33,11 @@ option(BUILD_SHARED        "Control whether to build the shared libraries" OFF)
 option(BUILD_UNITTEST      "Control whether to build the unittest"          ON)
 option(BUILD_BENCH         "Control whether to build the benmark"           ON)
 option(BUILD_DOC           "Control whether to build API documentation"    OFF)
-option(NN_CODE_CHECK       "Control whether to check coding style"          ON)
+option(NN_CODE_CHECK       "Control whether to check coding style"         OFF)
 option(NN_BUILD_TEST       "Control whether to build the tests"             ON)
 option(NN_BUILD_EXAMPLE    "Control whether to build the examples"          ON)
 option(NN_INSTALL_APP      "Control whether to install the APPs"            ON)
-option(EXTERNAL_URL_SSH    "Control choose external URL for repository"     ON)
+option(EXTERNAL_URL_SSH    "Control choose external URL for repository"    OFF)
 
 set(NN_WITH_SRC "" CACHE STRING "The default compilation depends")
 

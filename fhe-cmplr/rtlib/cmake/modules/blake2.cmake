@@ -6,14 +6,7 @@
 #=============================================================================
 
 function(fetch_blake2)
-  set(BLAKE2_URL      "https://code.alipay.com/fhe-cmplr/BLAKE2.git")
-  set(BLAKE2_URL_SSH  "git@code.alipay.com:fhe-cmplr/BLAKE2.git")
-  if(EXTERNAL_URL_SSH)
-    set(REPO_BLAKE2_URL ${BLAKE2_URL_SSH})
-  else()
-    set(REPO_BLAKE2_URL ${BLAKE2_URL})
-  endif()
-
+  set(REPO_BLAKE2_URL      "https://github.com/BLAKE2/BLAKE2.git")
   message(STATUS "Cloning External Repository   : ${REPO_BLAKE2_URL}")
 
   include(FetchContent)

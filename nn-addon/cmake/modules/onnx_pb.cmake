@@ -8,31 +8,33 @@
 # Build external onnx project dependent function
 function(build_external_proto)
 
-  set(ONNX_URL      "https://code.alipay.com/air-infra/onnx.git")
-  set(ONNX_URL_SSH  "git@code.alipay.com:air-infra/onnx.git")
-  if(EXTERNAL_URL_SSH)
-    set(REPO_ONNX_URL ${ONNX_URL_SSH})
-  else()
-    set(REPO_ONNX_URL ${ONNX_URL})
-  endif()
-
+  set(REPO_ONNX_URL      "https://github.com/onnx/onnx.git")
   message(STATUS "Cloning External Repository   : ${REPO_ONNX_URL}")
 
   include(FetchContent)
   FetchContent_Declare(
     onnx
     GIT_REPOSITORY  ${REPO_ONNX_URL}
-    GIT_TAG         feat-ACI_v1.9.0
+    GIT_TAG         rel-1.9.0
     GIT_SUBMODULES  ""
   )
 
   FetchContent_GetProperties(onnx)
   if(NOT onnx_POPULATED)
-      FetchContent_Populate(onnx)
+    FetchContent_Populate(onnx)
+
+    # Path to onnx.proto
+    set(ONNX_PROTO ${onnx_SOURCE_DIR}/onnx/onnx.proto)
+  
+    # Modify onnx.proto
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E echo "Modifying onnx.proto..."
+      COMMAND ${CMAKE_COMMAND} -E copy ${ONNX_PROTO} ${ONNX_PROTO}.bak
+      COMMAND ${CMAKE_COMMAND} -E sed -i.bak 's/option optimize_for = LITE_RUNTIME;//' ${ONNX_PROTO}
+    )
   endif()
 
   set(ONNX_PATH   ${onnx_SOURCE_DIR}/onnx/)
-  set(ONNX_PROTO  ${onnx_SOURCE_DIR}/onnx/onnx.proto)
   set(ONNX_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/onnx)
 
   execute_process(
