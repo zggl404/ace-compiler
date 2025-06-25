@@ -23,7 +23,7 @@ RUN pip3 install torch==2.0.1 && \
 
 # COPY script 
 COPY scripts/* /app/scripts/
-RUN chmod +x /app/scripts/fhelipe.sh
+RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh
 
 # clone fhelipe, apply patch
 WORKDIR /app/FHELIPE/
@@ -41,7 +41,7 @@ RUN pip install -e frontend/ && pip cache purge
 
 # build fhelipe
 # copy submodudle due to network issue
-ADD scripts/aws-cppwrapper-lattigo.tgz /app/FHELIPE/fhelipe/backend/aws-cppwrapper-lattigo
+ADD scritps/aws-cppwrapper-lattigo.tgz /app/FHELIPE/fhelipe/backend
 WORKDIR /app/FHELIPE/fhelipe/backend
 RUN scons lib
 RUN scons deps --no-deps-pull

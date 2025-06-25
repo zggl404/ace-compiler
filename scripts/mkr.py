@@ -51,12 +51,27 @@ if __name__ == "__main__":
                         help='directory that holds repos of air-infra, fhe-cmplr & nn-addon')
     parser.add_argument('-t', '--trace', action='store_false', default=True,
                         help='print out trace info into log file')
+    parser.add_argument("-o", "--output-log-dir", type=str, default="/app/mkr_ae_result/mkr/",
+        help="Specify the directory to move generated log files to.")
     args = parser.parse_args()
+
+    # Define the output directory path
+    output_log_dir = Path(args.output_log_dir)
+    # Ensure the top-level output directory exists before processing any cases
+    try:
+        os.makedirs(output_log_dir, exist_ok=True)
+        print(f"MKR logs will be moved to {output_log_dir}")
+    except OSError as e:
+        print(f"Error: Could not create output directory {output_log_dir}")
+        sys.exit(1)
+
     cwd = os.getcwd()
     date_time = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
-    log_file_name = date_time + '.mkr.log'
-    log = open(os.path.join(cwd, log_file_name), 'w')
-    info = '#### log for: %s\n' % (' '.join(sys.argv))
-    write_log(info, log)
-    oopsla25_ae(cwd, args, log)
-    log.close()
+    log_file_name = date_time + '.oopsla25.log'
+    final_log_path = output_log_dir / log_file_name
+    with open(final_log_path, 'w') as log:
+        info = '#### log for: %s\n' % (' '.join(sys.argv))
+        write_log(info, log)
+        oopsla25_ae(cwd, args, log)
+
+    print(f"MKR's log have be moved to {final_log_path}")

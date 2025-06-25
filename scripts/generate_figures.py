@@ -449,8 +449,8 @@ def main():
     parser.add_argument(
         '-o', '--output-dir',
         type=str,
-        default='/appt/scripts',
-        help='Specify the directory to save output files. Defaults to "/app/sripts".'
+        default='/app/mkr_ae_result',
+        help='Specify the directory to save output files. Defaults to "/app/mkr_ae_result".'
     )
 
     args = parser.parse_args()

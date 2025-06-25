@@ -4522,13 +4522,14 @@ index 7779b9a..fb6483c 100644
      "condor_fhelipe_logreg": condor_fhelipe_logreg,
 diff --git a/test_fhelipe.py b/test_fhelipe.py
 new file mode 100644
-index 0000000..cce10b9
+index 0000000..72641d9
 --- /dev/null
 +++ b/test_fhelipe.py
-@@ -0,0 +1,338 @@
+@@ -0,0 +1,373 @@
 +import argparse
 +import subprocess
 +import sys
++import os
 +from pathlib import Path
 +import shutil
 +import re
@@ -4679,31 +4680,48 @@ index 0000000..cce10b9
 +        print(ColorFilter.colored(f"\nFormatting error: {str(e)}", "\033[31m"))
 +        return None
 +
-+def rename_and_format_timing_file(program_name):
-+    """Handle timing file operations with formatting"""
-+    original_path = Path("ops_timing.txt")
-+    new_path = Path(f"{program_name}_ops_timing.txt")
++def rename_and_format_timing_file(program_name:str, output_log_dir: Path):
++    """Handle timing file operations with formatting and move to specified output directory."""
++    original_timing_file = Path("ops_timing.txt")
++
++    # Define the new base name for the timing file
++    new_base_name = f"{program_name}_ops_timing"
++
++    # Define the final paths in the output_log_dir
++    final_unformatted_path = output_log_dir / f"{new_base_name}.txt"
++    final_formatted_path = output_log_dir / f"{new_base_name}_formatted.txt"
 +
 +    try:
-+        if not original_path.exists():
-+            warn_msg = f"\nWarning: {original_path} not found"
++        # Check if the original timing file exists
++        if not original_timing_file.exists():
++            warn_msg = f"\nWarning: {original_timing_file} not found."
 +            print(ColorFilter.colored(warn_msg, "\033[33m"))
 +            return False
 +
-+        shutil.move(str(original_path), str(new_path))
-+        msg = f"\nRenamed timing file to {new_path}"
++        # Ensure the target output directory exists
++        os.makedirs(output_log_dir, exist_ok=True)
++
++        # 1. Move and rename the original timing file to the output directory
++        shutil.move(str(original_timing_file), str(final_unformatted_path))
++        msg = f"\nMoved and renamed timing file to: {final_unformatted_path}"
 +        print(ColorFilter.colored(msg, "\033[32m"))
 +
-+        # Format the new file
-+        formatted_path = format_timing_file(new_path)
-+        if formatted_path:
-+            msg = f"Created formatted file: {formatted_path}"
++        # 2. Format the file. format_timing_file will create the formatted file
++        #    next to the unformatted one (in output_log_dir).
++        #    It returns the path to the newly created formatted file.
++        actual_formatted_path = format_timing_file(final_unformatted_path)
++
++        if actual_formatted_path and actual_formatted_path.exists(): # Verify formatting succeeded and file exists
++            msg = f"Created formatted file: {actual_formatted_path}"
 +            print(ColorFilter.colored(msg, "\033[32m"))
 +            return True
-+        return False
++        else:
++            warn_msg = f"Warning: Failed to create formatted file for {program_name}."
++            print(ColorFilter.colored(warn_msg, "\033[33m"))
++            return False
 +
 +    except Exception as e:
-+        err_msg = f"\nFile error: {str(e)}"
++        err_msg = f"\nFile operation error for {program_name}: {str(e)}"
 +        print(ColorFilter.colored(err_msg, "\033[31m"))
 +        return False
 +
@@ -4749,7 +4767,7 @@ index 0000000..cce10b9
 +        print(ColorFilter.colored(f"Error reading input file: {str(e)}", "\033[31m"))
 +        sys.exit(1)
 +
-+def process_case(case_name, case_num, total_cases):
++def process_case(case_name: str, case_num: int, total_cases: int, output_log_dir: Path):
 +    """Process single case with progress tracking"""
 +    header = f"\nProcessing case {case_num}/{total_cases}: {case_name}"
 +    print(ColorFilter.colored(header, "\033[1m"))
@@ -4766,7 +4784,7 @@ index 0000000..cce10b9
 +        {
 +            "cmd": ["scripts/run.py", "--program", case_name, "--lattigo"],
 +            "desc": "Execution with Lattigo",
-+            "post": True
++            "post": True # Flag to indicate timing file processing
 +        }
 +    ]
 +
@@ -4777,7 +4795,7 @@ index 0000000..cce10b9
 +            return False
 +            
 +        if step.get("post", False):
-+           if not rename_and_format_timing_file(case_name):
++           if not rename_and_format_timing_file(case_name, output_log_dir):
 +                return False
 +                
 +    return True
@@ -4811,7 +4829,23 @@ index 0000000..cce10b9
 +    group.add_argument("-p", "--program", help="Single program name to process")
 +    group.add_argument("-f", "--file", help="Input file containing multiple program names")
 +
++    parser.add_argument("-o", "--output-log-dir", type=str,
++        default="fhelipe_logs", # Default output directory name
++        help="Specify the directory to move generated timing log files (e.g., ops_timing.txt) to."
++    )
++
 +    args = parser.parse_args()
++
++    # Define the output directory path
++    output_log_dir = Path(args.output_log_dir)
++
++    # Ensure the top-level output directory exists before processing any cases
++    try:
++        os.makedirs(output_log_dir, exist_ok=True)
++        print(ColorFilter.colored(f"\nAll generated timing logs will be moved to: {output_log_dir.resolve()}", "\033[36m"))
++    except OSError as e:
++        print(ColorFilter.colored(f"Error: Could not create output directory {output_log_dir}: {e}", "\033[31m"))
++        sys.exit(1)
 +
 +    # Get processing cases
 +    cases = get_processing_cases(args)
@@ -4823,7 +4857,7 @@ index 0000000..cce10b9
 +
 +    # Process each case
 +    for idx, case in enumerate(cases, 1):
-+        success = process_case(case, idx, total_cases)
++        success = process_case(case, idx, total_cases, output_log_dir)
 +        if success:
 +            success_count += 1
 +        else:
@@ -4835,6 +4869,7 @@ index 0000000..cce10b9
 +    # Print final summary
 +    print(ColorFilter.colored("\nProcessing Summary:", "\033[1m"))
 +    print(f"Successfully processed: {success_count}/{total_cases}")
++    print(ColorFilter.colored(f"\nAll generated timing logs have been moved to: {output_log_dir.resolve()}", "\033[36m"))
 +    if failed_cases:
 +        print(ColorFilter.colored("\nFailed cases:", "\033[31m"))
 +        for case in failed_cases:
