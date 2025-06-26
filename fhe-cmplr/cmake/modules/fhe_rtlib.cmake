@@ -82,7 +82,7 @@ function(build_rtlib)
   install(DIRECTORY ${SOURCE_DIR}/ant/include/ DESTINATION rtlib/include/ant)
 
   # put it here now, rm it wait for refactor private key
-  install(FILES ${BINARY_DIR}/_deps/uthash-src/src/uthash.h DESTINATION rtlib/include/ant)
+  install(FILES ${SOURCE_DIR}/cmake/modules/uthash/src/uthash.h DESTINATION rtlib/include/ant)
 
   install(FILES ${BINARY_DIR}/common/libFHErt_common.a DESTINATION rtlib/lib)
   install(FILES ${BINARY_DIR}/ant/libFHErt_ant.a DESTINATION rtlib/lib)
