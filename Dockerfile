@@ -10,16 +10,25 @@ RUN apt-get -y update && \
 	libgmp3-dev libtool libomp5 libomp-dev libntl-dev pybind11-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install torch==2.0.1 && \
-    pip3 install onnx==1.14.1 && \
-    pip3 install onnxruntime==1.15.1 && \
-    pip3 install matplotlib==3.7.5 && \
-    pip3 install numpy==1.24.4 && \
-    pip3 install torchvision==0.15.2 && \
-    pip3 install PyYAML==6.0.2 &&\
-    pip3 install plottable &&\
-    pip3 install psutil &&\
-    rm -rf /root/.cache/pip
+
+ENV PIP_NO_CACHE_DIR 1
+
+RUN pip install --upgrade pip setuptools wheel
+
+RUN set -ex && \
+    pip install \
+        PyYAML==5.3.1 \
+        onnx==1.14.1 \
+        onnxruntime==1.15.1 \
+        matplotlib==3.7.5 \
+        numpy==1.24.4 \
+        plottable \
+        psutil && \
+    pip install \
+        torch==2.0.1+cpu \
+        torchvision==0.15.2+cpu \
+        --index-url https://download.pytorch.org/whl/cpu \
+        --extra-index-url https://pypi.org/simple
 
 # COPY script 
 COPY scripts/* /app/scripts/

@@ -4044,13 +4044,13 @@ index 01212c3..b9c52d7 100644
 +        return y.timestamp(6, 0)
 diff --git a/input_cases.txt b/input_cases.txt
 new file mode 100644
-index 0000000..7b1f563
+index 0000000..69a9224
 --- /dev/null
 +++ b/input_cases.txt
 @@ -0,0 +1,21 @@
 +# gemm
-+metak_fhelipe_fc_512x512
 +metak_fhelipe_fc_4096x4096
++metak_fhelipe_fc_4096x25088
 +# conv
 +metak_fhelipe_conv_3x16x32x3
 +metak_fhelipe_conv_16x16x32x3
