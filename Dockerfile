@@ -44,6 +44,7 @@ WORKDIR /app
 COPY air-infra ace-compiler/air-infra/
 COPY nn-addon ace-compiler/nn-addon/
 COPY fhe-cmplr ace-compiler/fhe-cmplr/
+COPY proof ace-compiler/proof/
 RUN pip install --no-cache-dir -r scripts/requirements.txt
 # && \
 #    cmake -S ace-compiler/fhe-cmplr -B release -DFHE_WITH_SRC="air-infra;nn-addon" -DCMAKE_BUILD_TYPE=Release && \

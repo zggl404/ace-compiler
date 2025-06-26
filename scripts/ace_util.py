@@ -25,6 +25,17 @@ REQUIRED_MEMORY = {
     'conv_128x128x28x3': 10,
     'conv_256x256x14x3': 10,
     'conv_512x512x7x3': 15,
+    'gemv_4096x4096': 50,
+    'gemv_4096x25088': 100,
+    'squeezenet_cifar10':100,
+    'alexnet_cifar10': 100,
+    'vgg11_cifar10': 100,
+    'mobilenet_cifar10': 100,
+    'resnet18_imagenet': 500,
+    'squeezenet_imagenet': 500,
+    'alexnet_imagenet': 500,
+    'vgg11_imagenet': 500,
+    'mobilenet_imagenet':500,
 }
 # Default options, supposed to be the fastest options
 DEFAULT_OPTION = [
@@ -333,25 +344,41 @@ OOPSLA25_MODEL = [
     'conv_16x16x32x3',
     'conv_32x32x16x3',
     'conv_64x64x8x3',
-    'conv_64x64x56x3',
-    'conv_128x128x28x3',
-    'conv_256x256x14x3',
-    'conv_512x512x7x3',
     'gemv_4096x4096',   # 64M size onnx file
-    'gemv_4096x25088'   # 392M size onnx file
+    'gemv_4096x25088',   # 392M size onnx file
+    'resnet20_cifar10',
+    'fhelipe_squeezenet',
+    'fhelipe_alexnet',
+    'fhelipe_vgg11',
+    'fhelipe_mobilenet'
 ]
 
-# ACE compilation options for performance tests
+# OPSLA25 test configurations
+OOPSLA25_SHARDING_MODEL = [
+    'conv_64x64x56x3',      
+    'conv_128x128x28x3',    
+    'conv_256x256x14x3',    
+    'conv_512x512x7x3',   
+    'resnet18_imagenet',
+    'squeezenet_imagenet',
+    'alexnet_imagenet',
+    'vgg11_imagenet',
+    'mobilenet_imagenet'
+]
+
+# ACE compilation options for non-sharding option performance tests
 OOPSLA25_PERF_OPTION = [
-    '-VEC:ms=32768:ssf:conv_parl:sharding:rtt',
+    '-VEC:ms=32768:ssf:conv_parl:rtt',
     '-SIHE:relu_vr_def=100:rtt',
     '-CKKS:hw=192:q0=60:sf=56:N=65536:pots:rtt',
     '-POLY:rtt',
     '-P2C:fp'           # df option is enabled in the ace_compile_and_link method
 ]
 
+
 OOPSLA25_CONFIG = {
     'test': OOPSLA25_MODEL,
+    'sharding_test': OOPSLA25_SHARDING_MODEL,
     'perf': OOPSLA25_PERF_OPTION
 }
 
@@ -670,6 +697,9 @@ def get_ace_option(test, paper, lib, extra, acc, trace):
         relu_opt = config.get(test + '_relu')
         if relu_opt is not None:
             res.extend(relu_opt)
+    # sharding options
+    if test in config.get('sharding_test'):
+        res.extend('-VEC:sharding')
     # Target library option
     res.append('-P2C:lib=' + lib)
     # Trace option
