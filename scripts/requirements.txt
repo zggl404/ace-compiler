@@ -1,0 +1,16 @@
+PyYAML==5.3.1
+onnx==1.14.1
+onnxruntime==1.15.1
+matplotlib==3.7.5
+numpy==1.24.4
+plottable
+psutil
+onnx
+torchsummary
+onnxsim
+
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.0.1+cpu
+torchvision==0.15.2+cpu
+
+--extra-index-url https://pypi.org/simple

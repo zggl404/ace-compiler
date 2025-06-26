@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-
-# ResNet ImageNet (3, 224, 224)
-
 import torch
 import torch.nn as  nn
 import torch.nn.functional as F

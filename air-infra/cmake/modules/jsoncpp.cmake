@@ -8,14 +8,13 @@
 # Build external jsoncpp project dependent function
 function(build_external_jsoncpp)
 
-  set(REPO_JSONCPP_URL      "https://github.com/open-source-parsers/jsoncpp.git")
+  set(REPO_JSONCPP_URL      "${PROJECT_SOURCE_DIR}/cmake/modules/jsoncpp")
   message(STATUS "Cloning External Repository   : ${REPO_JSONCPP_URL}")
 
   include(FetchContent)
   FetchContent_Declare(
     jsoncpp
-    GIT_REPOSITORY ${REPO_JSONCPP_URL}
-    GIT_TAG master
+    SOURCE_DIR ${REPO_JSONCPP_URL}
     SOURCE_SUBDIR cmake
     CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=Release

@@ -8,15 +8,13 @@
 # Build external onnx project dependent function
 function(build_external_proto)
 
-  set(REPO_ONNX_URL      "https://github.com/onnx/onnx.git")
+  set(REPO_ONNX_URL      "${PROJECT_SOURCE_DIR}/cmake/modules/onnx")
   message(STATUS "Cloning External Repository   : ${REPO_ONNX_URL}")
 
   include(FetchContent)
   FetchContent_Declare(
     onnx
-    GIT_REPOSITORY  ${REPO_ONNX_URL}
-    GIT_TAG         rel-1.9.0
-    GIT_SUBMODULES  ""
+    SOURCE_DIR  ${REPO_ONNX_URL}
   )
 
   FetchContent_GetProperties(onnx)

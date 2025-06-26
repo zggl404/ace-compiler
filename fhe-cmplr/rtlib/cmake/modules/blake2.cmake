@@ -6,15 +6,14 @@
 #=============================================================================
 
 function(fetch_blake2)
-  set(REPO_BLAKE2_URL      "https://github.com/BLAKE2/BLAKE2.git")
+  set(REPO_BLAKE2_URL      "${PROJECT_SOURCE_DIR}/cmake/modules/BLAKE2")
   message(STATUS "Cloning External Repository   : ${REPO_BLAKE2_URL}")
 
   include(FetchContent)
 
   FetchContent_Declare(
       blake2
-      GIT_REPOSITORY ${REPO_BLAKE2_URL}
-      GIT_TAG master
+      SOURCE_DIR ${REPO_BLAKE2_URL}
   )
   FetchContent_MakeAvailable(blake2)
 

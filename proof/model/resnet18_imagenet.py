@@ -11,7 +11,7 @@ import onnx
 import onnxsim
 
 from torchsummary import summary
-from . import ResNet18
+from resnet_imagenet import ResNet18
 
 model = ResNet18()
 summary(model, (3, 224, 224))

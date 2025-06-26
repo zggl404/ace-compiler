@@ -10,29 +10,11 @@ RUN apt-get -y update && \
 	libgmp3-dev libtool libomp5 libomp-dev libntl-dev pybind11-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-
-ENV PIP_NO_CACHE_DIR 1
-
-RUN pip install --upgrade pip setuptools wheel
-
-RUN set -ex && \
-    pip install \
-        PyYAML==5.3.1 \
-        onnx==1.14.1 \
-        onnxruntime==1.15.1 \
-        matplotlib==3.7.5 \
-        numpy==1.24.4 \
-        plottable \
-        psutil && \
-    pip install \
-        torch==2.0.1+cpu \
-        torchvision==0.15.2+cpu \
-        --index-url https://download.pytorch.org/whl/cpu \
-        --extra-index-url https://pypi.org/simple
-
 # COPY script 
 COPY scripts/* /app/scripts/
 RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r /app/scripts/requirements.txt
 
 # clone fhelipe, apply patch
 WORKDIR /app/FHELIPE/
@@ -50,19 +32,24 @@ RUN pip install -e frontend/ && pip cache purge
 
 # build fhelipe
 # copy submodudle due to network issue
-ADD scritps/aws-cppwrapper-lattigo.tgz /app/FHELIPE/fhelipe/backend
+ADD scripts/aws-cppwrapper-lattigo.tgz /app/FHELIPE/fhelipe/backend
 WORKDIR /app/FHELIPE/fhelipe/backend
-RUN scons lib
-RUN scons deps --no-deps-pull
-RUN scons -j16 --release
+RUN export GOFLAGS="-buildvcs=false" && \
+    scons lib && \
+    scons deps --no-deps-pull && \
+    scons -j16 --release
 
 
 WORKDIR /app
-RUN git clone -b metakernel-proof https://github.com/ant-research/ace-compiler.git
+COPY air-infra ace-compiler/air-infra/
+COPY nn-addon ace-compiler/nn-addon/
+COPY fhe-cmplr ace-compiler/fhe-cmplr/
+RUN pip install --no-cache-dir -r scripts/requirements.txt
+# && \
+#    cmake -S ace-compiler/fhe-cmplr -B release -DFHE_WITH_SRC="air-infra;nn-addon" -DCMAKE_BUILD_TYPE=Release && \
+#    cmake --build release -j
 
-# COPY onnx model
-COPY model /app/model
-# COPY readme model
+# COPY readme
 COPY README.md .
 
 
