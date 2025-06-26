@@ -133,7 +133,7 @@ GLOB_SCOPE* Run_sharding_opt(GLOB_SCOPE* gscope, VECTOR_CTX& ctx,
 
     air::base::VISITOR<
         nn::vector::T2TSHARDING_ANALYSIS_CTX,
-        air::core::HANDLER<air::core::DEFAULT_HANDLER>,
+        air::core::HANDLER<nn::vector::T2TSHARDING_ANALYSIS_CORE_HANDLER>,
         nn::core::HANDLER<nn::vector::T2TSHARDING_ANALYSIS_HANDLER> >
         trav_analysis(ctx_analysis);
     trav_analysis.Visit<void>(body);
@@ -201,9 +201,9 @@ GLOB_SCOPE* Run_sharding_opt(GLOB_SCOPE* gscope, VECTOR_CTX& ctx,
       std::vector<int64_t>  xyz = ishard->Spec();
       const ARRAY_SHARDING* fsharding =
           shmap.Get_data_sharding(fscope->Id(), input_node->Addr_datum_id());
-      nn::core::Set_input_scheme_attr(new_cntr->Entry_node()->Child(0),
-                                      input_node->Rtype(), 1, xyz[1], xyz[2], 1,
-                                      fsharding->Halosize());
+      nn::core::Set_scheme_attr(new_cntr->Entry_node()->Child(0),
+                                input_node->Rtype(), 1, xyz[1], xyz[2], 1,
+                                fsharding->Halosize());
     }
     ctx_trans.Trace(TF_SHARDING, "#### IR trace after sharding ",
                     new_fscope->Owning_func()->Name()->Char_str(), "\n");

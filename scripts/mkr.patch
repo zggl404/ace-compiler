@@ -4070,10 +4070,10 @@ index 0000000..7b1f563
 +# imagenet
 +# not support or OOM
 diff --git a/scripts/default_parameters.py b/scripts/default_parameters.py
-index 7779b9a..fb6483c 100644
+index 7779b9a..203adbb 100644
 --- a/scripts/default_parameters.py
 +++ b/scripts/default_parameters.py
-@@ -192,6 +192,389 @@ condor_fhelipe_squeezenet = Benchmark(
+@@ -192,6 +192,388 @@ condor_fhelipe_squeezenet = Benchmark(
          scheduler_config,
          runnable_compiler_flags)
  
@@ -4209,7 +4209,6 @@ index 7779b9a..fb6483c 100644
 +
 +metak_fhelipe_conv_3x16x32x3 = Benchmark(
 +        default_lattigo_parameters,
-+        flags.fhelipe_path / Path("frontend/fheapps/base/conv_3x16x32x3.py"),
 +        [flags.fhelipe_path / Path("frontend/fheapps/base/conv.py"),
 +         "+c", "3", "+k", "16", "+w", "32", "+r", "3"],
 +        flags.folder / "metak_fhelipe_conv",
@@ -4463,7 +4462,7 @@ index 7779b9a..fb6483c 100644
  condor_fhelipe_logreg = Benchmark(
      default_logreg_parameters,
      flags.fhelipe_path / Path("frontend/fheapps/logreg/logreg.py"),
-@@ -209,7 +592,8 @@ manual_resnet = Benchmark(
+@@ -209,7 +591,8 @@ manual_resnet = Benchmark(
      compiler,
      scheduler,
      scheduler_config,
@@ -4473,7 +4472,7 @@ index 7779b9a..fb6483c 100644
  )
  
  chet_resnet = Benchmark(
-@@ -371,9 +755,46 @@ benchmark_dict = {
+@@ -371,9 +754,46 @@ benchmark_dict = {
      "manual_lola_mnist": manual_lola_mnist,
      "chet_lola_mnist": chet_lola_mnist,
      "fhelipe_resnet": fhelipe_resnet,

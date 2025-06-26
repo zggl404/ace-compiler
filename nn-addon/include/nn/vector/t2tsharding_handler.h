@@ -762,6 +762,47 @@ public:
     STMT_PTR new_stp = cntr->New_stp(new_child, new_preg, node->Spos());
     return RETV(new_stp->Node());
   }
+
+  template <typename RETV, typename VISITOR>
+  RETV Handle_retv(VISITOR* visitor, air::base::NODE_PTR node) {
+    T2TSHARDING_CTX& ctx  = visitor->Context();
+    CONTAINER*       cntr = ctx.Container();
+    SPOS             spos = node->Spos();
+
+    SHARDING_MAP* shmap = ctx.Sharding_map();
+    ctx.Trace(TF_SHARDING, ">> Sharding transformation: ", node->Name(),
+              shmap->Is_op_sharding(node), "\n");
+    ctx.Trace_cmd(TF_SHARDING, Trace_node, node);
+
+    if (!shmap->Is_op_sharding(node)) {
+      STMT_PTR new_stmt = cntr->Clone_stmt(node->Stmt());
+      NODE_PTR new_node = new_stmt->Node();
+      NODE_PTR child    = visitor->template Visit<RETV>(node->Child(0)).Node();
+      AIR_ASSERT(child != air::base::Null_ptr);
+      new_node->Set_child(0, child);
+      return RETV(new_node);
+    }
+
+    OP_SHARDING shard = shmap->Get_op_sharding(node);
+    ctx.Trace_cmd(TF_SHARDING, Trace_op_sharding, shard, node->Name());
+    std::vector<int64_t> xyz = shard.Imap(0).Spec();
+    int64_t              y = xyz[1], z = xyz[2];
+    AIR_ASSERT(xyz[0] == 1);
+    int64_t halosize = shard.Imap(0).Halosize();
+
+    TYPE_PTR orig_type = node->Child(0)->Rtype();
+
+    NODE_PTR input = visitor->template Visit<RETV>(node->Child(0)).Node();
+    AIR_ASSERT(input != air::base::Null_ptr &&
+               input->Opcode() == air::core::OPC_LD);
+    STMT_PTR new_retv  = cntr->New_retv(input, input->Spos());
+    NODE_PTR retv_node = new_retv->Node();
+
+    nn::core::Set_scheme_attr(retv_node, orig_type, 1, xyz[1], xyz[2], 1,
+                              halosize);
+
+    return RETV(retv_node);
+  }
 };
 
 }  // namespace vector

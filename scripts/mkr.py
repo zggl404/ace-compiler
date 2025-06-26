@@ -10,6 +10,7 @@ import datetime
 from ace_util import *  # noqa F403
 from ace_compile import run_ace_compile
 from run_perf import run_perf
+from pathlib import Path
 
 
 def oopsla25_ae(cwd, args, log):
