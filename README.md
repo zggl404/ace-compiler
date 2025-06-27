@@ -87,8 +87,9 @@ All ONNX models utilized by the ACE compiler are located in the `/app/model` dir
 
 Upon successful completion, you will see:
 ```
--------- Done --------
-MKR's log have be moved to /app/mkr_ae_result/mkr/
+Processing Summary:
+Successfully processed: 20/20
+MKR's log have be moved to /app/mkr_ae_result/mkr/mkr.run.log
 root@xxxxxx:/app#
 ```
 
@@ -111,13 +112,13 @@ All FHELIPE tests are implemented in /app/FHELIPE/source/frontend/fheapps in the
 Upon successful completion, you will see:
 ```
 Processing Summary:
-Successfully processed: 14/14
+Successfully processed: 13/13
 
 All generated timing logs have been moved to: /app/mkr_ae_result/fhelipe/
 root@xxxxxx:/app#
 ```
 
-*Note: On the hardware environment described above, completing all MKR tests using a single thread takes **approximately 24 hours**. Test cases that exceed 20 hours are excluded, including MVM with shape `[4096, 25088]`, MobileNet and all DNN models on ImageNet.*
+*Note: On the hardware environment described above, completing all FHELIPE tests using a single thread takes **approximately 24 hours**. Test cases that exceed 20 hours are excluded, including MVM with shape `[4096, 25088]`, MobileNet and all DNN models on ImageNet.*
 
 
 ### 5. Generate all figures and tables
