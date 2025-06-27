@@ -521,7 +521,7 @@ void NODE::Set_child(uint32_t num, CONST_NODE_PTR node) {
 }
 
 void NODE::Set_rtype(TYPE_ID type) {
-  CMPLR_ASSERT(0, "Do not call this API to change rtype.");
+  //CMPLR_ASSERT(0, "Do not call this API to change rtype.");
   AIR_ASSERT(Has_rtype());
   AIR_ASSERT(!Is_block());
   _data->_comm._rtype = type.Value();
@@ -531,7 +531,7 @@ void NODE::Set_rtype(TYPE_ID type) {
 }
 
 void NODE::Set_rtype(CONST_TYPE_PTR type) {
-  CMPLR_ASSERT(0, "Do not call this API to change rtype.");
+  //CMPLR_ASSERT(0, "Do not call this API to change rtype.");
   Set_rtype(type->Id());
 }
 

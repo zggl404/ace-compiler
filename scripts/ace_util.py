@@ -27,10 +27,10 @@ REQUIRED_MEMORY = {
     'conv_512x512x7x3': 15,
     'gemv_4096x4096': 50,
     'gemv_4096x25088': 100,
-    'squeezenet_cifar10':100,
-    'alexnet_cifar10': 100,
-    'vgg11_cifar10': 100,
-    'mobilenet_cifar10': 100,
+    'fhelipe_squeezenet':100,
+    'fhelipe_alexnet': 100,
+    'fhelipe_vgg11': 100,
+    'fhelipe_mobilenet': 100,
     'resnet18_imagenet': 500,
     'squeezenet_imagenet': 500,
     'alexnet_imagenet': 500,
@@ -368,7 +368,7 @@ OOPSLA25_SHARDING_MODEL = [
 
 # ACE compilation options for non-sharding option performance tests
 OOPSLA25_PERF_OPTION = [
-    '-VEC:ms=32768:ssf:conv_parl:rtt',
+    '-VEC:ms=32768:gemmf:convf:ssf:conv_parl:rtt',
     '-SIHE:relu_vr_def=100:rtt',
     '-CKKS:hw=192:q0=60:sf=56:N=65536:pots:rtt',
     '-POLY:rtt',
@@ -611,7 +611,7 @@ def get_test_onnx_files(onnx_file, model_dir, paper):
             if paper == 'asplos25':
                 test_set = ASPLOS25_MODEL
             elif paper == 'oopsla25':
-                test_set = OOPSLA25_MODEL
+                test_set = list(set(OOPSLA25_MODEL) | set(OOPSLA25_SHARDING_MODEL))
             for test in test_set:
                 found = False
                 for model_file in model_files:
@@ -699,7 +699,7 @@ def get_ace_option(test, paper, lib, extra, acc, trace):
             res.extend(relu_opt)
     # sharding options
     if test in config.get('sharding_test'):
-        res.extend('-VEC:sharding')
+        res.append('-VEC:sharding')
     # Target library option
     res.append('-P2C:lib=' + lib)
     # Trace option

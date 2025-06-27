@@ -81,9 +81,9 @@ def run_perf(exec_files, cifar10_dir, cifar100_dir, index, debug, trace, log):
             sys.exit(-1)
         cmds = ['time', '-f', '\"%e %M\"', exec_file]
         test = get_test_name(exec_file)
-        cifar_file = get_cifar_option(test, cifar10_dir, cifar100_dir)
-        if cifar_file is not None:
-            cmds.extend([cifar_file, str(index), str(index)])
+        #cifar_file = get_cifar_option(test, cifar10_dir, cifar100_dir)
+        #if cifar_file is not None:
+        #    cmds.extend([cifar_file, str(index), str(index)])
         rq_mem = get_exec_mem(test)
         if not check_required_memory(rq_mem):
             print('Not enough memory, %s requires %s GB' % (test, rq_mem))
