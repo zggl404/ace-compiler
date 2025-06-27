@@ -67,9 +67,9 @@ def gen_table456(output_dir: str):
     data_table5 = get_data(data5) 
     data_table6 = get_data(data6) 
 
-    plot_table_chart456(data_table4, "table4.pdf", output_dir)
-    plot_table_chart456(data_table5, "table5.pdf", output_dir)
-    plot_table_chart456(data_table6, "table6.pdf", output_dir)
+    plot_table_chart456(data_table4, "Table4.pdf", output_dir)
+    plot_table_chart456(data_table5, "Table5.pdf", output_dir)
+    plot_table_chart456(data_table6, "Table6.pdf", output_dir)
 
 
 p_row = {columns[i]: '' for i in range(10)}
@@ -124,7 +124,7 @@ def gen_table7(output_dir: str):
     """
 
     data_table7 = get_data7(data7) 
-    plot_table_chart7(data_table7, "table7.pdf", output_dir)
+    plot_table_chart7(data_table7, "Table7.pdf", output_dir)
 
 
 
@@ -371,7 +371,7 @@ def gen_table8(output_dir):
     df = pd.DataFrame(table_data)
     df = df.set_index("Kernel")
 
-    plot_table_chart8(df, "table8.pdf", output_dir)
+    plot_table_chart8(df, "Table8.pdf", output_dir)
 
 
 

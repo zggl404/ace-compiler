@@ -1,6 +1,6 @@
 #!/bin/bash
 
-working_dir=/app/
+working_dir=/app
 
 # check build type
 if [ "$1" != "Debug" -a "$1" != "Release" ]; then

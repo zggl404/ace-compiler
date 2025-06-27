@@ -43,6 +43,7 @@ def run_single(exec_cmd, indent_size, log, trace):
             indent = ' ' * (indent_size + 6)
             for item in msg:
                 write_log(indent + item + '\n', log)
+        return True
     else:
         info = 'Exec: failed'
         if ret.returncode > 128:
@@ -55,7 +56,7 @@ def run_single(exec_cmd, indent_size, log, trace):
             write_log(item + '\n', log)
         for item in err:
             write_log(item + '\n', log)
-    return
+        return False
 
 
 def run_perf(exec_files, cifar10_dir, cifar100_dir, index, debug, trace, log):
@@ -74,6 +75,10 @@ def run_perf(exec_files, cifar10_dir, cifar100_dir, index, debug, trace, log):
     info = '-------- ACE Performance --------\n'
     write_log(info, log)
     start_time = datetime.datetime.now()
+
+    total_cases = len(exec_files)
+    success_count = 0
+    failed_cases = []
     for exec_file in exec_files:
         exec_file = os.path.abspath(exec_file)
         if not os.path.exists(exec_file):
@@ -93,12 +98,27 @@ def run_perf(exec_files, cifar10_dir, cifar100_dir, index, debug, trace, log):
         if debug:
             print(' '.join(cmds))
         # run tests in serial
-        run_single(cmds, len(test) + 2, log, trace)
+        success = run_single(cmds, len(test) + 2, log, trace)
+        if success:
+            success_count += 1
+        else:
+            failed_cases.append(exec_file)
     end_time = datetime.datetime.now()
     spend_time = (end_time - start_time).total_seconds()
     info = 'Spent time = %.2f(s)\n' % spend_time
-    info += '-------- Done --------\n'
     write_log(info, log)
+
+    info = 'Processing Summary:\n'
+    write_log(info, log)
+    info = 'Successfully processed: %d/%d\n' % (success_count, total_cases)
+    write_log(info, log)
+
+    if failed_cases:
+        info = 'Failed cases:\n'
+        write_log(info, log)
+        for case in failed_cases:
+            info = " - {case}\n"
+            write_log(info, log)
     return
 
 

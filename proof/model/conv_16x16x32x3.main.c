@@ -130,19 +130,7 @@ int main(int argc, char* argv[]) {
 
   Run_main_graph();
 
-  //double  *result = Handle_output("output");
-
   Finalize_context();
-
-  //bool    res_relative    = Validate_output_data_relative_error(result, Expected_data, Expected_len);
-  //bool    res_absolute    = Validate_output_data_absolute_error(result, Expected_data, Expected_len);
-  //free(result);
-  //if (res_relative || res_absolute) {
-  //  printf("SUCCESS!\n");
-  //} else {
-  //  printf("FAILED!\n");
-  //  return 1;
-  //}
 
   return 0;
 }

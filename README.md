@@ -1,12 +1,11 @@
 README
 ================
 
-We provide instructions to enable the evaluation of the artifact associated with our OOPSLA'25 paper, titled "MetaKernel: Enabling Efficient Encrypted Neural Network Inference Through Unified MVM and Convolution". This paper presents MetaKernel(MKR), a novel composition-based compiler approach that optimizes MVM and Conv kernel
-operations for DNN models under CKKS within a unified framework.
+We provide instructions to enable the evaluation of the artifact associated with our OOPSLA'25 paper, titled "MetaKernel: Enabling Efficient Encrypted Neural Network Inference Through Unified MVM and Convolution". This paper presents MetaKernel(MKR), a novel composition-based compiler approach that optimizes MVM and Conv kernel operations for DNN models under CKKS within a unified framework.
 
-MKR decomposes each kernel into composable units to enhance SIMD parallelism within ciphertexts (via horizontal batching) and computational parallelism across them (via vertical batching). Our approach addresses previously unaddressed challenges, such as reducing rotation overhead with a rotation-aware cost model for data packing, while ensuring high slot utilization, handling inputs of arbitrary sizes, and maintaining output tensor layout compatibility. MKR is implemented in the open-source ANT-ACE compiler [Li et al. CGO'25] with about 3500 lines of C++ code.
+MKR decomposes each kernel into composable units to enhance SIMD parallelism within ciphertexts (via horizontal batching) and computational parallelism across them (via vertical batching). Our approach addresses previously unaddressed challenges, such as reducing rotation overhead with a rotation-aware cost model for data packing, while ensuring high slot utilization, handling inputs of arbitrary sizes, and maintaining output tensor layout compatibility. MKR is implemented in the open-source ANT-ACE compiler [Li et al. CGO'25](https://dl.acm.org/doi/10.1145/3696443.3708924) with about 3500 lines of C++ code.
 
-In our evaluation, we compared the MKR with FHELIPE [Krastev et al. PLDI'24], a state-of-the-art FHE compiler using 10 micro MVM and Conv kernels from real-world DNN models and 5 DNN models: ResNet-20/SqueezeNet/AlexNet/VGG11/MobileNet on both CIFAR-10 and ImageNet. The objective of this artifact evaluation is to reproduce our results, presented in Figures 7-8 and Tables 4-8:
+In our evaluation, we compared MKR with FHELIPE [Krastev et al. PLDI'24](https://dl.acm.org/doi/10.1145/3656382), a state-of-the-art FHE compiler using 10 MVM and Conv kernels from real-world DNN models and 5 DNN models: ResNet-20/SqueezeNet/AlexNet/VGG11/MobileNet on both CIFAR-10 and ImageNet. The objective of this artifact evaluation is to reproduce our results, presented in Figures 7-8 and Tables 4-8:
 - **Table 4**: Comparison of MKR and FHELIPE for small Conv Kernels
 - **Table 5**: Comparison of MKR and FHELIPE for large Conv kernels
 - **Table 6**: Comparison of MKR and FHELIPE for MVM kernels
@@ -17,75 +16,79 @@ In our evaluation, we compared the MKR with FHELIPE [Krastev et al. PLDI'24], a 
 
 *Let us begin by noting that performing artifact evaluation for FHE compilation, especially for encrypted inference, is challenging due to the substantial computing resources and significant running times required.*
 
-It is essential to emphasize that FHE remains up to 10,000 times slower than unencrypted computation, even for small machine learning models. To generate Figures 7-8 and Tables 4-6, the process will take **approximately 48 hours**.
+It is important to highlight that FHE remains significantly slower—by up to **10,000×**—compared to unencrypted computation, even for relatively small machine learning models. Generating the results shown in **Figures 7–8** and **Tables 4–6** takes approximately **48 hours**.
 
-To facilitate artifact evaluation, we provide detailed steps, environment setup, and execution guidelines to ensure that the findings of our research can be independently verified.
+To support artifact evaluation, we provide detailed instructions, including environment setup and execution guidelines, to ensure that our research findings can be independently verified.
 
 
 **Hardware Setup:**  
 - Intel Xeon Platinum 8369B CPU @ 2.70 GHz  
 - 512 GB memory
+- 40 GB free disk space
 
 **Software Requirements:**  
-- Detailed in the [*Dockerfile*]__(https://anonymous.4open.science/r/mkr_artifact/Dockerfile)__ for Docker container version __25.0.1__
-- Docker image based on Ubuntu __20.04__
+- x86_64 Linux (64-bit) with Docker enabled
+- Detailed in the [*Dockerfile*](https://anonymous.4open.science/r/mkr_artifact/Dockerfile) for Docker container version 25.0.1
+- Docker image based on Ubuntu 22.04
 
-Encrypted inference is both compute-intensive and memory-intensive. A computer with at least **400GB** of memory is required to perform artifact evaluation for our work.
-
+Encrypted inference is both compute- and memory-intensive. To perform artifact evaluation for our work, a machine with at least **400 GB** of memory is required.
 
 ## Repository Overview
-- **FHELIPE:** Directory for FHELIPE source code, patches and test cases and scripts.
-- **model:** Contains pre-trained ONNX models for MKR evaluation.
-- **raw_data:** Raw testing logs for reference.
-- **source:** Contains the source code for MKR.
+- **FHELIPE:** Contains the FHELIPE source code, patches, test cases, and related scripts.
+- **ace-compiler:** The source code for the ACE compiler with MKR support and the MKR test cases.
 - **scripts:** Scripts for building and running MKR and FHELIPE tests.
-- **Dockerfile:** File to create Docker image to perform all tests.
+- **Dockerfile:** Used to build the Docker image for running all tests.
 - **README.md:** This README file.
 
 ### 1. Preparing a DOCKER environment to Build and Test the MetaKernel
 
-It is recommended to pull the pre-built docker image __(opencc/mkr:latest)__ from Docker Hub:
+It is recommended to pull the pre-built docker image (opencc/ace:oopsla25) from Docker Hub:
 ```
 cd [YOUR_DIR_TO_DO_AE]
 mkdir -p mkr_ae_result
-docker pull opencc/mkr:latest
-docker run -it --name mkr -v "$(pwd)"/mkr_ae_result:/app/mkr_ae_result --privileged opencc/mkr:latest bash
+docker pull opencc/ace:oopsla25
+docker run -it --name mkr -v "$(pwd)"/mkr_ae_result:/app/mkr_ae_result --privileged opencc/ace:oopsla25 bash
 ```
-A local directory `mkr_ae_result` is created and mounted in the docker container to collect the generated figures and tables. The container will launch and automatically enters the `/app` directory:
+A local directory `mkr_ae_result` is created and mounted into the Docker container to collect the generated figures and tables. The container will launch and automatically enter the `/app` directory:
 ```
 root@xxxxxx:/app#
 ```
 
-### 2. Building the MKR Compiler
+*Note: The Docker image is about 9 GB and may take **several to dozens of minutes** to download depending on the network speed.*
 
-To build the MKR compiler, navigate to the `/app` directory within the container and run:
+### 2. Building the ACE Compiler with MKR
+
+To build the ACE compiler, navigate to the `/app` directory within the container and run:
 ```
 /app/scripts/build_cmplr.sh Release
 ```
 Upon successful completion, you will see:
 ```
-Info: build project succeeded. MKR compiler executable can be found in /app/mkr_cmplr/bin/fhe_cmplr
+Info: build project succeeded. FHE compiler executable can be found in /app//mkr_cmplr/bin/fhe_cmplr
 root@xxxxxx:/app#
 ```
-The MKR compiler will be built under `/app/release` and installed in the `/app/mkr_cmplr` directory.
+The ACE compiler will be built in the `/app/release` directory and installed to `/app/mkr_cmplr`.
+
+*Note: For the hardware environment outlined above, it will take **approximately 1 minutes** to build the ACE compiler with MKR.*
 
 
 ### 3. Running All MKR Tests
 
 In the `/app` directory of the container, run:
 ```
-python3 /app/scripts/mkr.py
+/app/scripts/mkr.sh
 ```
 
 This command will perform the following actions:
-  - Compile and run all MVM and Conv kernels listed in Table 3
-  - Compile and run all DNN models listed in Table 7
+  - Apply MKR to compile and run all MVM and Conv kernels listed in **Table 3**
+  - Apply MRK to Compile and run all DNN models listed in **Table 7**
 
-All pre-trained ONNX models utilized by the MKR compiler are located in the [*model*] directory.
+All ONNX models utilized by the ACE compiler are located in the `/app/model` directory. All MKR tests are implemented in `/app/ace-compiler/fhe-cmplr/rtlib/ant/dataset` directory.
 
 Upon successful completion, you will see:
 ```
-BLAHBLAH BLAH BLAH
+-------- Done --------
+MKR's log have be moved to /app/mkr_ae_result/mkr/
 root@xxxxxx:/app#
 ```
 
@@ -95,35 +98,37 @@ root@xxxxxx:/app#
 
 In the `/app` directory of the container, run:
 ```
-python3 /app/FHELIPE/fhelipe.py
+/app/scripts/fhelipe.sh
 ```
 
 This command will perform the following actions:
-  - Pull original FHELIPE code from github
-  - Apply patches for timing and new models for performance comparison
-  - Build fhelipe compiler
-  - Compile and run all MVM and Conv kernels listed in Table 3
-  - Compile and run all DNN models listed in Table 7
+- Apply FHELIPE to compile and run all MVM and Conv kernels listed in **Table 3**  
+- Apply FHELIPE to compile and run all DNN models listed in **Table 7**
+
 
 All FHELIPE tests are implemented in /app/FHELIPE/source/frontend/fheapps in the [*FHELIPE*] directory.
 
 Upon successful completion, you will see:
 ```
-BLAHBLAH BLAH BLAH
+Processing Summary:
+Successfully processed: 14/14
+
+All generated timing logs have been moved to: /app/mkr_ae_result/fhelipe/
 root@xxxxxx:/app#
 ```
 
-*Note: For the hardware environment outlined above, it will take **approximately 24 hours** to complete all the MKR tests using a single thread. The cases which runs exceeds 20 hours are ignored in the test include MVM with shape [4096, 25088] and all DNN models on ImageNet. *
+*Note: On the hardware environment described above, completing all MKR tests using a single thread takes **approximately 24 hours**. Test cases that exceed 20 hours are excluded, including MVM with shape `[4096, 25088]`, MobileNet and all DNN models on ImageNet.*
 
 
 ### 5. Generate all figures and tables
-Once command 2, 3 and 4 completed successfully, in the `/app` directory of the container, run:
+Once the above three steps have been completed successfully, navigate to the `/app` directory inside the container and run:
 ```
 python3 /app/scripts/generate_figures.py
 ```
-The script will generate the results as depicted in the figures and tables of our paper. The outputs are named 'Table4.pdf', 'Table5.pdf', 'Table6.pdf', 'Table7.pdf', 'Figure7.pdf', 'Figure8.pdf' and 'Table8.pdf'. For the raw data, please refer to the corresponding *.log files.
+The script will generate results corresponding to the figures and tables presented in the evaluation section of our paper. The output files include: `Table4.pdf`, `Table5.pdf`, `Table6.pdf`, `Table7.pdf`, `Figure7.pdf`, `Figure8.pdf`, and `Table8.pdf`. For raw data, please refer to the corresponding `.log` files.
 
 Here is what you can expect from each file:
+
 
 - **Table4.pdf**:
   ![Table4](scripts/Table4.png)
@@ -140,4 +145,5 @@ Here is what you can expect from each file:
 - **Table8.pdf**:
   ![Table8](scripts/Table8.png)
 
-*Note: The appearance of the generated PDF files might vary slightly due to differences in the hardware environments used.*
+*Note: The appearance of the generated PDF files may vary slightly depending on the hardware environment used.*
+

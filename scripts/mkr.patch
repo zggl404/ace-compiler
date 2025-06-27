@@ -4521,10 +4521,10 @@ index 7779b9a..203adbb 100644
      "condor_fhelipe_logreg": condor_fhelipe_logreg,
 diff --git a/test_fhelipe.py b/test_fhelipe.py
 new file mode 100644
-index 0000000..72641d9
+index 0000000..2721e3b
 --- /dev/null
 +++ b/test_fhelipe.py
-@@ -0,0 +1,373 @@
+@@ -0,0 +1,340 @@
 +import argparse
 +import subprocess
 +import sys
@@ -4532,6 +4532,54 @@ index 0000000..72641d9
 +from pathlib import Path
 +import shutil
 +import re
++import io
++
++class Logger:
++    """
++    A simple logger that can output to both the console and a file.
++    ANSI color codes are automatically stripped when outputting to a file.
++    """
++    def __init__(self, log_file_path: Path):
++        self.terminal = sys.stdout
++        self.log_file_path = log_file_path
++        try:
++            # Make sure the dir exist
++            self.log_file_path.parent.mkdir(parents=True, exist_ok=True)
++            self.log_file = open(log_file_path, 'w', encoding='utf-8')
++        except IOError as e:
++            # If the log file cannot be created, it will only be output to the terminal.
++            print(f"[CRITICAL_ERROR] Could not open log file {log_file_path}: {e}. Logging to file is disabled.")
++            self.log_file = None
++
++        # Print the location information of the log file
++        if self.log_file:
++            self.log(f"Log file for this run: {self.log_file_path.resolve()}")
++
++    def log(self, *args, **kwargs):
++        """
++        Log a message, print it to the console and write it to a file.
++        """
++        # 1. Log a message, print it to the console and write it to a file.
++        print(*args, **kwargs, file=self.terminal)
++
++        # 2. Write to file (remove color)
++        if self.log_file:
++            # Use io.StringIO to capture the output of print in order to handle parameters such as end, sep, etc.
++            str_io = io.StringIO()
++            print(*args, **kwargs, file=str_io)
++            message = str_io.getvalue()
++            clean_message = ColorFilter.strip_colors(message)
++            self.log_file.write(clean_message)
++            self.log_file.flush() # Ensure immediate write
++
++    def close(self):
++        """Close the log file."""
++        if self.log_file:
++            self.log_file.close()
++
++# Global logger instance, initialized in the main function
++logger = None
++# --- End of logging class ---
 +
 +# ANSI color code handling class
 +class ColorFilter:
@@ -4555,20 +4603,18 @@ index 0000000..72641d9
 +
 +def execute_command(command, phase_name):
 +    """Execute command with resource monitoring and color handling"""
-+    # Dynamic color code generation
 +    phase_header = ColorFilter.colored(f"\n[PHASE] {phase_name}", "\033[34m")
-+    print(phase_header)
++    logger.log(phase_header)
 +
-+    # Build command with time tracking
 +    timed_command = [
-+        "stdbuf", "-o0",  # Disable output buffering
++        "stdbuf", "-o0",
 +        TIME_CMD,
 +        "-f", "TIME_STATS::%e::%M::",
-+        "python", "-u"  # Unbuffered Python output
++        "python", "-u"
 +    ] + command
 +
 +    cmd_str = ' '.join(timed_command)
-+    print(f"Executing: {ColorFilter.strip_colors(cmd_str)}")
++    logger.log(f"Executing: {ColorFilter.strip_colors(cmd_str)}")
 +
 +    try:
 +        result = subprocess.run(
@@ -4576,52 +4622,42 @@ index 0000000..72641d9
 +            check=True,
 +            text=True,
 +            stdout=subprocess.PIPE,
-+            stderr=subprocess.STDOUT  # Merge stderr with stdout
++            stderr=subprocess.STDOUT
 +        )
-+
-+        # Process colored output
-+        cleaned_output = ColorFilter.strip_colors(result.stdout)
 +        
-+        # Automatic output destination detection
-+        if sys.stdout.isatty():
-+            print(result.stdout)
-+        else:
-+            print(cleaned_output)
++        # Print raw output with color regardless of whether the terminal is a tty
++        # logger will handle color removal in the file
++        logger.log(result.stdout)
 +
-+        # Parse timing statistics
-+        if "TIME_STATS::" in cleaned_output:
-+            time_line = [l for l in cleaned_output.split('\n') if "TIME_STATS::" in l][-1]
-+            _, elapsed, mem_kb, _ = time_line.split("::")
++        # Parse from result.stdout instead of cleaned_output
++        if "TIME_STATS::" in result.stdout:
++            # Find the last time statistic from a possibly multi-line output
++            time_line = [l for l in result.stdout.split('\n') if "TIME_STATS::" in l][-1]
++            # Clean up color codes for easier parsing
++            cleaned_time_line = ColorFilter.strip_colors(time_line)
++            _, elapsed, mem_kb, _ = cleaned_time_line.split("::")
 +            stats = f"TIMING: {elapsed}s | MEMORY: {int(mem_kb)//1024} MB"
-+            print(ColorFilter.colored(stats, "\033[33m"))
++            logger.log(ColorFilter.colored(stats, "\033[33m"))
 +        else:
 +            warn = "WARNING: Time stats not captured"
-+            print(ColorFilter.colored(warn, "\033[33m"))
++            logger.log(ColorFilter.colored(warn, "\033[33m"))
 +
 +        return True
 +
 +    except subprocess.CalledProcessError as e:
-+        error_output = ColorFilter.strip_colors(e.stdout)
-+        err_msg = f"[ERROR] {phase_name} failed:\n{error_output}"
-+        print(ColorFilter.colored(err_msg, "\033[31m"))
++        # e.stdout already includes stdout and stderr
++        err_msg = f"[ERROR] {phase_name} failed:\n{e.stdout}"
++        logger.log(ColorFilter.colored(err_msg, "\033[31m"))
 +        return False
 +
 +def format_timing_file(input_path):
 +    """Format timing file with aligned columns"""
-+    # Column configuration: (header, width, alignment)
 +    columns = [
-+        ("OP", 10, '<'),
-+        ("LEVEL", 7, '>'),
-+        ("COUNT", 7, '>'),
-+        ("EXEC", 9, '>'),
-+        ("LOAD(MB)", 9, '>'),
-+        ("DRAM(MB)", 9, '>')
++        ("OP", 10, '<'), ("LEVEL", 7, '>'), ("COUNT", 7, '>'),
++        ("EXEC", 9, '>'), ("LOAD(MB)", 9, '>'), ("DRAM(MB)", 9, '>')
 +    ]
-+
-+    # Create format strings
 +    header_fmt = "|".join([f" {{:{align}{width}}} " for _, width, align in columns])
 +    separator = "|".join(["-" * (width + 2) for _, width, _ in columns])
-+
 +    data = []
 +    output_path = input_path.with_stem(input_path.stem + "_formatted")
 +
@@ -4629,119 +4665,59 @@ index 0000000..72641d9
 +        with open(input_path, 'r') as f:
 +            for line in f:
 +                line = line.strip()
-+                if '@' not in line:
-+                    continue
-+                
++                if '@' not in line: continue
 +                parts = line.split()
-+                if len(parts) < 4:
-+                    continue
-+
-+                # Parse OP and LEVEL
++                if len(parts) < 4: continue
 +                op_part = parts[0].rstrip(':')
 +                op, level = op_part.split('@')
++                try: exec_val = int(parts[2])
++                except (ValueError, IndexError): continue
++                data.append({'op': op, 'level': int(level), 'exec': exec_val})
 +
-+                # Extract values
-+                try:
-+                    exec_val = int(parts[2])
-+                except (ValueError, IndexError):
-+                    continue
-+
-+                data.append({
-+                    'op': op,
-+                    'level': int(level),
-+                    'exec': exec_val
-+                })
-+
-+        # Build output
-+        output = []
-+        # Header
-+        output.append("|" + header_fmt.format(*[col[0] for col in columns]) + "|")
-+        output.append("|" + separator + "|")
-+
-+        # Data rows
++        output = ["|" + header_fmt.format(*[col[0] for col in columns]) + "|", "|" + separator + "|"]
 +        for entry in data:
 +            output.append("|" + header_fmt.format(
-+                entry['op'],
-+                entry['level'],
-+                0,          # COUNT
-+                entry['exec'],
-+                0.0,        # LOAD(MB)
-+                0.0         # DRAM(MB)
++                entry['op'], entry['level'], 0, entry['exec'], 0.0, 0.0
 +            ) + "|")
 +
-+        # Write to file
 +        with open(output_path, 'w') as f:
 +            f.write('\n'.join(output))
-+
 +        return output_path
 +
 +    except Exception as e:
-+        print(ColorFilter.colored(f"\nFormatting error: {str(e)}", "\033[31m"))
++        logger.log(ColorFilter.colored(f"\nFormatting error: {str(e)}", "\033[31m"))
 +        return None
 +
 +def rename_and_format_timing_file(program_name:str, output_log_dir: Path):
 +    """Handle timing file operations with formatting and move to specified output directory."""
 +    original_timing_file = Path("ops_timing.txt")
-+
-+    # Define the new base name for the timing file
 +    new_base_name = f"{program_name}_ops_timing"
-+
-+    # Define the final paths in the output_log_dir
 +    final_unformatted_path = output_log_dir / f"{new_base_name}.txt"
-+    final_formatted_path = output_log_dir / f"{new_base_name}_formatted.txt"
 +
 +    try:
-+        # Check if the original timing file exists
 +        if not original_timing_file.exists():
 +            warn_msg = f"\nWarning: {original_timing_file} not found."
-+            print(ColorFilter.colored(warn_msg, "\033[33m"))
++            logger.log(ColorFilter.colored(warn_msg, "\033[33m"))
 +            return False
 +
-+        # Ensure the target output directory exists
 +        os.makedirs(output_log_dir, exist_ok=True)
-+
-+        # 1. Move and rename the original timing file to the output directory
 +        shutil.move(str(original_timing_file), str(final_unformatted_path))
 +        msg = f"\nMoved and renamed timing file to: {final_unformatted_path}"
-+        print(ColorFilter.colored(msg, "\033[32m"))
++        logger.log(ColorFilter.colored(msg, "\033[32m"))
 +
-+        # 2. Format the file. format_timing_file will create the formatted file
-+        #    next to the unformatted one (in output_log_dir).
-+        #    It returns the path to the newly created formatted file.
 +        actual_formatted_path = format_timing_file(final_unformatted_path)
-+
-+        if actual_formatted_path and actual_formatted_path.exists(): # Verify formatting succeeded and file exists
++        if actual_formatted_path and actual_formatted_path.exists():
 +            msg = f"Created formatted file: {actual_formatted_path}"
-+            print(ColorFilter.colored(msg, "\033[32m"))
++            logger.log(ColorFilter.colored(msg, "\033[32m"))
 +            return True
 +        else:
 +            warn_msg = f"Warning: Failed to create formatted file for {program_name}."
-+            print(ColorFilter.colored(warn_msg, "\033[33m"))
++            logger.log(ColorFilter.colored(warn_msg, "\033[33m"))
 +            return False
 +
 +    except Exception as e:
 +        err_msg = f"\nFile operation error for {program_name}: {str(e)}"
-+        print(ColorFilter.colored(err_msg, "\033[31m"))
-+        return False
-+
-+def rename_timing_file(program_name):
-+    """Handle timing file renaming with color output"""
-+    original_path = Path("ops_timing.txt")
-+    new_path = Path(f"{program_name}_ops_timing.txt")
-+
-+    try:
-+        if original_path.exists():
-+            shutil.move(str(original_path), str(new_path))
-+            msg = f"\nRenamed timing file to {new_path}"
-+            print(ColorFilter.colored(msg, "\033[32m"))
-+            return True
-+        else:
-+            warn_msg = f"\nWarning: {original_path} not found"
-+            print(ColorFilter.colored(warn_msg, "\033[33m"))
-+            return False
-+    except Exception as e:
-+        err_msg = f"\nFile error: {str(e)}"
-+        print(ColorFilter.colored(err_msg, "\033[31m"))
++        logger.log(ColorFilter.colored(err_msg, "\033[31m"))
 +        return False
 +
 +def read_input_file(file_path):
@@ -4749,54 +4725,40 @@ index 0000000..72641d9
 +    try:
 +        with open(file_path, 'r') as f:
 +            raw_cases = [line.strip() for line in f.readlines()]
-+            
-+        # Filter valid cases
 +        valid_cases = [case for case in raw_cases if case and not case.startswith('#')]
 +        
 +        if not valid_cases:
-+            print(ColorFilter.colored("Error: Input file contains no valid cases", "\033[31m"))
++            logger.log(ColorFilter.colored("Error: Input file contains no valid cases", "\033[31m"))
 +            sys.exit(1)
-+            
 +        return valid_cases
 +    
 +    except FileNotFoundError:
-+        print(ColorFilter.colored(f"Error: Input file {file_path} not found", "\033[31m"))
++        logger.log(ColorFilter.colored(f"Error: Input file {file_path} not found", "\033[31m"))
 +        sys.exit(1)
 +    except Exception as e:
-+        print(ColorFilter.colored(f"Error reading input file: {str(e)}", "\033[31m"))
++        logger.log(ColorFilter.colored(f"Error reading input file: {str(e)}", "\033[31m"))
 +        sys.exit(1)
 +
 +def process_case(case_name: str, case_num: int, total_cases: int, output_log_dir: Path):
 +    """Process single case with progress tracking"""
 +    header = f"\nProcessing case {case_num}/{total_cases}: {case_name}"
-+    print(ColorFilter.colored(header, "\033[1m"))
++    logger.log(ColorFilter.colored(header, "\033[1m"))
 +    
 +    steps = [
-+        {
-+            "cmd": ["scripts/compile.py", "--program", case_name],
-+            "desc": "Source Compilation"
-+        },
-+        {
-+            "cmd": ["scripts/in_shared.py", "--program", case_name],
-+            "desc": "Shared Memory Initialization"
-+        },
-+        {
-+            "cmd": ["scripts/run.py", "--program", case_name, "--lattigo"],
-+            "desc": "Execution with Lattigo",
-+            "post": True # Flag to indicate timing file processing
-+        }
++        {"cmd": ["scripts/compile.py", "--program", case_name], "desc": "Source Compilation"},
++        {"cmd": ["scripts/in_shared.py", "--program", case_name], "desc": "Shared Memory Initialization"},
++        {"cmd": ["scripts/run.py", "--program", case_name, "--lattigo"], "desc": "Execution with Lattigo", "post": True}
 +    ]
 +
 +    for step in steps:
 +        success = execute_command(step["cmd"], step["desc"])
 +        if not success:
-+            print(ColorFilter.colored(f"\nAborted during {step['desc']}", "\033[41m"))
++            logger.log(ColorFilter.colored(f"\nAborted during {step['desc']}", "\033[41m"))
 +            return False
 +            
 +        if step.get("post", False):
 +           if not rename_and_format_timing_file(case_name, output_log_dir):
 +                return False
-+                
 +    return True
 +
 +def get_processing_cases(args):
@@ -4804,14 +4766,18 @@ index 0000000..72641d9
 +    cases = []
 +    
 +    if args.program and args.file:
++        # The print here will happen before the logger is initialized, so keep
 +        print(ColorFilter.colored("Error: Cannot specify both -p/--program and -f/--file", "\033[31m"))
 +        sys.exit(1)
 +        
 +    if args.program:
 +        cases = [args.program]
 +    elif args.file:
++        # The print here will happen before the logger is initialized, so use the logger.log inside read_input_file
++        # To avoid complications, let read_input_file handle the error directly and exit
 +        cases = read_input_file(args.file)
 +    else:
++        # The print here will happen before the logger is initialized, so keep
 +        print(ColorFilter.colored("Error: Must specify either -p/--program or -f/--file", "\033[31m"))
 +        sys.exit(1)
 +        
@@ -4819,83 +4785,83 @@ index 0000000..72641d9
 +
 +def main():
 +    """Main entry point for the pipeline processor"""
++    global logger
++
 +    parser = argparse.ArgumentParser(
 +        description="Flexible Test FHELIPE Pipeline Processor",
 +        formatter_class=argparse.ArgumentDefaultsHelpFormatter
 +    )
-+
 +    group = parser.add_mutually_exclusive_group(required=True)
 +    group.add_argument("-p", "--program", help="Single program name to process")
 +    group.add_argument("-f", "--file", help="Input file containing multiple program names")
-+
 +    parser.add_argument("-o", "--output-log-dir", type=str,
-+        default="fhelipe_logs", # Default output directory name
-+        help="Specify the directory to move generated timing log files (e.g., ops_timing.txt) to."
++        default="fhelipe.run.log",
++        help="Specify the directory for all generated logs (timing files and main run log)."
 +    )
-+
 +    args = parser.parse_args()
 +
-+    # Define the output directory path
 +    output_log_dir = Path(args.output_log_dir)
 +
-+    # Ensure the top-level output directory exists before processing any cases
++    # Initialize Logger
++    log_file_path = output_log_dir / 'fhelipe.run.log'
++    logger = Logger(log_file_path)
++
 +    try:
 +        os.makedirs(output_log_dir, exist_ok=True)
-+        print(ColorFilter.colored(f"\nAll generated timing logs will be moved to: {output_log_dir.resolve()}", "\033[36m"))
-+    except OSError as e:
-+        print(ColorFilter.colored(f"Error: Could not create output directory {output_log_dir}: {e}", "\033[31m"))
-+        sys.exit(1)
++        logger.log(ColorFilter.colored(f"\nAll generated timing logs will be moved to: {output_log_dir.resolve()}", "\033[36m"))
++        
++        cases = get_processing_cases(args)
++        total_cases = len(cases)
++        success_count = 0
++        failed_cases = []
 +
-+    # Get processing cases
-+    cases = get_processing_cases(args)
-+    total_cases = len(cases)
-+    success_count = 0
-+    failed_cases = []
++        logger.log(ColorFilter.colored(f"\nStarting processing of {total_cases} case(s)", "\033[1m"))
 +
-+    print(ColorFilter.colored(f"\nStarting processing of {total_cases} case(s)", "\033[1m"))
++        for idx, case in enumerate(cases, 1):
++            success = process_case(case, idx, total_cases, output_log_dir)
++            if success:
++                success_count += 1
++            else:
++                failed_cases.append(case)
++            if idx < total_cases:
++                logger.log("-" * 50)
 +
-+    # Process each case
-+    for idx, case in enumerate(cases, 1):
-+        success = process_case(case, idx, total_cases, output_log_dir)
-+        if success:
-+            success_count += 1
++        logger.log(ColorFilter.colored("\nProcessing Summary:", "\033[1m"))
++        logger.log(f"Successfully processed: {success_count}/{total_cases}")
++        logger.log(ColorFilter.colored(f"\nAll generated logs are located in: {output_log_dir.resolve()}", "\033[36m"))
++        if failed_cases:
++            logger.log(ColorFilter.colored("\nFailed cases:", "\033[31m"))
++            for case in failed_cases:
++                logger.log(f" - {case}")
++            logger.log(ColorFilter.colored("", "\033[0m"))
++
++    except Exception as e:
++        # Catching unexpected global errors
++        if logger:
++            logger.log(ColorFilter.colored(f"\n[CRITICAL_ERROR] An unexpected error occurred: {e}", "\033[31m"))
 +        else:
-+            failed_cases.append(case)
++            # If the logger fails to even initialize
++            print(f"\n[CRITICAL_ERROR] An unexpected error occurred: {e}")
++        sys.exit(1)
++    finally:
++        # Make sure the log file is closed
++        if logger:
++            logger.close()
 +
-+        if idx < total_cases:
-+            print("-" * 50)
-+
-+    # Print final summary
-+    print(ColorFilter.colored("\nProcessing Summary:", "\033[1m"))
-+    print(f"Successfully processed: {success_count}/{total_cases}")
-+    print(ColorFilter.colored(f"\nAll generated timing logs have been moved to: {output_log_dir.resolve()}", "\033[36m"))
-+    if failed_cases:
-+        print(ColorFilter.colored("\nFailed cases:", "\033[31m"))
-+        for case in failed_cases:
-+            print(f" - {case}")
-+        print(ColorFilter.colored("", "\033[0m"))  # Reset color
 +
 +if __name__ == "__main__":
-+    # Validate GNU time installation
 +    if not Path(TIME_CMD).exists():
 +        err_msg = f"GNU time not found at {TIME_CMD}\nInstall with: sudo apt install time"
-+        print(ColorFilter.colored(err_msg, "\033[31m"))
++        print(ColorFilter.colored(err_msg, "\033[31m")) # Before logger initialization, print directly
 +        sys.exit(1)
 +    
-+    # Validate required scripts
-+    required_files = [
-+        "scripts/compile.py",
-+        "scripts/in_shared.py",
-+        "scripts/run.py"
-+    ]
-+    
++    required_files = ["scripts/compile.py", "scripts/in_shared.py", "scripts/run.py"]
 +    missing_files = [f for f in required_files if not Path(f).exists()]
 +    if missing_files:
 +        print(ColorFilter.colored("Configuration error: Missing required scripts:", "\033[31m"))
-+        for f in missing_files:
-+            print(f"- {f}")
++        for f in missing_files: print(f"- {f}")
 +        print(ColorFilter.colored("Ensure scripts directory contains all pipeline components", "\033[31m"))
 +        sys.exit(1)
 +        
 +    main()
-\ No newline at end of file
++

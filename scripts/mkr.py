@@ -6,7 +6,6 @@
 import os
 import sys
 import argparse
-import datetime
 from ace_util import *  # noqa F403
 from ace_compile import run_ace_compile
 from run_perf import run_perf
@@ -67,9 +66,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     cwd = os.getcwd()
-    date_time = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
-    log_file_name = date_time + '.oopsla25.log'
-    final_log_path = output_log_dir / log_file_name
+    final_log_path = output_log_dir / 'mkr.run.log'
     with open(final_log_path, 'w') as log:
         info = '#### log for: %s\n' % (' '.join(sys.argv))
         write_log(info, log)
