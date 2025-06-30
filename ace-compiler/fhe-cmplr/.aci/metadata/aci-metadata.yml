@@ -1,0 +1,9 @@
+metaName: ant-ace
+metaVersion: v0.0.1
+author: ant-ace.group
+imageBuild: reg.docker.alibaba-inc.com/ace/dev:ci
+imageTest: reg.docker.alibaba-inc.com/ace/cti:ci
+imageBuildARM: reg.docker.alibaba-inc.com/ace/dev:ci_aarch64
+imageTestARM: reg.docker.alibaba-inc.com/ace/cti:ci_aarch64
+imageOmpBuild: reg.docker.alibaba-inc.com/ace/dev_omp:ci
+imageOmpBuildARM: reg.docker.alibaba-inc.com/ace/dev_omp:ci_aarch64

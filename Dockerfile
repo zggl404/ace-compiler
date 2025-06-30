@@ -1,43 +1,31 @@
-# ubuntu:20.04
-ARG IMAGE_BASE=ubuntu:20.04
-FROM ${IMAGE_BASE}
+# ubuntu22.04 cuda:12.2.0
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# install common tools
 RUN apt-get update && \
-    apt-get install -y git vim wget time \
-                        build-essential \
-                        gcc \
-                        g++ \
+    apt-get install -y tzdata && \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    dpkg-reconfigure -f noninteractive tzdata
+
+# install common tools for build ace
+RUN apt-get install -y git git-lfs vim wget time \
                         cmake \
-                        ninja-build \
                         python3 \
-                        python3-pip \
                         python3-dev \
-                        libprotobuf-dev  \
+                        python3-pip \
+                        libprotobuf-dev \
                         protobuf-compiler \
-                        libssl-dev  \
-                        libgmp3-dev  \
-                        libtool \
-                        libomp5 \
-                        libomp-dev \
+                        pybind11-dev \
+                        libgmp-dev \
                         libntl-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install PyYAML==5.3.1 &&\
-    pip3 install torch==2.0.1 && \
-    pip3 install onnx==1.14.1 && \
-    pip3 install onnxruntime==1.15.1 && \
-    pip3 install matplotlib==3.7.5 && \
-    pip3 install numpy==1.24.4 && \
-    pip3 install torchvision==0.15.2 && \
-    rm -rf /root/.cache/pip
-
+# add cifar dataset
 WORKDIR /app/cifar
-
-RUN wget -qO- https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz | tar xzv --strip-components=1 && \
-    wget -qO- https://www.cs.toronto.edu/~kriz/cifar-100-binary.tar.gz | tar xzv --strip-components=1 && \
+RUN wget -O - https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz | tar -xz -C . && \
+    wget -O - https://www.cs.toronto.edu/~kriz/cifar-100-binary.tar.gz | tar -xz -C . && \
     wget https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz && \
     wget https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz
 
@@ -45,3 +33,8 @@ RUN wget -qO- https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz | tar xzv 
 WORKDIR /app
 
 COPY ./ .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+RUN python3 /app/FHE-MP-CNN/build_cnn.py
+
+ENV CI_TOKEN f8fee7370ee5492eb79244d0a2aca4c4

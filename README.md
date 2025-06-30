@@ -1,93 +1,129 @@
-# Introduction
+# Test Content
 
-<b>ANT-ACE</b> is a Fully Homomorphic Encryption (FHE) Compiler Framework designed for automating Neural Network (NN) Inference. ANT-ACE accepts a pre-trained ONNX model as input and directly generates C/C++ programs to perform NN inference on encrypted data.
+## Preparing a DOCKER environment to Build and Test 
 
-FHE represents a revolutionary cryptographic technology that enables direct computations on encrypted data without the need for decryption. This powerful technique allows for the manipulation of sensitive data while ensuring that the computing party remains unaware of the actual information, yet still produces valuable encrypted output.
+- Pull the pre-built docker image from Docker Hub
 
-<div align="center"><i>Decrypt(Homo_Add(Encrypt(a), Encrypt(b))) == Add(a, b)</i></div>
-<div align="center"><i>Decrypt(Homo_Mult(Encrypt(a), Encrypt(b))) == Mult(a, b)</i></div>
+    Run on CPU for testing 7.1, 7.2, 7.3
+    Run on GPU for testing 7.4
 
-ANT-ACE is tailored for Privacy-Preserving Machine Learning (PPML) Inference Applications. In this setup, ML inference operates in the cloud, enabling clients to upload their data and receive inference results. Typically, ML inference services transfer both data and results in plaintext, risking exposure to privacy breaches. Although traditional symmetric encryption secures data during transmission, it does not prevent privacy leaks within the cloud infrastructure. There is a risk that service providers might access the data, either inadvertently or with malicious intent. However, using homomorphic encryption allows ML inference to be performed directly on encrypted user data. This method ensures that sensitive user data is shielded from unauthorized access at all stages of the cloud-based inference process.
+    ```
+    docker pull opencc/ace:20250524
+    ```
 
-<p align="center"><img src="scripts/ace-ppml.png" width="40%"></p>
+- If you want to Build Docker Image locally, you can execute the following command
 
-ANT-ACE takes a pre-trained ML model as input and compiles it into an FHE program directly for both the server side and client side. This makes ANT-ACE easily integrable into any existing ML framework, such as ONNX, PyTorch, TensorFlow, and others. In this way, the development of FHE applications is greatly simplified. As a result, developers won't need to understand the sophisticated mathematical foundations behind FHE, grasp the intricacies of effectively using FHE libraries, or manually manage trade-offs between correctness, security, and performance involving security parameter selection and complex optimizations regarding homomorphic operations such as noise and scale management. This significantly simplifies the development process for FHE applications.
+    ```
+    docker build . -t opencc/ace:20250524
+    ```
 
-<p align="center"><img src="scripts/ace-ml-integ.png" width="80%"></p>
+## 1. Testing the Inference Performance of Neural Networks for Fully Homomorphic Encryption
 
-Currently, ANT-ACE is designed with a compiler infrastructure that supports five levels of abstraction (i.e., five IRs) to compile pre-trained ML models operating on multi-dimensional tensors into low-level polynomial operations. These five phases successively translate pre-trained models into C/C++ programs by automatically performing various analyses and optimizations to make trade-offs between correctness, security, and performance.
+- Setup
 
-<p align="center"><img src="scripts/ace-arch.png" width="90%"></p>
+    ```
+    docker pull opencc/ace:20250524
+    docker run -it -d --name test_7.1 opencc/ace:20250524 bash
+    docker exec -it test_7.1 bash
+    ```
 
+- Build
 
-The ANT-ACE compiler framework marks an initial step in our FHE compiler technology research. We have developed fundamental capabilities for an FHE compiler focused on privacy-preserving machine learning inference, showcased through multiple abstraction levels that automate ONNX model inference using CKKS-encrypted data on CPUs. Future extensions of ANT-ACE will support various input formats and FHE schemes across different computing architectures, including GPUs, enhanced by contributions from open-source communities.
-</div>
-</div>
+    ```
+    python3 /app/FHE-MP-CNN/build_cnn.py
+    /app/scripts/build_cmplr.sh Release
+    ```
 
-# Repository Overview
-- **air-infra:** Contains the base components of the ACE compiler.
-- **fhe-cmplr:** Houses FHE-related components of the ACE compiler.
-- **nn-addon:** Includes ONNX-related components for the ACE compiler.
-- **README.md:** This README file.
-- **Dockerfile:** File used to build the Docker image.
-- **requirements.txt:** Specifies Python package requirements.
+- Inference
 
-# Build ANT-ACE Compiler
+    ```
+    nohup python3 /app/scripts/perf.py -a > /dev/null 2>&1 &
+    ```
 
-## 1. Preparing a Docker environment to Build and Test the ANT-ACE Compiler
+## 2 Generalization Ability Test of Fully Homomorphic Encryption Compiler
 
-It's recommended to use a Docker environment to Build and Test the ANT-ACE Compiler. We provide the [*Dockerfile*](https://github.com/ant-research/ace-compiler/blob/main/Dockerfile) to build the Docker image. The docker image is based on Ubuntu 20.04. You may set up your own environment on other Linux platforms with necessary Linux and Python packages listed in [*Dockerfile*](https://github.com/ant-research/ace-compiler/blob/main/Dockerfile) and [*requirements.txt*](https://github.com/ant-research/ace-compiler/blob/main/requirements.txt). We recommended to pull the pre-built docker image (opencc/ace:latest) from Docker Hub:
+- Setup
 
-```
-mkdir ace-compiler && cd ace-compiler
-docker pull opencc/ace:latest
-docker run -it --name ace -v "$(pwd)":/app --privileged opencc/ace:latest bash
-```
-A local directory `ace-compiler` is created and mounted in the docker container. The container will launch and automatically enters the `/app` directory:
-```
-root@xxxxxx:/app#
-```
-Alternatively, if you encounter issues pulling the pre-built image, you can build the image from the [*Dockerfile*](https://github.com/ace-compiler/ace-compiler/blob/main/Dockerfile):
-```
-git clone https://github.com/ace-compiler/ace-compiler.git
-cd ace-compiler
-docker build -t ace:latest .
-docker run -it --name ace -v "$(pwd)":/app --privileged ace:latest bash
-```
+    ```
+    docker pull opencc/ace:20250524
+    docker run -it -d --name test_7.2 opencc/ace:20250524 bash
+    docker exec -it test_7.2 bash
+    ```
 
-## 2. Building the ACE Compiler
-To build the ACE compiler, navigate to the `/app` directory within the container and run:
-```
-/app/scripts/build_cmplr.sh Release
-```
-Upon successful completion, you will see:
-```
-Info: build project succeeded. FHE compiler executable can be found in /app/ace_cmplr/bin/fhe_cmplr
-root@xxxxxx:/app#
-```
-The ACE compiler will be built under `/app/release` and installed in the `/app/ace_cmplr` directory.
+- Build
 
-For debug purpose, run
-```
-/app/scripts/build_cmplr.sh Debug
-```
-The ACE compiler will be built under `/app/debug`.
+    ```
+    /app/scripts/build_cmplr_omp.sh Release
+    ```
 
-## 3. Building and run ResNet20-CIFAR model
-To build the ResNet20-CIFAR model, navigate to the `/app/release` directory within the container and run:
-```
-cd /app/release
-/app/scripts/build_resnet20_cifar10.sh test
-```
-'test' is just a configuration name and can be replaced by any other string. Upon successful completion, you will see:
-```
-[INFO]: build resnet20_cifar10 succeeded.
-root@xxxxxx:/app/release#
-```
+- Inference
 
-To run this model with first 10 images in CIFAR-10 dataset, run:
-```
-./dataset/resnet20_cifar10.test test_batch.bin 0 9
-```
-where 'test_batch.bin' is the path to CIFAR-10 data file, 0 and 9 is the index of start and end image. 
+    ```
+    nohup python3 scripts/resbm.py -n 10 > /dev/null 2>&1 &
+    ```
 
+## 3 Testing the Inference Accuracy of Neural Network Models for Fully homomorphic Encryption
+
+- Setup
+
+    ```
+    docker pull opencc/ace:20250524
+    docker run -it -d --name test_7.3 opencc/ace:20250524 bash
+    docker exec -it test_7.3 bash
+    ```
+
+- Build
+
+    ```
+    /app/scripts/build_cmplr_omp.sh Release
+    ```
+
+- Inference
+
+    ```
+    nohup python3 scripts/resbm.py -n 100 > /dev/null 2>&1 &
+    ```
+
+## 4. Performance Testing of Fully homomorphic Compilation Systems for Hardware Accelerators
+
+- Setup
+
+    ```
+    docker pull opencc/ace:20250524
+    docker run -it -d --name test_7.4 --gpus '"device=1"' opencc/ace:20250524 bash
+    docker exec -it test_7.4 bash
+    root@99c62073fab2:/app# nvidia-smi 
+    Sun Jun 29 18:40:19 2025       
+    +-----------------------------------------------------------------------------------------+
+    | NVIDIA-SMI 550.144.03             Driver Version: 550.144.03     CUDA Version: 12.4     |
+    |-----------------------------------------+------------------------+----------------------+
+    | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+    | Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+    |                                         |                        |               MIG M. |
+    |=========================================+========================+======================|
+    |   0  NVIDIA H20                     Off |   00000000:26:00.0 Off |                    0 |
+    | N/A   40C    P0             74W /  500W |       4MiB /  97871MiB |      0%      Default |
+    |                                         |                        |             Disabled |
+    +-----------------------------------------+------------------------+----------------------+
+                                                                                            
+    +-----------------------------------------------------------------------------------------+
+    | Processes:                                                                              |
+    |  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+    |        ID   ID                                                               Usage      |
+    |=========================================================================================|
+    |  No running processes found                                                             |
+    +-----------------------------------------------------------------------------------------+
+    ```
+
+- Build
+
+    ```
+    /app/scripts/build_cmplr_gpu.sh Release
+    python3 scripts/build_phantom-fhe.py
+    ```
+
+- Inference
+
+    ```
+    nohup python3 scripts/perf_gpu.py -a > /dev/null 2>&1 &
+    ```
