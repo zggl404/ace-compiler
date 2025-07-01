@@ -7,7 +7,7 @@ RUN apt-get -y update && \
         python3-venv scons curl git time \
         wget gcc g++ python3 python3-pip python3-dev  \
         libprotobuf-dev protobuf-compiler libssl-dev \
-	libgmp3-dev libtool libomp5 libomp-dev libntl-dev pybind11-dev && \
+	libgmp3-dev libtool libomp5 libomp-dev libntl-dev pybind11-dev fontconfig && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
