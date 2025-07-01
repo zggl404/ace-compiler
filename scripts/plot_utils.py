@@ -10,7 +10,6 @@ from typing import List, Tuple, Set, Union
 # setup font
 font = FontProperties()
 font.set_family('serif')
-font.set_name('Helvetica')
 
 
 def _plot_generic_table(

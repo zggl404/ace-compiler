@@ -10,6 +10,13 @@ RUN apt-get -y update && \
 	libgmp3-dev libtool libomp5 libomp-dev libntl-dev pybind11-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
+    apt-get update && \
+    apt-get install -y --reinstall ttf-mscorefonts-installer
+
+RUN fc-cache -f -v
+RUN rm -rf ~/.cache/matplotlib
+
 # COPY script 
 COPY scripts/* /app/scripts/
 RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh

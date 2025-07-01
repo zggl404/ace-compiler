@@ -699,7 +699,7 @@ def get_ace_option(test, paper, lib, extra, acc, trace):
             res.extend(relu_opt)
     # sharding options
     if test in config.get('sharding_test'):
-        res.append('-VEC:sharding')
+        res.append('-VEC:sharding -CKKS:icl=4')
     # Target library option
     res.append('-P2C:lib=' + lib)
     # Trace option

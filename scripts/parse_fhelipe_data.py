@@ -69,7 +69,7 @@ def extract_fhelipe_data(directory_path):
 
     # Build paths to required files
     directory = Path(directory_path)
-    log_file = directory / "fhelipe.run.log.txt"
+    log_file = directory / "fhelipe.run.log"
 
     # Validate main log file exists
     if not log_file.exists():
@@ -137,7 +137,7 @@ def extract_fhelipe_data(directory_path):
         runtime_pattern = re.compile(
             rf"Processing case.*?{re.escape(full_kernel)}.*?"
             r"\[PHASE\] Execution with Lattigo.*?"
-            r"TIMING: (\d+\.\d+)s",
+            r"Runtime (\d+\.\d+)",
             re.DOTALL
         )
         runtime_match = runtime_pattern.search(log_content)
