@@ -81,6 +81,7 @@
 - Inference
 
     ```
+    python3 /app/scripts/resbm_expert.py -n 100
     nohup python3 /app/scripts/resbm.py -n 100 > /dev/null 2>&1 &
     ```
 
