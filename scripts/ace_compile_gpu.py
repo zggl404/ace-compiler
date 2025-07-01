@@ -181,8 +181,8 @@ def inference(prog, input, idx, num):
     return ret
 
 def main():
-    # cur_dir = '/app'
-    cwd = os.getcwd()
+    cwd = '/app'
+    # cwd = os.getcwd()
     cmplr = os.path.join(cwd, 'ace_cmplr/bin/fhe_cmplr')
     model_dir = os.path.join(cwd, 'model')
     link_dir = os.path.join(cwd, 'ace-compiler/fhe-cmplr/rtlib/phantom/example')
