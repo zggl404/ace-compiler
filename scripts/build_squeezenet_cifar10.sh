@@ -21,12 +21,12 @@ RELU_VR="$RELU_VR;/fire3/squeeze/squeeze.2/Relu=3"    # 6
 RELU_VR="$RELU_VR;/fire4/Relu=3"    # 7
 RELU_VR="$RELU_VR;/fire4/squeeze/squeeze.2/Relu=4"    # 8
 RELU_VR="$RELU_VR;/fire5/Relu=3"    # 9
-RELU_VR="$RELU_VR;/fire5/squeeze/squeeze.2/Relu=3"    # 10
+RELU_VR="$RELU_VR;/fire5/squeeze/squeeze.2/Relu=4"    # 10
 RELU_VR="$RELU_VR;/fire6/Relu=3"    # 11
 RELU_VR="$RELU_VR;/fire6/squeeze/squeeze.2/Relu=4"    # 12
 RELU_VR="$RELU_VR;/fire7/Relu=3"    # 13
 RELU_VR="$RELU_VR;/fire7/squeeze/squeeze.2/Relu=4"    # 14
-RELU_VR="$RELU_VR;/fire8/Relu=2"    # 15
+RELU_VR="$RELU_VR;/fire8/Relu=3"    # 15
 RELU_VR="$RELU_VR;/fire8/squeeze/squeeze.2/Relu=5"    # 16
 RELU_VR="$RELU_VR;/fire9/Relu=13"    # 17
 RELU_VR="$RELU_VR;/fire9/squeeze/squeeze.2/Relu=5"    # 18

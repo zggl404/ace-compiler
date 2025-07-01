@@ -147,7 +147,7 @@ def link_target(cwd, model, inc_file):
     """
 
     script = os.path.join(cwd, "scripts/build_target_gpu.sh")
-    cu_file = os.path.join('model', f'{model}_gpu.cu')
+    cu_file = os.path.join(cwd, f'model/{model}_gpu.cu')
 
     # Linker command
     cmds = ['time', '-f', '\"%e %M\"', script]
