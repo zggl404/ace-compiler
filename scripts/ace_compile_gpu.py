@@ -9,7 +9,7 @@ import datetime
 
 CONFIG = {
     "resnet20_cifar10": {
-        "vec": '-VEC:conv_parl',
+        "vec": '-VEC:conv_parl:ssf',
         "relu_vr_def": 3,
         "relu_vr": (
             "/relu/Relu=4;"
@@ -21,7 +21,7 @@ CONFIG = {
         "p2c": "-P2C:lib=phantom"
     },
     "resnet32_cifar10": {
-        "vec": '-VEC:conv_parl',
+        "vec": '-VEC:conv_parl:ssf',
         "relu_vr_def": 2,
         "relu_vr": (
             "/relu/Relu=4;"
@@ -34,7 +34,7 @@ CONFIG = {
         "p2c": "-P2C:lib=phantom"
     },
     "resnet32_cifar100": {
-        "vec": '-VEC:conv_parl',
+        "vec": '-VEC:conv_parl:ssf',
         "relu_vr_def": 3,
         "relu_vr": (
             "/relu/Relu=5;"
@@ -46,7 +46,7 @@ CONFIG = {
         "p2c": "-P2C:lib=phantom"
     },
     "resnet44_cifar10": {
-        "vec": '-VEC:conv_parl',
+        "vec": '-VEC:conv_parl:ssf',
         "relu_vr_def": 2,
         "relu_vr": (
             "/relu/Relu=4;"
@@ -59,7 +59,7 @@ CONFIG = {
         "p2c": "-P2C:lib=phantom"
     },
     "resnet56_cifar10": {
-        "vec": '-VEC:conv_parl',
+        "vec": '-VEC:conv_parl:ssf',
         "relu_vr_def": 2,
         "relu_vr": (
             "/relu/Relu=4;"
@@ -71,7 +71,7 @@ CONFIG = {
         "p2c": "-P2C:lib=phantom"
     },
     "resnet110_cifar10": {
-        "vec": '-VEC:conv_parl',
+        "vec": '-VEC:conv_parl:ssf',
         "relu_vr_def": 3,
         "relu_vr": (
             "/relu/Relu=14;"
