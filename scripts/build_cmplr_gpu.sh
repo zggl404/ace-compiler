@@ -58,4 +58,12 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Info: build project succeeded. FHE compiler executable can be found in $working_dir/ace_cmplr/bin/fhe_cmplr"
+
+echo "Build Testcase for CUDA."
+python3 /app/scripts/ace_compile_gpu.py
+# if [ $? -ne 0 ]; then
+#   echo "Error: build testcase failed."
+#   exit 4
+# fi
+
 exit 0

@@ -235,8 +235,6 @@ def test_perf_ace(cwd, cmplr_path, onnx_path, log, debug):
     info = '-------- ACE --------\n'
     write_log(info, log)
 
-    ret = subprocess.run(["python3", "/app/scripts/ace_compile_gpu.py"])
-
     exec_dir = os.path.join(cwd, 'ace-compiler/release/rtlib/build/example')
     for model in INDEXES:
         case = model + '_gpu'

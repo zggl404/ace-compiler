@@ -118,8 +118,8 @@
 - Build
 
     ```
-    /app/scripts/build_cmplr_gpu.sh Release
-    python3 scripts/build_phantom-fhe.py
+    python3 /app/scripts/build_phantom-fhe.py
+    /app/scripts/build_cmplr_gpu.sh Release          # For a long time
     ```
 
 - Inference
