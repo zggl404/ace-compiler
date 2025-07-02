@@ -338,7 +338,7 @@ CGO25_CONFIG = {
 ASPLOS25_MODEL = []
 ASPLOS25_CONFIG = {}
 
-# OPSLA25 test configurations
+# OOPSLA25 test configurations
 OOPSLA25_MODEL = [
     'conv_3x16x32x3',
     'conv_16x16x32x3',
@@ -353,7 +353,16 @@ OOPSLA25_MODEL = [
     'fhelipe_mobilenet'
 ]
 
-# OPSLA25 test configurations
+# OOPSLA25 test models need specify icl option
+OOPSLA25_ICL_MODEL = [
+    'resnet18_imagenet',
+    'squeezenet_imagenet',
+    'alexnet_imagenet',
+    'vgg11_imagenet',
+    'mobilenet_imagenet'
+]
+
+# OOPSLA25 test models need specify sharding
 OOPSLA25_SHARDING_MODEL = [
     'conv_64x64x56x3',      
     'conv_128x128x28x3',    
@@ -699,7 +708,10 @@ def get_ace_option(test, paper, lib, extra, acc, trace):
             res.extend(relu_opt)
     # sharding options
     if test in config.get('sharding_test'):
-        res.append('-VEC:sharding -CKKS:icl=4')
+        res.append('-VEC:sharding')
+        # icl option
+        if test in OOPSLA25_ICL_MODEL:
+            res.append('-CKKS:icl=4')
     # Target library option
     res.append('-P2C:lib=' + lib)
     # Trace option
