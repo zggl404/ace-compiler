@@ -1,0 +1,7 @@
+-------- Unencrypted Accuracy for 10 Images --------
+AlexNet: Unencrypted Accuracy = 100.0%
+ResNet-20: Unencrypted Accuracy = 100.0%
+SqueezeNet: Unencrypted Accuracy = 100.0%
+VGG16: Unencrypted Accuracy = 100.0%
+Total time = 12.67(s), Max memory usage = 0.6(Gb)
+-------- Accuracy Test Done --------

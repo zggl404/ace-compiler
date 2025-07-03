@@ -37,7 +37,8 @@
 - Inference
 
     ```
-    nohup python3 /app/scripts/perf.py -a > /dev/null 2>&1 &
+    nohup python3 /app/scripts/perf.py -e > /dev/null 2>&1 &
+    nohup python3 /app/scripts/cgo25_ae.py -a > /dev/null 2>&1 &
     ```
 
 ## 2 Generalization Ability Test of Fully Homomorphic Encryption Compiler
@@ -95,32 +96,7 @@
     docker exec -it test_7.4 bash
     ```
 
-    H20
-    ```
-    root@99c62073fab2:/app# nvidia-smi 
-    Sun Jun 29 18:40:19 2025       
-    +-----------------------------------------------------------------------------------------+
-    | NVIDIA-SMI 550.144.03             Driver Version: 550.144.03     CUDA Version: 12.4     |
-    |-----------------------------------------+------------------------+----------------------+
-    | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-    | Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
-    |                                         |                        |               MIG M. |
-    |=========================================+========================+======================|
-    |   0  NVIDIA H20                     Off |   00000000:26:00.0 Off |                    0 |
-    | N/A   40C    P0             74W /  500W |       4MiB /  97871MiB |      0%      Default |
-    |                                         |                        |             Disabled |
-    +-----------------------------------------+------------------------+----------------------+
-                                                                                            
-    +-----------------------------------------------------------------------------------------+
-    | Processes:                                                                              |
-    |  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
-    |        ID   ID                                                               Usage      |
-    |=========================================================================================|
-    |  No running processes found                                                             |
-    +-----------------------------------------------------------------------------------------+
-    ```
-
-    A100:
+    NVIDIA A100:
     ```
     root@7a4253dbaa94:/app# nvidia-smi
     Tue Jul  1 12:19:42 2025
@@ -139,6 +115,31 @@
     +-----------------------------------------------------------------------------------------+
     | Processes:                                                                              |
     |  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+    |        ID   ID                                                               Usage      |
+    |=========================================================================================|
+    |  No running processes found                                                             |
+    +-----------------------------------------------------------------------------------------+
+    ```
+
+    NVIDIA H20:
+    ```
+    root@99c62073fab2:/app# nvidia-smi 
+    Sun Jun 29 18:40:19 2025       
+    +-----------------------------------------------------------------------------------------+
+    | NVIDIA-SMI 550.144.03             Driver Version: 550.144.03     CUDA Version: 12.4     |
+    |-----------------------------------------+------------------------+----------------------+
+    | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+    | Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+    |                                         |                        |               MIG M. |
+    |=========================================+========================+======================|
+    |   0  NVIDIA H20                     Off |   00000000:26:00.0 Off |                    0 |
+    | N/A   40C    P0             74W /  500W |       4MiB /  97871MiB |      0%      Default |
+    |                                         |                        |             Disabled |
+    +-----------------------------------------+------------------------+----------------------+
+                                                                                            
+    +-----------------------------------------------------------------------------------------+
+    | Processes:                                                                              |
+    |  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
     |        ID   ID                                                               Usage      |
     |=========================================================================================|
     |  No running processes found                                                             |

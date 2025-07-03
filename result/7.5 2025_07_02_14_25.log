@@ -1,0 +1,80 @@
+root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_add
+input(tensor): [
+ 0.100000 0.200000 0.300000 0.400000
+ 0.500000 0.600000 0.700000 0.800000
+]
+onnx::Add_1(tensor): [
+ 0.100000 0.200000 0.300000 0.400000
+ 0.500000 0.600000 0.700000 0.800000
+]
+ckks_param: _provider = 0, _poly_degree = 1024, mul_depth = 0, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 1, _num_p = 1, _num_rot_idx = 0,_hamming_weight = 0
+Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 82248 bytes
+Total memory size for weight plain: cnt = 0, size = 0 bytes
+SUCESS!
+root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_add_const 
+ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 0, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 1, _num_p = 1, _num_rot_idx = 0,_hamming_weight = 0
+input(tensor): [
+ 1.038078 -3.171092
+ -0.024826 0.648381
+]
+Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 1608 bytes
+Total memory size for weight plain: cnt = 1, size = 200 bytes
+SUCESS!
+root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_gemm   
+ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 1, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 2, _num_p = 1, _num_rot_idx = 4,_hamming_weight = 0
+input(tensor): [
+ 0.240770 0.760216 -1.997120
+]
+Total memory size for keys: rot_key_cnt = 4, rot_key_size = 7104 bytes, total_key_size = 10352 bytes
+Total memory size for weight plain: cnt = 3, size = 984 bytes
+SUCESS!
+root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_mul_const
+ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 8, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 3, _num_p = 2, _num_rot_idx = 0,_hamming_weight = 0
+input(tensor): [
+ 0.294421 -0.069912
+ -1.092273 -0.449766
+]
+Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 14104 bytes
+Total memory size for weight plain: cnt = 0, size = 0 bytes
+SUCESS!
+root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_bootstrap
+ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 25, input_lev = 0, _first_mod_size = 60, _scaling_mod_size = 51, _num_q_parts = 3, _num_p = 8, _num_rot_idx = 0,_hamming_weight = 0
+input(tensor): [
+ 1.038078 -3.171092
+ -0.024826 0.648381
+]
+WARN: input cipher level of bootstrap, 5, is larger than 1
+Total memory size for keys: rot_key_cnt = 5, rot_key_size = 132280 bytes, total_key_size = 174288 bytes
+Total memory size for weight plain: cnt = 1, size = 200 bytes
+SUCESS!
+root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_conv2d   
+ckks_param: _provider = 0, _poly_degree = 1024, mul_depth = 1, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 2, _num_p = 1, _num_rot_idx = 12,_hamming_weight = 0
+input(tensor): [
+ 0.342731 -0.243094 -0.752497 0.289009 -0.211315
+ 1.116150 -1.955365 0.309955 -0.890346 -0.290432
+ -1.080194 -1.444086 -0.466877 0.182985 0.287251
+ 1.031010 -0.027195 -0.079632 0.332443 -0.431641
+ 0.710583 0.523803 1.133475 -1.157343 -0.288674
+ 0.688653 -0.428383 -0.997726 -0.473661 0.336998
+ -0.234482 1.228737 1.116782 0.765312 -0.381198
+ -1.519397 -0.469078 0.082001 -1.022308 1.111148
+ -0.962841 -0.543373 -1.322096 0.017167 0.943401
+ 0.827888 1.759674 0.356043 0.142547 0.192807
+ -0.559110 0.257637 0.393902 -0.344599 0.822022
+ 1.607423 -1.439999 -0.261026 -1.193762 -1.616551
+ 0.145983 1.473824 0.108271 0.139073 -1.232262
+ -1.218806 0.407234 -1.414934 -0.518950 0.821763
+ 1.167928 -1.108428 -0.833621 -1.077689 -0.611435
+]
+Total memory size for keys: rot_key_cnt = 12, rot_key_size = 1182528 bytes, total_key_size = 1363184 bytes
+Total memory size for weight plain: cnt = 28, size = 460768 bytes
+SUCESS!
+root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_relin    
+ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 1, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 2, _num_p = 1, _num_rot_idx = 0,_hamming_weight = 0
+input(tensor): [
+ 0.294421 -0.069912
+ -1.092273 -0.449766
+]
+Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 3248 bytes
+Total memory size for weight plain: cnt = 0, size = 0 bytes
+SUCESS!

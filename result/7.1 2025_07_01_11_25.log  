@@ -1,0 +1,26 @@
+-------- Expert --------
+resnet20_cifar10_expert: Time = 2984.53(s) TotalMemory = 302.1(Gb) KeyMemory = 280.0(GB)
+                             Tensor::conv = 421.16 / 421.16(s) Count = 21
+                             FHE::relu = 258.68 / 679.84(s) Count = 19
+                             FHE::bootstrap = 2183.94 / 2863.78(s) Count = 18
+resnet32_cifar10_expert: Time = 4756.92(s) TotalMemory = 302.0(Gb) KeyMemory = 280.0(GB)
+                             Tensor::conv = 654.78 / 654.78(s) Count = 33
+                             FHE::relu = 414.05 / 1068.83(s) Count = 31
+                             FHE::bootstrap = 3556.47 / 4625.30(s) Count = 30
+resnet32_cifar100_expert: Time = 4806.61(s) TotalMemory = 302.1(Gb) KeyMemory = 280.0(GB)
+                              Tensor::conv = 675.88 / 675.88(s) Count = 33
+                              FHE::relu = 415.56 / 1091.43(s) Count = 31
+                              FHE::bootstrap = 3560.37 / 4651.81(s) Count = 30
+resnet44_cifar10_expert: Time = 6644.72(s) TotalMemory = 302.0(Gb) KeyMemory = 280.0(GB)
+                             Tensor::conv = 907.38 / 907.38(s) Count = 45
+                             FHE::relu = 579.09 / 1486.48(s) Count = 43
+                             FHE::bootstrap = 5015.60 / 6502.08(s) Count = 42
+resnet56_cifar10_expert: Time = 8514.96(s) TotalMemory = 302.1(Gb) KeyMemory = 280.0(GB)
+                             Tensor::conv = 1156.28 / 1156.28(s) Count = 57
+                             FHE::relu = 743.79 / 1900.08(s) Count = 55
+                             FHE::bootstrap = 6457.59 / 8357.66(s) Count = 54
+resnet110_cifar10_expert: Time = 16637.20(s) TotalMemory = 301.9(Gb) KeyMemory = 280.0(GB)
+                              Tensor::conv = 2220.98 / 2220.98(s) Count = 111
+                              FHE::relu = 1450.93 / 3671.91(s) Count = 109
+                              FHE::bootstrap = 12760.77 / 16432.68(s) Count = 108
+-------- Done --------
