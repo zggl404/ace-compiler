@@ -21,7 +21,7 @@ def oopsla25_ae(cwd, args, log):
         args(Namespace): arguments needed to run
         log(file): log file
     '''
-    exec_files = run_ace_compile(cwd, args.file, args.model, None, args.cmplr, args.src,
+    exec_files = run_ace_compile(cwd, args.file, args.model, None, args.cmplr, args.src, args.temp,
                                  'oopsla25', 'ant', None, False, False, args.debug, args.trace, log)
     run_perf(exec_files, args.cifar10, args.cifar100, args.index, args.debug, args.trace, log)
     return
@@ -51,18 +51,22 @@ if __name__ == "__main__":
                         help='directory that holds repos of air-infra, fhe-cmplr & nn-addon')
     parser.add_argument('-t', '--trace', action='store_false', default=True,
                         help='print out trace info into log file')
+    parser.add_argument('-tmp', '--temp', default="/app/mkr_ae_temp", help='directory that holds temp files')
     parser.add_argument("-o", "--output-log-dir", type=str, default="/app/mkr_ae_result/mkr/",
         help="Specify the directory to move generated log files to.")
     args = parser.parse_args()
 
-    # Define the output directory path
+    # Define the output and temp file directory path
     output_log_dir = Path(args.output_log_dir)
-    # Ensure the top-level output directory exists before processing any cases
+    temp_file_dir = Path(args.temp)
+    # Ensure the top-level output and temp directory exists before processing any cases
     try:
         os.makedirs(output_log_dir, exist_ok=True)
         print(f"MKR logs will be moved to {output_log_dir}")
+        os.makedirs(temp_file_dir, exist_ok=True)
+        print(f"MKR temp files will be moved to {temp_file_dir}")
     except OSError as e:
-        print(f"Error: Could not create output directory {output_log_dir}")
+        print(f"Error: Could not create output directory {output_log_dir} or temp directory {temp_file_dir}")
         sys.exit(1)
 
     cwd = os.getcwd()

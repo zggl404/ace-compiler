@@ -61,7 +61,7 @@ E2E_MODEL_MAP = {
         'mkr': 'fhelipe_alexnet'
     },
     'VGG11': {
-        'fhelipe': 'ace_fhelipe_vgg11',
+        'fhelipe': 'ace_fhelipe_vgg',
         'mkr': 'fhelipe_vgg11'
     },
     'MobileNet': {

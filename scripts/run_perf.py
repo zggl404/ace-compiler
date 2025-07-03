@@ -36,7 +36,7 @@ def run_single(exec_cmd, indent_size, log, trace):
                 continue
             item = line.split(' ')
             accuracy = float(item[6].strip().split(',')[0].strip()) * 100
-        info = '%sExec: Time = %.1f(s), Memory = %.1f(GB), Accuracy = %.1f%%\n' % (
+        info = '%sExec: Time = %.2f(s), Memory = %.2f(GB), Accuracy = %.2f%%\n' % (
             indent, time, memory, accuracy)
         write_log(info, log)
         if trace:
