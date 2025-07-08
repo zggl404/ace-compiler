@@ -41,6 +41,15 @@ RT_DATA_INFO* Get_rt_data_info() {
 size_t Len             = 4;
 float  Add_const_val[] = {1.0, 1.0, 1.0, 1.0};
 
+void Print_polydata(char* name, int64_t* poly, int start, int end, int num) {
+  int i = 0;
+  printf("%s: ", name);
+  for(i = start; i < num; i++) printf("%ld, ", poly[i]);
+  printf(",,,");
+  for(i = end - num; i < end; i++) printf("%ld, ", poly[i]);
+  printf("\n");
+}
+
 bool Main_graph() {
   CIPHERTEXT input;
   CIPHERTEXT output;
@@ -61,7 +70,13 @@ bool Main_graph() {
   while (Sc_degree(&bs_ciph) > 1) {
     Rescale_ciph(&bs_ciph, &bs_ciph);
   }
+  Print_polydata("input._c0_poly", Get_c0(&input)->_data, 0, 16, 4);
+  Print_polydata("input._c1_poly", Get_c1(&input)->_data, 0, 16, 4);
+  Print_polydata("bs_ciph._c0_poly", Get_c0(&bs_ciph)->_data, 0, 16, 4);
+  Print_polydata("bs_ciph._c1_poly", Get_c1(&bs_ciph)->_data, 0, 16, 4);
   Add_ciph(&output, &bs_ciph, &input);
+  Print_polydata("output._c0_poly", Get_c0(&output)->_data, 0, 16, 4);
+  Print_polydata("output._c1_poly", Get_c1(&output)->_data, 0, 16, 4);
   Set_output_data("output", 0, &output);
   return true;
 }

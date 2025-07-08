@@ -14,6 +14,15 @@ float32_t _cst_2[8] = {
   0, 4, 2, 0, 1, 5, 0, 3
 };
 
+void Print_polydata(char* name, int64_t* poly, int start, int end, int num) {
+  int i = 0;
+  printf("%s: ", name);
+  for(i = start; i < num; i++) printf("%ld, ", poly[i]);
+  printf(",,,");
+  for(i = end - num; i < end; i++) printf("%ld, ", poly[i]);
+  printf("\n");
+}
+
 bool Main_graph() {
   int32_t index0;
   int32_t index1;
@@ -56,6 +65,8 @@ bool Main_graph() {
   memset(&_pgen_tmp_2, 0, sizeof(_pgen_tmp_2));
   memset(&_pgen_tmp_3, 0, sizeof(_pgen_tmp_3));
   memset(&_pgen_tmp_4, 0, sizeof(_pgen_tmp_4));
+  Print_polydata("input._c0_poly", Get_c0(&input)->_data, 0, 16, 4);
+  Print_polydata("input._c1_poly", Get_c1(&input)->_data, 0, 16, 4);
   Init_ciph_same_scale(&_pgen_tmp_0, &input, 0);
   {
     _pgen_swk_c0 = Alloc_poly(degree, Poly_level(&input._c1_poly), 1);
@@ -306,6 +317,8 @@ bool Main_graph() {
   Init_ciph_same_scale(&output, &tmp_result, 0);
   Copy_poly(&output._c0_poly, &tmp_result._c0_poly);
   Copy_poly(&output._c1_poly, &tmp_result._c1_poly);
+  Print_polydata("output._c0_poly", Get_c0(&output)->_data, 0, 16, 4);
+  Print_polydata("output._c1_poly", Get_c1(&output)->_data, 0, 16, 4);
   Set_output_data("output", 0, &output);
   return true;
 }

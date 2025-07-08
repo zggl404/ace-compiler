@@ -5,6 +5,15 @@ typedef float float32_t;
 
 // global constants definition
 
+void Print_polydata(char* name, int64_t* poly, int start, int end, int num) {
+  int i = 0;
+  printf("%s: ", name);
+  for(i = start; i < num; i++) printf("%ld, ", poly[i]);
+  printf(",,,");
+  for(i = end - num; i < end; i++) printf("%ld, ", poly[i]);
+  printf("\n");
+}
+
 bool Main_graph() {
   CIPHERTEXT  input;
   CIPHERTEXT  output;
@@ -32,6 +41,8 @@ bool Main_graph() {
   input              = Get_input_data("input", 0);
   memset(&output, 0, sizeof(output));
   memset(&_pgen_tmp_0, 0, sizeof(_pgen_tmp_0));
+  Print_polydata("input._c0_poly", Get_c0(&input)->_data, 0, 16, 4);
+  Print_polydata("input._c1_poly", Get_c1(&input)->_data, 0, 16, 4);
   Init_ciph3_up_scale(&_pgen_tmp_0, &input, &input);
   {
     _pgen_modulus = Q_modulus();
@@ -151,6 +162,8 @@ bool Main_graph() {
     Free_poly(_pgen_tmp_poly);
     Free_poly(_pgen_decomp);
   }
+  Print_polydata("output._c0_poly", Get_c0(&output)->_data, 0, 16, 4);
+  Print_polydata("output._c1_poly", Get_c1(&output)->_data, 0, 16, 4);
   Set_output_data("output", 0, &output);
   return true;
 }

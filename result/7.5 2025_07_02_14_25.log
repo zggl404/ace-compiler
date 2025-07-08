@@ -1,4 +1,4 @@
-root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_add
+root@7dea60d13fc5:/app# ./ace-compiler/release/rtlib/build/example/eg_fhertlib_add
 input(tensor): [
  0.100000 0.200000 0.300000 0.400000
  0.500000 0.600000 0.700000 0.800000
@@ -8,46 +8,114 @@ onnx::Add_1(tensor): [
  0.500000 0.600000 0.700000 0.800000
 ]
 ckks_param: _provider = 0, _poly_degree = 1024, mul_depth = 0, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 1, _num_p = 1, _num_rot_idx = 0,_hamming_weight = 0
+input._c0_poly: 3445197167, 6809903045, 2783557736, 1111907986, ,,,8294926411, 3478978028, 6114984726, 8262756915, 
+onnx_add_1._c0_poly: 6339030922, 3786584729, 8260582286, 165377046, ,,,729694451, 2056006736, 7700958217, 8159533895, 
+output._c0_poly: 1194322168, 2006581853, 2454234101, 1277285032, ,,,434714941, 5534984764, 5226037022, 7832384889, 
+input._c1_poly: 6569683788, 1010241629, 1183681338, 5448079419, ,,,486089276, 2683727873, 8133425952, 6594817724, 
+onnx_add_1._c1_poly: 5214263553, 6384693990, 187196433, 5026736396, ,,,1347668679, 5701733670, 5565623271, 8441426356, 
+output._c1_poly: 3194041420, 7394935619, 1370877771, 1884909894, ,,,1833757955, 8385461543, 5109143302, 6446338159, 
 Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 82248 bytes
 Total memory size for weight plain: cnt = 0, size = 0 bytes
-SUCESS!
-root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_add_const 
+Value of PRINT_ALL: ON
+expect relative error less than: 0.001000
+index: 0, result: 0.200001, expect: 0.200000, result relative error=0.000003, ok
+index: 1, result: 0.400000, expect: 0.400000, result relative error=0.000000, ok
+index: 2, result: 0.600001, expect: 0.600000, result relative error=0.000001, ok
+index: 3, result: 0.800000, expect: 0.800000, result relative error=0.000000, ok
+index: 4, result: 1.000000, expect: 1.000000, result relative error=0.000000, ok
+index: 5, result: 1.200000, expect: 1.200000, result relative error=0.000000, ok
+index: 6, result: 1.400000, expect: 1.400000, result relative error=0.000000, ok
+index: 7, result: 1.599999, expect: 1.600000, result relative error=0.000000, ok
+Value of PRINT_ALL: ON
+expect absolute error less than: 0.000100
+index: 0, result: 0.200001, expect: 0.200000, result absolute error=0.000001, ok
+index: 1, result: 0.400000, expect: 0.400000, result absolute error=0.000000, ok
+index: 2, result: 0.600001, expect: 0.600000, result absolute error=0.000001, ok
+index: 3, result: 0.800000, expect: 0.800000, result absolute error=0.000000, ok
+index: 4, result: 1.000000, expect: 1.000000, result absolute error=0.000000, ok
+index: 5, result: 1.200000, expect: 1.200000, result absolute error=0.000000, ok
+index: 6, result: 1.400000, expect: 1.400000, result absolute error=0.000000, ok
+index: 7, result: 1.599999, expect: 1.600000, result absolute error=0.000001, ok
+SUCCESS!
+
+root@7dea60d13fc5:/app# ./ace-compiler/release/rtlib/build/example/eg_fhertlib_add_const 
 ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 0, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 1, _num_p = 1, _num_rot_idx = 0,_hamming_weight = 0
 input(tensor): [
  1.038078 -3.171092
  -0.024826 0.648381
 ]
+input._c0_poly: 820183721, 2507507760, 2498402929, 1298691285, ,,,6942549835, 3092899505, 260717979, 1029372045, 
+onnx_add_1._poly: 2306879338, 7540237451, 5860951988, 8525970836, ,,,2474194035, 2466234891, 2913031656, 6567203305, 
+output._c0_poly: 3127063059, 1457811162, 8359354917, 1234728072, ,,,826809821, 5559134396, 3173749635, 7596575350, 
+input._c1_poly: 3968562311, 2758473414, 7426463202, 8545718090, ,,,1358823832, 7339286316, 2930567737, 7457425613, 
+output._c1_poly: 3968562311, 2758473414, 7426463202, 8545718090, ,,,1358823832, 7339286316, 2930567737, 7457425613, 
 Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 1608 bytes
 Total memory size for weight plain: cnt = 1, size = 200 bytes
-SUCESS!
-root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_gemm   
+Value of PRINT_ALL: ON
+expect relative error less than: 0.001000
+index: 0, result: 2.038078, expect: 2.038078, result relative error=0.000000, ok
+index: 1, result: -2.171092, expect: -2.171092, result relative error=-0.000000, ok
+index: 2, result: 0.975174, expect: 0.975174, result relative error=0.000000, ok
+index: 3, result: 1.648381, expect: 1.648381, result relative error=0.000000, ok
+Value of PRINT_ALL: ON
+expect absolute error less than: 0.000100
+index: 0, result: 2.038078, expect: 2.038078, result absolute error=0.000000, ok
+index: 1, result: -2.171092, expect: -2.171092, result absolute error=0.000000, ok
+index: 2, result: 0.975174, expect: 0.975174, result absolute error=0.000000, ok
+index: 3, result: 1.648381, expect: 1.648381, result absolute error=0.000000, ok
+SUCCESS!
+
+root@7dea60d13fc5:/app# ./ace-compiler/release/rtlib/build/example/eg_fhertlib_gemm 
 ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 1, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 2, _num_p = 1, _num_rot_idx = 4,_hamming_weight = 0
 input(tensor): [
  0.240770 0.760216 -1.997120
 ]
+input._c0_poly: 5124856041, 1965910396, 5374658951, 5093165665, ,,,4331174457, 7408296009, 2887009951, 683100491, 
+input._c1_poly: 299677122, 2619411378, 2748212367, 6062230695, ,,,4860770523, 7680131570, 4116643813, 1575990867, 
+output._c0_poly: 1965075290, 5570641345, 5366627397, 2047844385, ,,,6844112673, 2199304108, 2966553993, 916415627, 
+output._c1_poly: 2028693641, 5345913472, 4939012710, 6521628105, ,,,5156565098, 2310983639, 8010922020, 1379170381, 
 Total memory size for keys: rot_key_cnt = 4, rot_key_size = 7104 bytes, total_key_size = 10352 bytes
 Total memory size for weight plain: cnt = 3, size = 984 bytes
-SUCESS!
-root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_mul_const
-ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 8, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 3, _num_p = 2, _num_rot_idx = 0,_hamming_weight = 0
-input(tensor): [
- 0.294421 -0.069912
- -1.092273 -0.449766
-]
-Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 14104 bytes
-Total memory size for weight plain: cnt = 0, size = 0 bytes
-SUCESS!
-root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_bootstrap
+Value of PRINT_ALL: ON
+expect relative error less than: 0.001000
+index: 0, result: -2.234025, expect: -2.234025, result relative error=-0.000000, ok
+index: 1, result: -5.222430, expect: -5.222430, result relative error=-0.000000, ok
+Value of PRINT_ALL: ON
+expect absolute error less than: 0.000100
+index: 0, result: -2.234025, expect: -2.234025, result absolute error=0.000000, ok
+index: 1, result: -5.222430, expect: -5.222430, result absolute error=0.000000, ok
+SUCCESS!
+
+root@7dea60d13fc5:/app# ./ace-compiler/release/rtlib/build/example/eg_fhertlib_bootstrap
 ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 25, input_lev = 0, _first_mod_size = 60, _scaling_mod_size = 51, _num_q_parts = 3, _num_p = 8, _num_rot_idx = 0,_hamming_weight = 0
 input(tensor): [
  1.038078 -3.171092
  -0.024826 0.648381
 ]
 WARN: input cipher level of bootstrap, 5, is larger than 1
+input._c0_poly: 383127646709406451, 801949788136487100, 619803412866129530, 343160189701428013, ,,,305565712614763900, 381227298527411441, 42431279437708228, 121694406013817, 
+input._c1_poly: 457300266323298489, 540821422475541184, 660941496352285693, 275208947658967720, ,,,112940190601170511, 978541906447810989, 276741919084323262, 198821693318560693, 
+bs_ciph._c0_poly: 405518563415596762, 1041332897365315016, 1048392843561721241, 35341438468887160, ,,,606568344101412847, 524523580264718693, 14862115028044663, 386074538485372461, 
+bs_ciph._c1_poly: 444918889866648042, 946070505703939778, 496657139782495920, 1078762846519442101, ,,,1063917835140047368, 203615728087597790, 188339577175972972, 259879699766651997, 
+output._c0_poly: 788646210125003213, 690361180894956643, 515274751821005298, 378501628170315173, ,,,912134056716176747, 905750878792130134, 57293394465752891, 386196232891386278, 
+output._c1_poly: 902219156189946531, 333970423572635489, 4677131527936140, 201050289571564348, ,,,23936521134372406, 29236129928563306, 465081496260296234, 458701393085212690, 
 Total memory size for keys: rot_key_cnt = 5, rot_key_size = 132280 bytes, total_key_size = 174288 bytes
 Total memory size for weight plain: cnt = 1, size = 200 bytes
-SUCESS!
-root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_conv2d   
+Value of PRINT_ALL: ON
+expect relative error less than: 0.001000
+index: 0, result: 2.038065, expect: 2.038078, result relative error=0.000007, ok
+index: 1, result: -2.171105, expect: -2.171092, result relative error=-0.000006, ok
+index: 2, result: 0.975137, expect: 0.975174, result relative error=0.000038, ok
+index: 3, result: 1.648380, expect: 1.648381, result relative error=0.000000, ok
+Value of PRINT_ALL: ON
+expect absolute error less than: 0.000100
+index: 0, result: 2.038065, expect: 2.038078, result absolute error=0.000013, ok
+index: 1, result: -2.171105, expect: -2.171092, result absolute error=0.000013, ok
+index: 2, result: 0.975137, expect: 0.975174, result absolute error=0.000037, ok
+index: 3, result: 1.648380, expect: 1.648381, result absolute error=0.000001, ok
+SUCCESS!
+
+root@7dea60d13fc5:/app# ./ace-compiler/release/rtlib/build/example/eg_fhertlib_conv2d 
 ckks_param: _provider = 0, _poly_degree = 1024, mul_depth = 1, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 2, _num_p = 1, _num_rot_idx = 12,_hamming_weight = 0
 input(tensor): [
  0.342731 -0.243094 -0.752497 0.289009 -0.211315
@@ -66,15 +134,90 @@ input(tensor): [
  -1.218806 0.407234 -1.414934 -0.518950 0.821763
  1.167928 -1.108428 -0.833621 -1.077689 -0.611435
 ]
+input._c0_poly: 6759121778, 2412223834, 3921127092, 1108362983, ,,,3132322480, 3113583964, 5880922123, 7620465759, 
+input._c1_poly: 3701388443, 3241246640, 7900498676, 4878395372, ,,,6588732613, 7302062401, 5088424753, 4340771783, 
+input._c0_poly: 71592770, 7389271923, 1907851406, 6661322566, ,,,2077808754, 7609684093, 5090588611, 2617501251, 
+input._c1_poly: 2752650694, 2520786814, 8281669993, 4184354426, ,,,2754001773, 6673755584, 4206266378, 1114861679, 
 Total memory size for keys: rot_key_cnt = 12, rot_key_size = 1182528 bytes, total_key_size = 1363184 bytes
 Total memory size for weight plain: cnt = 28, size = 460768 bytes
-SUCESS!
-root@7dea60d13fc5:/app/ace-compiler/release/rtlib/build/example# ./eg_fhertlib_relin    
+Value of PRINT_ALL: ON
+expect relative error less than: 0.001000
+index: 0, result: 0.109733, expect: 0.109734, result relative error=0.000012, ok
+index: 1, result: 0.233621, expect: 0.233623, result relative error=0.000009, ok
+index: 2, result: 0.046415, expect: 0.046415, result relative error=0.000005, ok
+index: 3, result: -0.159268, expect: -0.159268, result relative error=-0.000002, ok
+index: 4, result: -0.672671, expect: -0.672671, result relative error=-0.000001, ok
+index: 5, result: -0.555958, expect: -0.555959, result relative error=-0.000002, ok
+index: 6, result: 0.089557, expect: 0.089557, result relative error=0.000005, ok
+index: 7, result: -0.480431, expect: -0.480431, result relative error=-0.000002, ok
+index: 8, result: 0.100565, expect: 0.100565, result relative error=0.000003, ok
+index: 9, result: -0.353184, expect: -0.353183, result relative error=-0.000003, ok
+index: 10, result: -0.151285, expect: -0.151284, result relative error=-0.000007, ok
+index: 11, result: -0.991077, expect: -0.991078, result relative error=-0.000002, ok
+index: 12, result: 0.419598, expect: 0.419596, result relative error=0.000004, ok
+index: 13, result: -0.735241, expect: -0.735241, result relative error=-0.000000, ok
+index: 14, result: -0.012214, expect: -0.012215, result relative error=-0.000049, ok
+index: 15, result: 0.436611, expect: 0.436612, result relative error=0.000001, ok
+index: 16, result: -0.384023, expect: -0.384022, result relative error=-0.000004, ok
+index: 17, result: 0.275857, expect: 0.275856, result relative error=0.000003, ok
+index: 18, result: -0.631432, expect: -0.631433, result relative error=-0.000001, ok
+index: 19, result: -0.992077, expect: -0.992077, result relative error=-0.000000, ok
+index: 20, result: -0.739569, expect: -0.739569, result relative error=-0.000000, ok
+index: 21, result: -0.751997, expect: -0.751995, result relative error=-0.000002, ok
+index: 22, result: -0.605511, expect: -0.605512, result relative error=-0.000000, ok
+index: 23, result: -0.344740, expect: -0.344739, result relative error=-0.000001, ok
+index: 24, result: -0.159536, expect: -0.159536, result relative error=-0.000001, ok
+Value of PRINT_ALL: ON
+expect absolute error less than: 0.000100
+index: 0, result: 0.109733, expect: 0.109734, result absolute error=0.000001, ok
+index: 1, result: 0.233621, expect: 0.233623, result absolute error=0.000002, ok
+index: 2, result: 0.046415, expect: 0.046415, result absolute error=0.000000, ok
+index: 3, result: -0.159268, expect: -0.159268, result absolute error=0.000000, ok
+index: 4, result: -0.672671, expect: -0.672671, result absolute error=0.000000, ok
+index: 5, result: -0.555958, expect: -0.555959, result absolute error=0.000001, ok
+index: 6, result: 0.089557, expect: 0.089557, result absolute error=0.000000, ok
+index: 7, result: -0.480431, expect: -0.480431, result absolute error=0.000001, ok
+index: 8, result: 0.100565, expect: 0.100565, result absolute error=0.000000, ok
+index: 9, result: -0.353184, expect: -0.353183, result absolute error=0.000001, ok
+index: 10, result: -0.151285, expect: -0.151284, result absolute error=0.000001, ok
+index: 11, result: -0.991077, expect: -0.991078, result absolute error=0.000002, ok
+index: 12, result: 0.419598, expect: 0.419596, result absolute error=0.000002, ok
+index: 13, result: -0.735241, expect: -0.735241, result absolute error=0.000000, ok
+index: 14, result: -0.012214, expect: -0.012215, result absolute error=0.000001, ok
+index: 15, result: 0.436611, expect: 0.436612, result absolute error=0.000001, ok
+index: 16, result: -0.384023, expect: -0.384022, result absolute error=0.000001, ok
+index: 17, result: 0.275857, expect: 0.275856, result absolute error=0.000001, ok
+index: 18, result: -0.631432, expect: -0.631433, result absolute error=0.000001, ok
+index: 19, result: -0.992077, expect: -0.992077, result absolute error=0.000000, ok
+index: 20, result: -0.739569, expect: -0.739569, result absolute error=0.000000, ok
+index: 21, result: -0.751997, expect: -0.751995, result absolute error=0.000002, ok
+index: 22, result: -0.605511, expect: -0.605512, result absolute error=0.000000, ok
+index: 23, result: -0.344740, expect: -0.344739, result absolute error=0.000000, ok
+index: 24, result: -0.159536, expect: -0.159536, result absolute error=0.000000, ok
+SUCCESS!
+
+root@7dea60d13fc5:/app# ./ace-compiler/release/rtlib/build/example/eg_fhertlib_relin
 ckks_param: _provider = 0, _poly_degree = 16, mul_depth = 1, input_lev = 0, _first_mod_size = 33, _scaling_mod_size = 30, _num_q_parts = 2, _num_p = 1, _num_rot_idx = 0,_hamming_weight = 0
 input(tensor): [
  0.294421 -0.069912
  -1.092273 -0.449766
 ]
+input._c0_poly: 962747171, 1097031709, 7387514942, 7247590742, ,,,3824546317, 4878623879, 4650462928, 4395490592, 
+input._c1_poly: 7618509671, 6282881451, 7207447353, 7049238743, ,,,4356425452, 43873003, 7806173800, 6264347022, 
+output._c0_poly: 8289983422, 3988138295, 465182160, 3575582159, ,,,7939223561, 543497632, 7938491140, 7351992025, 
+output._c1_poly: 3805012888, 2076458652, 2502705026, 5370776247, ,,,8162321312, 4316638617, 5235248321, 6930457400, 
 Total memory size for keys: rot_key_cnt = 0, rot_key_size = 0 bytes, total_key_size = 3248 bytes
 Total memory size for weight plain: cnt = 0, size = 0 bytes
-SUCESS!
+Value of PRINT_ALL: ON
+expect relative error less than: 0.001000
+index: 0, result: 0.086684, expect: 0.086684, result relative error=0.000000, ok
+index: 1, result: 0.004888, expect: 0.004888, result relative error=0.000001, ok
+index: 2, result: 1.193061, expect: 1.193061, result relative error=0.000000, ok
+index: 3, result: 0.202290, expect: 0.202290, result relative error=0.000000, ok
+Value of PRINT_ALL: ON
+expect absolute error less than: 0.000100
+index: 0, result: 0.086684, expect: 0.086684, result absolute error=0.000000, ok
+index: 1, result: 0.004888, expect: 0.004888, result absolute error=0.000000, ok
+index: 2, result: 1.193061, expect: 1.193061, result absolute error=0.000000, ok
+index: 3, result: 0.202290, expect: 0.202290, result absolute error=0.000000, ok
+SUCCESS!

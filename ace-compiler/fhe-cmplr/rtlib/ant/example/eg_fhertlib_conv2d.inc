@@ -135,6 +135,15 @@ float32_t _cst_5[25] = {-0.13928, -0.13928, -0.13928, -0.13928, -0.13928,
                         -0.13928, -0.13928, -0.13928, -0.13928, -0.13928};
 int32_t   _cst_6[9]  = {-6, -5, -4, -1, 0, 1, 4, 5, 6};
 
+void Print_polydata(char* name, int64_t* poly, int start, int end, int num) {
+  int i = 0;
+  printf("%s: ", name);
+  for(i = start; i < num; i++) printf("%ld, ", poly[i]);
+  printf(",,,");
+  for(i = end - num; i < end; i++) printf("%ld, ", poly[i]);
+  printf("\n");
+}
+
 bool Main_graph() {
   CIPHERTEXT  input;
   CIPHERTEXT  output;
@@ -180,6 +189,8 @@ bool Main_graph() {
   memset(&_pgen_tmp_4, 0, sizeof(_pgen_tmp_4));
   memset(&_pgen_tmp_5, 0, sizeof(_pgen_tmp_5));
   ;
+  Print_polydata("input._c0_poly", Get_c0(&input)->_data, 0, 1024, 4);
+  Print_polydata("input._c1_poly", Get_c1(&input)->_data, 0, 1024, 4);
   Init_ciph_same_scale(&_pgen_tmp_0, &input, 0);
   {
     _pgen_swk_c0      = Alloc_poly(degree, Poly_level(&input._c1_poly), 1);
@@ -663,6 +674,8 @@ bool Main_graph() {
   Init_ciph_same_scale(&output, &tmp_result_n1, 0);
   Copy_poly(&output._c0_poly, &tmp_result_n1._c0_poly);
   Copy_poly(&output._c1_poly, &tmp_result_n1._c1_poly);
+  Print_polydata("input._c0_poly", Get_c0(&output)->_data, 0, 1024, 4);
+  Print_polydata("input._c1_poly", Get_c1(&output)->_data, 0, 1024, 4);
   Set_output_data("output", 0, &output);
   return true;
 }

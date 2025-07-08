@@ -57,6 +57,15 @@ int Get_input_count() {
   return 2;
 }
 
+void Print_polydata(char* name, int64_t* poly, int start, int end, int num) {
+  int i = 0;
+  printf("%s: ", name);
+  for(i = start; i < num; i++) printf("%ld, ", poly[i]);
+  printf(",,,");
+  for(i = end - num; i < end; i++) printf("%ld, ", poly[i]);
+  printf("\n");
+}
+
 bool Main_graph() {
   CIPHERTEXT   input;
   CIPHERTEXT   onnx_add_1;
@@ -77,11 +86,17 @@ bool Main_graph() {
     poly_dst  = Coeffs(&(output._c0_poly), poly_loop_idx, degree);
     poly_src0 = Coeffs(&(input._c0_poly), poly_loop_idx, degree);
     poly_src1 = Coeffs(&(onnx_add_1._c0_poly), poly_loop_idx, degree);
+    Print_polydata("input._c0_poly", poly_src0, 0, degree, 4);
+    Print_polydata("onnx_add_1._c0_poly", poly_src1, 0, degree, 4);
     Hw_modadd(poly_dst, poly_src0, poly_src1, modulus, degree);
+    Print_polydata("output._c0_poly", poly_dst, 0, degree, 4);
     poly_dst  = Coeffs(&(output._c1_poly), poly_loop_idx, degree);
     poly_src0 = Coeffs(&(input._c1_poly), poly_loop_idx, degree);
     poly_src1 = Coeffs(&(onnx_add_1._c1_poly), poly_loop_idx, degree);
+    Print_polydata("input._c1_poly", poly_src0, 0, degree, 4);
+    Print_polydata("onnx_add_1._c1_poly", poly_src1, 0, degree, 4);
     Hw_modadd(poly_dst, poly_src0, poly_src1, modulus, degree);
+    Print_polydata("output._c1_poly", poly_dst, 0, degree, 4);
     modulus++;
   }
   Set_output_data("output", 0, &output);

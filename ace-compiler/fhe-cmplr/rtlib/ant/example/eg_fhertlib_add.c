@@ -22,19 +22,89 @@ TENSOR* Generate_input_data() {
   return Alloc_tensor(1, 1, 2, 4, data);
 }
 
-//! @brief Validate output vector with expect vector
-//! @param result double *
-//! @param expect double *
-//! @return return true if value match
-bool Validate_output_data(double* result, double* expect, size_t len) {
-  for (size_t i = 0; i < len; i++) {
-    double d1 = result[i];
-    double d2 = expect[i];
-    if (fabs(d1 - d2) > 1e-3) {
-      printf("-- VALUES DO NOT MATCH AT INDEX %ld --\n", i);
-      printf("%f != %f\n", d1, d2);
-      return false;
+/**
+ * @brief validate output vector with expect vector
+ *
+ *
+ * @param result double *
+ * @param expect double *
+ * @param len int
+ * @return return true if value match
+ */
+bool Validate_output_data_absolute_error(double *result, double *expect, int len) {
+  bool print_all = false;
+  const char* print_all_str = getenv("PRINT_ALL");
+  if(print_all_str != NULL) {
+    printf("Value of PRINT_ALL: %s\n", print_all_str);
+    print_all = true;
+  }
+
+  const char* absolute_error_str = getenv("ABS_ERROR");
+  double absolute_error = 0.0001;
+  if(absolute_error_str != NULL) {
+    printf("Value of ABS_ERROR: %s\n", absolute_error_str);
+    absolute_error = atof(absolute_error_str);
+  }
+  printf("expect absolute error less than: %f\n", absolute_error);
+  int count = 0;
+  for(int i = 0; i < len; i++) {
+    double result_absolute_error = fabs(result[i] - expect[i]);
+    if(print_all) {
+      printf("index: %d, result: %f, expect: %f, result absolute error=%f, ", i, result[i], expect[i], result_absolute_error);
+      if(result_absolute_error > absolute_error) {
+        count++;
+        printf("%d failed\n", count);
+      } else {
+        printf("ok\n");
+      }
+    } else {
+      if(result_absolute_error > absolute_error) {
+        printf("index: %d, value: %f != %f, result absolute error=%f\n", i, result[i], expect[i], result_absolute_error);
+        return false;
+      }
     }
+  }
+  if(print_all && (count != 0)) {
+    return false;
+  }
+  return true;
+}
+
+bool Validate_output_data_relative_error(double *result, double *expect, int len) {
+  bool print_all = false;
+  const char* print_all_str = getenv("PRINT_ALL");
+  if(print_all_str != NULL) {
+    printf("Value of PRINT_ALL: %s\n", print_all_str);
+    print_all = true;
+  }
+
+  const char* relative_error_str = getenv("REL_ERROR");
+  double relative_error = 0.001;
+  if(relative_error_str != NULL) {
+    printf("Value of REL_ERROR: %s\n", relative_error_str);
+    relative_error = atof(relative_error_str);
+  }
+  printf("expect relative error less than: %f\n", relative_error);
+  int count = 0;
+  for(int i = 0; i < len; i++) {
+    double result_relative_error = fabs(result[i] - expect[i])/expect[i];
+    if(print_all) {
+      printf("index: %d, result: %f, expect: %f, result relative error=%f, ", i, result[i], expect[i], result_relative_error);
+      if(result_relative_error > relative_error) {
+        count++;
+        printf("%d failed\n", count);
+      } else {
+        printf("ok\n");
+      }
+    } else {
+      if (result_relative_error > relative_error) {
+        printf("index: %d, value: %f != %f, result relative error: %f\n", i, result[i], expect[i], result_relative_error);
+        return false;
+      }
+    }
+  }
+  if(print_all && (count != 0)) {
+    return false;
   }
   return true;
 }
@@ -63,14 +133,16 @@ int main() {
 
   size_t len      = 8;
   double expect[] = {0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6};
-  bool   res      = Validate_output_data(result, expect, len);
+  bool    res_relative    = Validate_output_data_relative_error(result, expect, len);
+  bool    res_absolute    = Validate_output_data_absolute_error(result, expect, len);
   free(result);
-  if (res) {
-    printf("SUCESS!\n");
+  if (res_relative || res_absolute) {
+    printf("SUCCESS!\n");
   } else {
     printf("FAILED!\n");
     return 1;
-  };
+  }
+
   return 0;
 }
 
