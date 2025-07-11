@@ -621,6 +621,8 @@ def get_test_onnx_files(onnx_file, model_dir, paper):
                 test_set = ASPLOS25_MODEL
             elif paper == 'oopsla25':
                 test_set = list(set(OOPSLA25_MODEL) | set(OOPSLA25_SHARDING_MODEL))
+            elif paper == 'oopsla25_mini':
+                test_set = OOPSLA25_MODEL[:2]   # first two cases
             for test in test_set:
                 found = False
                 for model_file in model_files:
@@ -695,7 +697,7 @@ def get_ace_option(test, paper, lib, extra, acc, trace):
         config = CGO25_CONFIG
     elif paper == 'asplos25':
         config = ASPLOS25_CONFIG
-    elif paper == 'oopsla25':
+    elif paper.startswith('oopsla25'):
         config = OOPSLA25_CONFIG
     if acc:
         res.extend(config['accuracy'])

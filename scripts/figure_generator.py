@@ -1,13 +1,13 @@
 import pandas as pd
-from plot_utils import plot_table_chart456, plot_table_chart7, plot_table_chart8, \
+from plot_utils import plot_table_chart45, plot_table_chart6, plot_table_chart7, plot_table_chart8, \
     plot_compile_time_chart, plot_run_time_chart
 from data_processing import format_speedup, process_special_mvm2
 import config
 import cost_model
 
 
-# --- Helper for Table 4, 5, 6 ---
-def _get_table456_row(fhelipe_data, mkr_data, op_fhelipe, op_mkr, kernel):
+# --- Helper for Table 4, 5 ---
+def _get_table45_row(fhelipe_data, mkr_data, op_fhelipe, op_mkr, kernel):
     speedup_val = format_speedup(fhelipe_data[op_fhelipe]['Runtime'], mkr_data[op_mkr]['Runtime'])
     return {
         'Kernel': kernel,
@@ -20,25 +20,51 @@ def _get_table456_row(fhelipe_data, mkr_data, op_fhelipe, op_mkr, kernel):
         'Speedup': speedup_val
     }
 
+def _get_table6_row(fhelipe_data, mkr_data, bsgs_data, op_fhelipe, op_mkr, kernel):
+    fhelipe_speedup = format_speedup(fhelipe_data[op_fhelipe]['Runtime'], mkr_data[op_mkr]['Runtime'])
+    bsgs_speedup = format_speedup(bsgs_data[op_mkr]['Runtime'], mkr_data[op_mkr]['Runtime'])
+    return {
+        'Kernel': kernel,
+        'Slot Util.': fhelipe_data[op_fhelipe]['SlotUtil'],
+        'Rotations': fhelipe_data[op_fhelipe]['Rotations'],
+        'Time (secs)': fhelipe_data[op_fhelipe]['Runtime'],
+        'Slot Util.2': bsgs_data[op_mkr]['SlotUtil'],
+        'Rotations2': bsgs_data[op_mkr]['Rotations'],
+        'Time (secs)2': bsgs_data[op_mkr]['Runtime'],
+        'Slot Util.3': mkr_data[op_mkr]['SlotUtil'],
+        'Rotations3': mkr_data[op_mkr]['Rotations'],
+        'Time (secs)3': mkr_data[op_mkr]['Runtime'],
+        'Speedup (FHELIPE)': fhelipe_speedup,
+        'Speedup (BSGS)': bsgs_speedup
+    }
 
-def gen_table456(fhelipe_data, mkr_data, output_dir):
+def gen_table45(fhelipe_data, mkr_data, output_dir):
     table_configs = [
         {"name": "Table4", "kernels": ['Conv1', 'Conv2', 'Conv3', 'Conv4'],
          "special_processing": None},
         {"name": "Table5", "kernels": ['Conv1_Large', 'Conv2_Large', 'Conv3_Large', 'Conv4_Large'],
-         "special_processing": None},
-        {"name": "Table6", "kernels": ['MVM1', 'MVM2'],
-         "special_processing": lambda: process_special_mvm2(fhelipe_data,
-                                                            config.SINGLE_OP_MAP['MVM2'][
-                                                                'fhelipe'])}
+         "special_processing": None}
     ]
     for conf in table_configs:
         if conf["special_processing"]:
             conf["special_processing"]()
-        rows = [_get_table456_row(fhelipe_data, mkr_data, config.SINGLE_OP_MAP[k]['fhelipe'],
+        rows = [_get_table45_row(fhelipe_data, mkr_data, config.SINGLE_OP_MAP[k]['fhelipe'],
                                   config.SINGLE_OP_MAP[k]['mkr'], k) for k in conf['kernels']]
         df = pd.DataFrame(rows).set_index("Kernel")
-        plot_table_chart456(df, f"{conf['name']}.pdf", output_dir)
+        plot_table_chart45(df, f"{conf['name']}.pdf", output_dir)
+
+
+def gen_table6(fhelipe_data, mkr_data, bsgs_data, output_dir):
+    conf = {"name": "Table6", "kernels": ['MVM1', 'MVM2'],
+         "special_processing": lambda: process_special_mvm2(fhelipe_data,
+                                                            config.SINGLE_OP_MAP['MVM2'][
+                                                                'fhelipe'])}
+    if conf["special_processing"]:
+        conf["special_processing"]()
+        rows = [_get_table6_row(fhelipe_data, mkr_data, bsgs_data, config.SINGLE_OP_MAP[k]['fhelipe'],
+                                    config.SINGLE_OP_MAP[k]['mkr'], k) for k in conf['kernels']]
+        df = pd.DataFrame(rows).set_index("Kernel")
+        plot_table_chart6(df, f"{conf['name']}.pdf", output_dir)
 
 
 def _get_table7_row(label, fhelipe_data, mkr_data):

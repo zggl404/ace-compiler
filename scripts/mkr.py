@@ -22,7 +22,7 @@ def oopsla25_ae(cwd, args, log):
         log(file): log file
     '''
     exec_files = run_ace_compile(cwd, args.file, args.model, None, args.cmplr, args.src, args.temp,
-                                 'oopsla25', 'ant', None, False, False, args.debug, args.trace, log)
+                                 args.exp_name, 'ant', None, False, False, args.debug, args.trace, log)
     run_perf(exec_files, args.cifar10, args.cifar100, args.index, args.debug, args.trace, log)
     return
 
@@ -54,6 +54,8 @@ if __name__ == "__main__":
     parser.add_argument('-tmp', '--temp', default="/app/mkr_ae_temp", help='directory that holds temp files')
     parser.add_argument("-o", "--output-log-dir", type=str, default="/app/mkr_ae_result/mkr/",
         help="Specify the directory to move generated log files to.")
+    parser.add_argument("-enm", "--exp-name", type=str, choices=["oopsla25", "oopsla25_mini"], default="oopsla25",
+        help="Experiment name, must be either 'oopsla25' or 'oopsla25_mini' (default: oopsla25)")
     args = parser.parse_args()
 
     # Define the output and temp file directory path

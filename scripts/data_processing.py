@@ -1,5 +1,6 @@
 from parse_fhelipe_data import extract_fhelipe_data, compute_fhelipe_slot_util
 from parse_mkr_data import parse_mkr_engine_logs
+from parse_bsgs_data import parse_bsgs_logs
 import numbers
 from pathlib import Path
 
@@ -12,10 +13,14 @@ def load_performance_data(data_dir: Path) -> tuple[dict, dict]:
     print("Extracting MKR data...")
     mkr_data = parse_mkr_engine_logs(data_dir / 'mkr')
 
+    print("Extracting BSGS data...")
+    bsgs_data = parse_bsgs_logs(data_dir / 'bsgs')
+
     assert fhelipe_data, "FHELIPE data is empty!"
     assert mkr_data, "MKR data is empty!"
+    assert bsgs_data, "BSGS data is empty!"
     
-    return fhelipe_data, mkr_data
+    return fhelipe_data, mkr_data, bsgs_data
 
 
 def format_speedup(numerator, denominator, default_value='–') -> str:

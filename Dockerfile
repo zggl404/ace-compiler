@@ -19,7 +19,7 @@ RUN rm -rf ~/.cache/matplotlib
 
 # COPY script 
 COPY scripts/* /app/scripts/
-RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh
+RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh /app/scripts/bsgs.sh
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /app/scripts/requirements.txt
 

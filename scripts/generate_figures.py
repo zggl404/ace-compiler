@@ -3,7 +3,7 @@ from pathlib import Path
 import logging
 
 from data_processing import load_performance_data
-from figure_generator import gen_table456, gen_table7, gen_table8, gen_figure7, gen_figure8
+from figure_generator import gen_table45, gen_table6, gen_table7, gen_table8, gen_figure7, gen_figure8
 
 
 def setup_environment():
@@ -27,11 +27,14 @@ def main():
         output_dir = setup_environment()
         
         # 1. Load Data
-        fhelipe_data, mkr_data = load_performance_data(output_dir)
+        fhelipe_data, mkr_data, bsgs_data = load_performance_data(output_dir)
         
         # 2. Generate all figures and tables
-        logging.info("--- Generating Tables 4, 5, 6 ---")
-        gen_table456(fhelipe_data, mkr_data, output_dir)
+        logging.info("--- Generating Tables 4, 5 ---")
+        gen_table45(fhelipe_data, mkr_data, output_dir)
+
+        logging.info("--- Generating Table 6 ---")
+        gen_table6(fhelipe_data, mkr_data, bsgs_data, output_dir)
         
         logging.info("--- Generating Table 7 ---")
         gen_table7(fhelipe_data, mkr_data, output_dir)

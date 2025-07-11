@@ -31,7 +31,6 @@ def _plot_generic_table(
         figsize: The figure size.
         row_dividers: Controls the row dividers. Can be a boolean or a set of row indices.
     """
-    # This is the logic that was completely duplicated across all functions
     fig, ax = plt.subplots(figsize=figsize)
 
     Table(
@@ -53,15 +52,15 @@ def _plot_generic_table(
     # plt.show()
 
 
-def plot_table_chart456(
+def plot_table_chart45(
     df: pd.DataFrame,
     output_filename: str = "tablex.pdf",
     output_dir: str = "plots"
 ):
-    """Generates charts for Table 4, 5, and 6."""
-    group1_name = "Fhelipe"
+    """Generates charts for Table 4 and 5."""
+    group1_name = "FHELIPE"
     group2_name = "MKR"
-    # MKR Column definitions Table 4 5 6
+    # MKR Column definitions Table 4 5
     col_defs = [
         ColumnDefinition(
             name="Kernel",
@@ -125,6 +124,106 @@ def plot_table_chart456(
         row_dividers=False
     )
 
+def plot_table_chart6(
+    df: pd.DataFrame,
+    output_filename: str = "tablex.pdf",
+    output_dir: str = "plots"
+):
+    """Generates charts for Table 6."""
+    group1_name = "FHELIPE"
+    group2_name = "BSGS"
+    group3_name = "MKR"
+    # MKR Column definitions Table 6
+    col_defs = [
+        ColumnDefinition(
+            name="Kernel",
+            textprops={"ha": "left"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Slot Util.",
+            group=group1_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Rotations",
+            group=group1_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Time (secs)",
+            group=group1_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+
+        ColumnDefinition(
+            name="Slot Util.2",
+            title="Slot Util.",
+            group=group2_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Rotations2",
+            title="Rotations",
+            group=group2_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Time (secs)2",
+            title="Time (secs)",
+            group=group2_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Slot Util.3",
+            title="Slot Util.",
+            group=group3_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Rotations3",
+            title="Rotations",
+            group=group3_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Time (secs)3",
+            title="Time (secs)",
+            group=group3_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Speedup (FHELIPE)",
+            group=group3_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+        ColumnDefinition(
+            name="Speedup (BSGS)",
+            group=group3_name,
+            textprops={"ha": "center"},
+            width=0.6,
+        ),
+    ]
+
+    _plot_generic_table(
+        df=df,
+        column_definitions=col_defs,
+        output_filename=output_filename,
+        output_dir=output_dir,
+        figsize=(15, 3),
+        row_dividers=False
+    )
+
 
 def plot_table_chart7(
     df: pd.DataFrame,
@@ -133,7 +232,7 @@ def plot_table_chart7(
 ):
     """Generates the chart for Table 7, with specific row dividers."""
 
-    table_group1 = "Fhelipe (secs)"
+    table_group1 = "FHELIPE (secs)"
     table_group2 = "MKR (secs)"
 
     # TODO: should be same with columns in get_data7 in figure_generators.py

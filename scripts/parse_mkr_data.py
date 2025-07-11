@@ -137,7 +137,7 @@ def compute_mkr_slot_util(base_kernel: str):
                 util = 1
 
         # Convert to percentage and store
-        percentage_dict[op] = f"{min(util * 100, 100):.1f}%"
+        percentage_dict[op] = f"{min(util * 100, 100):.2f}%"
 
     # print("\n".join(f"{k}: {v}" for k, v in percentage_dict.items()))
     return percentage_dict.get(base_kernel, "0%")
