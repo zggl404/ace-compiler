@@ -4619,7 +4619,7 @@ index 0000000..2721e3b
 +        "stdbuf", "-o0",
 +        TIME_CMD,
 +        "-f", "TIME_STATS::%e::%M::",
-+        "python", "-u"
++        "python3", "-u"
 +    ] + command
 +
 +    cmd_str = ' '.join(timed_command)

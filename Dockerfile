@@ -1,64 +1,64 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y update && \
-    apt-get -y upgrade && \
-    apt-get -y install build-essential clang-15 golang cmake ninja-build \
-        python3-venv scons curl git time \
-        wget gcc g++ python3 python3-pip python3-dev  \
-        libprotobuf-dev protobuf-compiler libssl-dev \
-	libgmp3-dev libtool libomp5 libomp-dev libntl-dev pybind11-dev fontconfig && \
+
+# Install the necessary packages and tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        time git curl wget \
+        build-essential gcc g++ clang-15 \
+        cmake make ninja-build scons \
+        python3 python3-dev python3-pip golang \
+        libprotobuf-dev protobuf-compiler libssl-dev libtool \
+        libgmp3-dev libomp5 libomp-dev libntl-dev pybind11-dev fontconfig && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
+# Update Font
+RUN ln -s /usr/bin/python3 /usr/bin/python && \
+    echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
     apt-get update && \
-    apt-get install -y --reinstall ttf-mscorefonts-installer
+    apt-get install -y --reinstall ttf-mscorefonts-installer && \
+    fc-cache -f -v && rm -rf ~/.cache/matplotlib && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN fc-cache -f -v
-RUN rm -rf ~/.cache/matplotlib
-
-# COPY script 
-COPY scripts/* /app/scripts/
-RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh /app/scripts/mkr.sh /app/scripts/bsgs.sh /app/scripts/run_mini.sh /app/scripts/run_full.sh
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r /app/scripts/requirements.txt
-
-# clone fhelipe, apply patch
-WORKDIR /app/FHELIPE/
-RUN git clone https://github.com/fhelipe-compiler/fhelipe.git 
-WORKDIR /app/FHELIPE/fhelipe
-RUN git checkout 6afbd1c && git apply /app/scripts/mkr.patch
-WORKDIR /app/FHELIPE/fhelipe/backend
-
-WORKDIR /app/FHELIPE/
-RUN python3 -m venv fhenv
-ENV PATH="/app/FHELIPE/fhenv/bin:$PATH"
-
-WORKDIR /app/FHELIPE/fhelipe
-RUN pip install -e frontend/ && pip cache purge
-
-# build fhelipe
-# copy submodudle due to network issue
-ADD scripts/aws-cppwrapper-lattigo.tgz /app/FHELIPE/fhelipe/backend
-WORKDIR /app/FHELIPE/fhelipe/backend
-RUN export GOFLAGS="-buildvcs=false" && \
-    scons lib && \
-    scons deps --no-deps-pull && \
-    scons -j16 --release
-
-
+# Set the initial working directory
 WORKDIR /app
+
+# Copy ace-compiler, scripts and set permissions
+COPY README.md .
 COPY air-infra ace-compiler/air-infra/
 COPY nn-addon ace-compiler/nn-addon/
 COPY fhe-cmplr ace-compiler/fhe-cmplr/
 COPY proof ace-compiler/proof/
-RUN chmod +x /app/ace-compiler/proof/BSGS/mvm1/b.sh /app/ace-compiler/proof/BSGS/mvm2/b.sh
-RUN pip install --no-cache-dir -r scripts/requirements.txt
-# && \
-#    cmake -S ace-compiler/fhe-cmplr -B release -DFHE_WITH_SRC="air-infra;nn-addon" -DCMAKE_BUILD_TYPE=Release && \
-#    cmake --build release -j
+COPY scripts/* /app/scripts/
+RUN chmod +x /app/scripts/fhelipe.sh \
+        /app/scripts/build_cmplr.sh \
+        /app/scripts/mkr.sh \
+        /app/scripts/bsgs.sh \
+        /app/scripts/run_mini.sh \
+        /app/scripts/run_full.sh \
+        /app/ace-compiler/proof/BSGS/mvm1/b.sh \
+        /app/ace-compiler/proof/BSGS/mvm2/b.sh && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r /app/scripts/requirements.txt
 
-# COPY readme
-COPY README.md .
+# Clone and prepare fhelipe repository
+WORKDIR /app/FHELIPE
+RUN git clone https://github.com/fhelipe-compiler/fhelipe.git && \
+    cd fhelipe && \
+    git checkout 6afbd1c && \
+    git apply /app/scripts/mkr.patch && \
+    pip install -e frontend && \
+    pip cache purge
 
+# Copy submodule and build fhelipe
+WORKDIR /app/FHELIPE/fhelipe/backend
+ADD scripts/aws-cppwrapper-lattigo.tgz .
+RUN export GOFLAGS="-buildvcs=false" && \
+    CORES=$(nproc) && \
+    scons lib && \
+    scons deps --no-deps-pull && \
+    scons -j${CORES} --release
 
+# Set working directory
+WORKDIR /app

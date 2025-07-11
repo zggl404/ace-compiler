@@ -13,5 +13,5 @@ else
     OUTPUT="/app/mkr_ae_result/fhelipe/"
 fi
 
-python test_fhelipe.py -f "$INPUT" -o "$OUTPUT"
+python3 test_fhelipe.py -f "$INPUT" -o "$OUTPUT"
 cd -
