@@ -4069,6 +4069,15 @@ index 0000000..92e39a0
 +# mobilenet is not support
 +# imagenet
 +# not support or OOM
+diff --git a/mini_input.txt b/mini_input.txt
+new file mode 100644
+index 0000000..5cd775d
+--- /dev/null
++++ b/mini_input.txt
+@@ -0,0 +1,3 @@
++# conv
++metak_fhelipe_conv_3x16x32x3
++metak_fhelipe_conv_16x16x32x3
 diff --git a/scripts/default_parameters.py b/scripts/default_parameters.py
 index 7779b9a..203adbb 100644
 --- a/scripts/default_parameters.py

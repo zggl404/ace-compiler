@@ -56,8 +56,8 @@ def load_performance_data(data_dir: Path) -> tuple[dict, dict]:
 def setup_environment():
     """Parses command line arguments and creates the output directory."""
     parser = argparse.ArgumentParser(description="Generates mini figures for the MKR OOPSLA'25 paper.")
-    parser.add_argument('-o', '--output-dir', type=Path, default=Path('/app/mkr_ae_mini'),
-                        help='Directory to save output files. Defaults to "/app/mkr_ae_mini".')
+    parser.add_argument('-o', '--output-dir', type=Path, default=Path('/app/mkr_ae_result/mini'),
+                        help='Directory to save output files. Defaults to "/app/mkr_ae_result/mini".')
     args = parser.parse_args()
     
     output_dir = args.output_dir

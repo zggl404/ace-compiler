@@ -19,7 +19,7 @@ RUN rm -rf ~/.cache/matplotlib
 
 # COPY script 
 COPY scripts/* /app/scripts/
-RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh /app/scripts/bsgs.sh
+RUN chmod +x /app/scripts/fhelipe.sh /app/scripts/build_cmplr.sh /app/scripts/mkr.sh /app/scripts/bsgs.sh /app/scripts/run_mini.sh /app/scripts/run_full.sh
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /app/scripts/requirements.txt
 
@@ -52,6 +52,7 @@ COPY air-infra ace-compiler/air-infra/
 COPY nn-addon ace-compiler/nn-addon/
 COPY fhe-cmplr ace-compiler/fhe-cmplr/
 COPY proof ace-compiler/proof/
+RUN chmod +x /app/ace-compiler/proof/BSGS/mvm1/b.sh /app/ace-compiler/proof/BSGS/mvm2/b.sh
 RUN pip install --no-cache-dir -r scripts/requirements.txt
 # && \
 #    cmake -S ace-compiler/fhe-cmplr -B release -DFHE_WITH_SRC="air-infra;nn-addon" -DCMAKE_BUILD_TYPE=Release && \
