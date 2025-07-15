@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 import logging
 import numbers
@@ -84,8 +85,10 @@ def main():
 
     except (AssertionError, FileNotFoundError) as e:
         logging.error(f"A critical error occurred: {e}")
+        sys.exit(1)
     except Exception as e:
         logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
