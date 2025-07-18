@@ -1,16 +1,20 @@
+setuptools
+wheel
+scons==4.0.1
 PyYAML==5.3.1
 onnx==1.14.1
 onnxruntime==1.15.1
-matplotlib==3.7.5
+onnxsim==0.4.36
+matplotlib==3.7.3
 numpy==1.24.4
-plottable
-psutil
-onnx
-torchsummary
-onnxsim
-
---index-url https://download.pytorch.org/whl/cpu
-torch==2.0.1+cpu
-torchvision==0.15.2+cpu
+plottable==0.1.5
+psutil==7.0.0
+onnx==1.14.1
+onnxruntime==1.15.1
+onnxsim==0.4.36
+torch==2.0.1
+torchvision==0.15.2
+torchsummary==1.5.1
+cmake==3.22.1
 
 --extra-index-url https://pypi.org/simple

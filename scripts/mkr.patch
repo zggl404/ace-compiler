@@ -4530,7 +4530,7 @@ index 7779b9a..203adbb 100644
      "condor_fhelipe_logreg": condor_fhelipe_logreg,
 diff --git a/test_fhelipe.py b/test_fhelipe.py
 new file mode 100644
-index 0000000..2721e3b
+index 0000000..33d957c
 --- /dev/null
 +++ b/test_fhelipe.py
 @@ -0,0 +1,340 @@
