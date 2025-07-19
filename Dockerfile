@@ -78,5 +78,7 @@ RUN export GOFLAGS="-buildvcs=false" && \
     scons deps --no-deps-pull && \
     scons -j${CORES} --release
 
+RUN pip install torchsummary==1.5.1
+
 # Set working directory
 WORKDIR /app
