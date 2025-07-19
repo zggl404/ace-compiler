@@ -10,10 +10,10 @@ err() {
 }
 
 cd /app/scripts || err ${LINENO} "Failed to cd to /app/scripts"
-./bsgs.sh || err ${LINENO} "bsgs.sh failed"
 ./build_cmplr.sh Release || err ${LINENO} "build_cmplr.sh failed"
 ./mkr.sh || err ${LINENO} "mkr.sh failed"
 ./fhelipe.sh || err ${LINENO} "fhelipe.sh failed"
+./bsgs.sh || err ${LINENO} "bsgs.sh failed"
 python3 generate_figures.py || err ${LINENO} "generate_figures.py failed"
 
 cd "$ORIG_DIR" || exit 1
