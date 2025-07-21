@@ -111,7 +111,7 @@ def ace_compile_and_link(cwd, onnx_file, cmplr_dir, installed, src_dir, temp_dir
         cmds.append('-lgomp')
     if debug:
         print(' '.join(cmds))
-    ret = subprocess.run(cmds, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if ret.returncode == 0:
         time, memory = time_and_memory(ret.stderr.decode().splitlines()[-1])
         info = '%sGCC: Time = %.2f(s), Memory = %.2f(GB)\n' % (indent, time, memory)
@@ -121,11 +121,13 @@ def ace_compile_and_link(cwd, onnx_file, cmplr_dir, installed, src_dir, temp_dir
         write_log(info, log)
         info = ' '.join(cmds) + '\n'
         write_log(info, log)
-        for item in ret.stdout.decode().splitlines():
-            write_log(item + '\n', log)
-        for item in ret.stderr.decode().splitlines():
-            write_log(item + '\n', log)
-        return None
+        if ret.stdout:
+            for item in ret.stdout.decode().splitlines():
+                write_log(item + '\n', log)
+        if ret.stderr:
+            for item in ret.stderr.decode().splitlines():
+                write_log(item + '\n', log)
+        sys.exit(-1)
     return exec_file
 
 
