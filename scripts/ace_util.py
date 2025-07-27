@@ -760,7 +760,6 @@ def get_cpp_option(cmplr_dir, installed, src_dir, omp):
         res(list[str]): c++ options
     '''
     res = []
-    ace_lib_to_link = ['libAIRutil.a', 'libFHErt_ant.a', 'libFHErt_common.a']
     res.append('-DRTLIB_SUPPORT_LINUX')
     res.extend(['-I', os.path.join(cmplr_dir, 'include')])
     # append include options
@@ -780,8 +779,8 @@ def get_cpp_option(cmplr_dir, installed, src_dir, omp):
     res.extend(['-O3', '-DNDEBUG', '-std=gnu++17'])
     if omp:
         res.append('-fopenmp')
-    for root, _, files in os.walk(cmplr_dir):
-        for f in files:
-            if f in ace_lib_to_link:
-                res.append(os.path.join(root, f))
+    # link order should not be changed
+    res.append(os.path.join(cmplr_dir, 'rtlib/lib/libFHErt_ant.a'))
+    res.append(os.path.join(cmplr_dir, 'rtlib/lib/libFHErt_common.a'))
+    res.append(os.path.join(cmplr_dir, 'lib/libAIRutil.a'))
     return res
