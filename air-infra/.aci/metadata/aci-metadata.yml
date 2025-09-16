@@ -1,0 +1,5 @@
+metaName: ant-ace
+metaVersion: v0.0.1
+author: ant-ace.group
+imageBuild: reg.docker.alibaba-inc.com/ace/dev
+imageTest: reg.docker.alibaba-inc.com/ace/cti
