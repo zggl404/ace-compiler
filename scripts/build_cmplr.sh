@@ -1,5 +1,5 @@
 #!/bin/bash
-
+  
 working_dir=/app
 
 # check build type
@@ -10,7 +10,7 @@ fi
 build_type=$1
 build_dir=`echo $1 | tr 'A-Z' 'a-z'`
 
-cd $working_dir/ace-compiler
+cd $working_dir/ant_compiler
 
 # check directory
 check_source_directory() {
@@ -36,17 +36,12 @@ if [ $? -ne 0 ]; then
   exit 2
 fi
 
-cmake --install $working_dir/$build_dir --prefix $working_dir/mkr_cmplr
+cmake --install $working_dir/$build_dir --prefix $working_dir/fhefusion_cmplr
 if [ $? -ne 0 ]; then
   echo "Error: compiler install failed."
   exit 3
 fi
 cd -
 
-echo "Info: build project succeeded. FHE compiler executable can be found in $working_dir/mkr_cmplr/bin/fhe_cmplr"
+echo "Info: build project succeeded. FHE compiler executable can be found in $working_dir/fhefusion_cmplr/bin/fhe_cmplr"
 exit 0
-
-~                                                                                                                                                                                       
-~                                                                                                                                                                                       
-~                                                                                                                                                                                       
-                                                                                                                                                                      48,0-1        All
