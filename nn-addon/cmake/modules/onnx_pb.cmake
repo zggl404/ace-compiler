@@ -20,16 +20,6 @@ function(build_external_proto)
   FetchContent_GetProperties(onnx)
   if(NOT onnx_POPULATED)
     FetchContent_Populate(onnx)
-
-    # Path to onnx.proto
-    set(ONNX_PROTO ${onnx_SOURCE_DIR}/onnx/onnx.proto)
-
-    # Modify onnx.proto
-    execute_process(
-      COMMAND ${CMAKE_COMMAND} -E echo "Modifying onnx.proto..."
-      COMMAND ${CMAKE_COMMAND} -E copy ${ONNX_PROTO} ${ONNX_PROTO}.bak
-      COMMAND ${CMAKE_COMMAND} -E sed -i.bak 's/option optimize_for = LITE_RUNTIME;//' ${ONNX_PROTO}
-    )
   endif()
 
   set(ONNX_PATH   ${onnx_SOURCE_DIR}/onnx/)
