@@ -72,6 +72,23 @@ public:
     dfg_builder.Perform();
   }
 
+  void Topo_sort() {
+    air::opt::DFG_CONTAINER* dfg_cntr = this->Dfg_cntr();
+
+    air::opt::DFG_NODE_PTR entry_node   = dfg_cntr->Entry(0);
+    air::base::NODE_PTR    debug_node   = entry_node->Node();
+    air::opt::DFG_NODE_PTR dfg_def_node = entry_node;
+
+    // traverse all successor(use site) and if there is strided_slice fusion
+    // candidate.
+    for (auto iter = dfg_def_node->Begin_succ();
+         iter != dfg_def_node->End_succ(); ++iter) {
+      air::opt::DFG_EDGE_PTR edge      = *iter;
+      air::opt::DFG_NODE_PTR dst_node  = edge->Dst();
+      NODE_PTR               succ_node = dst_node->Node();
+    }
+  }
+
   air::opt::SSA_CONTAINER* Ssa_cntr() { return &_ssa_cntr; }
 
   air::opt::DFG_CONTAINER* Dfg_cntr() { return &_dfg_cntr; }
@@ -91,6 +108,7 @@ public:
   //! @brief whehter this op will enlarge data size
   bool Is_enlarge_data_size_op(NODE_PTR node) {
     if ((node->Opcode() == OPCODE(nn::core::NN, nn::core::OPCODE::CONV)) ||
+        (node->Opcode() == OPCODE(nn::core::NN, nn::core::OPCODE::GEMM)) ||
         (node->Opcode() == OPCODE(nn::core::NN, nn::core::OPCODE::CONCAT))) {
       return true;
     }
@@ -178,6 +196,15 @@ public:
       NODE_ID node_id, const std::vector<int64_t>& input_shape) {
     NODE_PTR ss_node = this->Container()->Node(node_id);
 
+    CONSTANT_PTR stride_size_const = ss_node->Child(3)->Const();
+    int64_t      stride_row = 0, stride_col = 0;
+    Get_const_array_value(stride_size_const, stride_row, stride_col);
+    AIR_ASSERT_MSG(stride_row == stride_col, "only support same stride size");
+
+    std::vector<int> channel = Get_attr_data<int>(ss_node, core::ATTR::CHANNEL);
+    AIR_ASSERT_MSG(channel.size() == 1,
+                   "strided slice only contains 1 channel attribute");
+
     SS_FC_PAIR           result_pair;
     NODE_ID              df_cand = air::base::Null_id;
     std::vector<NODE_ID> mf_cands;
@@ -197,6 +224,13 @@ public:
         air::opt::DFG_EDGE_PTR edge      = *iter;
         air::opt::DFG_NODE_PTR dst_node  = edge->Dst();
         NODE_PTR               succ_node = dst_node->Node();
+
+        // indicate this is the last node
+        if (succ_node->Opcode() == air::core::RET ||
+            succ_node->Opcode() == air::core::RETV) {
+          break;
+        }
+
         if (Is_binary_op(succ_node)) {
           if (std::find(mf_cands.begin(), mf_cands.end(), succ_node->Id()) ==
               mf_cands.end()) {
@@ -224,12 +258,24 @@ public:
             Get_array_nchw(weight_node->Rtype(), channel_out, channel_in_kernel,
                            kernel_height, kernel_width);
             int output_size = channel_out * input_shape[2] * input_shape[3];
-            if (output_size > Get_slot()) {
+
+            // the number of gaps is small due to no padding, should do
+            // propagate and fusion.
+            if ((stride_row == 1) && output_size < Get_slot()) {
+              ;
+            } else if (output_size > Get_slot()) {
               break;
             }
           } else if (succ_node->Opcode() ==
                      OPCODE(nn::core::NN, nn::core::OPCODE::CONCAT)) {
             int output_size = Compute_concat_output_size(succ_node);
+            if (output_size > Get_slot()) {
+              break;
+            }
+          } else if (succ_node->Opcode() ==
+                     OPCODE(nn::core::NN, nn::core::OPCODE::GEMM)) {
+            // does this output_size correct?
+            int output_size = channel[0] * input_shape[2] * input_shape[3];
             if (output_size > Get_slot()) {
               break;
             }

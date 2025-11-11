@@ -58,7 +58,9 @@ extern "C" {
   DECL_RTM(RTM_MAIN_GRAPH, 0)       \
   /* coefficient operation */       \
   DECL_RTM(RTM_HW_ADD, 1)           \
+  DECL_RTM(RTM_HW_SUB, 1)           \
   DECL_RTM(RTM_HW_MUL, 1)           \
+  DECL_RTM(RTM_HW_MAC, 1)           \
   DECL_RTM(RTM_HW_ROT, 1)           \
   /* polynomial operation */        \
   DECL_RTM(RTM_COPY_POLY, 1)        \

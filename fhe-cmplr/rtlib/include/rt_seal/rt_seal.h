@@ -83,6 +83,11 @@ inline CIPHER Add_plain(CIPHER res, CIPHER op1, PLAIN op2) {
   return res;
 }
 
+inline CIPHER Add_scalar(CIPHER res, CIPHER op1, double op2) {
+  Seal_add_scalar(res, op1, op2);
+  return res;
+}
+
 inline CIPHER Mul_ciph(CIPHER res, CIPHER op1, CIPHER op2) {
   Seal_mul_ciph(res, op1, op2);
   return res;
@@ -90,6 +95,11 @@ inline CIPHER Mul_ciph(CIPHER res, CIPHER op1, CIPHER op2) {
 
 inline CIPHER Mul_plain(CIPHER res, CIPHER op1, PLAIN op2) {
   Seal_mul_plain(res, op1, op2);
+  return res;
+}
+
+inline CIPHER Mul_scalar(CIPHER res, CIPHER op1, double op2) {
+  Seal_mul_scalar(res, op1, op2);
   return res;
 }
 
@@ -127,6 +137,10 @@ inline void Copy_ciph(CIPHER res, CIPHER op) {
 }
 
 inline void Zero_ciph(CIPHER res) { Seal_zero(res); }
+
+inline void Free_ciph(CIPHER res) { res->release(); }
+
+inline void Free_plain(PLAIN res) { res->release(); }
 
 // We can get scale = pow(2.0, sc_degree) from SEAL Ciphertext, so we continue
 // use the double value but keep the interface named with "Sc_degree" to match

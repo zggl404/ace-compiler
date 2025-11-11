@@ -16,6 +16,7 @@
 #include "air/core/handler.h"
 #include "ckks2hpoly.h"
 #include "ckks2poly.h"
+#include "flatten_util.h"
 #include "h2lpoly.h"
 #include "hp1tohp2.h"
 #include "hpoly_attr_prop.h"
@@ -204,11 +205,11 @@ GLOB_SCOPE* POLY_DRIVER::Run_flatten(GLOB_SCOPE* glob, POLY_LAYER tgt_layer) {
       }
       return false;
     };
-    FLATTEN_CTX trav_ctx(
+    FLATTEN_CTX<FLATTEN_UTIL> trav_ctx(
         &cntr, std::move(tgt_layer == HPOLY ? flatten_ckks : flatten_poly));
-    VISITOR<FLATTEN_CTX> trav(trav_ctx);
-    NODE_PTR             entry = func->Container().Entry_node();
-    NODE_PTR             retv  = trav.Visit<NODE_PTR>(entry);
+    VISITOR<FLATTEN_CTX<FLATTEN_UTIL>> trav(trav_ctx);
+    NODE_PTR                           entry = func->Container().Entry_node();
+    NODE_PTR                           retv  = trav.Visit<NODE_PTR>(entry);
     AIR_ASSERT(retv->Is_entry());
     new_func->Set_entry_stmt(retv->Stmt());
   }

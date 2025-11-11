@@ -14,6 +14,32 @@ set(RTLIB_VERSION_MINOR 0)
 set(RTLIB_VERSION_PATCH 1)
 set(RTLIB_VERSION ${RTLIB_VERSION_MAJOR}.${RTLIB_VERSION_MINOR}.${RTLIB_VERSION_PATCH})
 
+option(RTLIB_ENABLE_CUDA "Enable CUDA support" OFF)
+
+if(RTLIB_ENABLE_CUDA)
+  enable_language(CUDA)
+
+  find_package(CUDA REQUIRED)
+  enable_language(CUDA)
+
+  # Options
+  option(PHANTOM_USE_CUDA_PTX "Use CUDA PTX Assembly" ON)
+  if (PHANTOM_USE_CUDA_PTX)
+    add_compile_definitions(PHANTOM_USE_CUDA_PTX)
+  endif ()
+
+  # CUDA settings
+  if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES native)
+  endif ()
+  set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+
+  set(CMAKE_CUDA_STANDARD 17)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+  set(RTLIB_ENABLE_PHANTOM ON)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CXX_STANDARD_REQUIRED ON)
 
@@ -46,6 +72,7 @@ option(RTLIB_INSTALL_APP     "Control whether to install the APPs"              
 option(RTLIB_ENABLE_SEAL     "Control whether to build with SEAL libraries"     ON)
 option(RTLIB_ENABLE_SEAL_BTS "Control whether to build with SEAL_BTS libraries" OFF)
 option(RTLIB_ENABLE_OPENFHE  "Control whether to build with OPENFHE libraries"  ON)
+option(RTLIB_ENABLE_PHANTOM  "Control whether to build with PHANTOM libraries"  OFF)
 option(BUILD_WITH_OPENMP     "Control whether to build with OpenMP libraries"   OFF)
 option(RTLIB_ENABLE_LINUX    "Control build rtlib support bare or linux"        ON)
 
@@ -80,6 +107,7 @@ message(STATUS "RTLIB_BUILD_EXAMPLE           : ${RTLIB_BUILD_EXAMPLE}")
 message(STATUS "RTLIB_ENABLE_SEAL             : ${RTLIB_ENABLE_SEAL}")
 message(STATUS "RTLIB_ENABLE_SEAL_BTS         : ${RTLIB_ENABLE_SEAL_BTS}")
 message(STATUS "RTLIB_ENABLE_OPENFHE          : ${RTLIB_ENABLE_OPENFHE}")
+message(STATUS "RTLIB_ENABLE_PHANTOM          : ${RTLIB_ENABLE_PHANTOM}")
 message(STATUS "RTLIB_INSTALL_APP             : ${RTLIB_INSTALL_APP}")
 message(STATUS "BUILD_WITH_OPENMP             : ${BUILD_WITH_OPENMP}")
 message(STATUS "BUILD_TIMESTAMP               : ${BUILD_TIMESTAMP}")
@@ -126,11 +154,28 @@ add_subdirectory(common)
 add_subdirectory(ant)
 
 if(RTLIB_ENABLE_SEAL OR RTLIB_ENABLE_SEAL_BTS)
-  add_subdirectory(seal)
+  if(DEFINED ENV{RTLIB_SEAL_PATH})
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{RTLIB_SEAL_PATH}")
+    add_subdirectory(seal)
+  else()
+    message(WARNING "Seal library not install")
+  endif()
 endif()
 
 if(RTLIB_ENABLE_OPENFHE)
-  add_subdirectory(openfhe)
+  if(BUILD_WITH_OPENMP AND DEFINED ENV{RTLIB_OPENFHE_OMP_PATH})
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{RTLIB_OPENFHE_OMP_PATH}")
+    add_subdirectory(openfhe)
+  elseif(DEFINED ENV{RTLIB_OPENFHE_PATH})
+    list(APPEND CMAKE_PREFIX_PATH "$ENV{RTLIB_OPENFHE_PATH}")
+    add_subdirectory(openfhe)
+  else()
+    message(WARNING "OpenFHE library not install")
+  endif()
+endif()
+
+if(RTLIB_ENABLE_PHANTOM)
+  add_subdirectory(phantom)
 endif()
 
 #--------------------------------------------------------------------

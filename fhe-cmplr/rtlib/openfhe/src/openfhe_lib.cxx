@@ -98,10 +98,11 @@ public:
   }
 
   void Add(const Ciphertext* op1, const Plaintext* op2, Ciphertext* res) {
+    Plaintext op2_copy = *op2;
     if (res == op1) {
-      _ctx->EvalAddInPlace(*op2, *res);
+      _ctx->EvalAddInPlace(op2_copy, *res);
     } else {
-      *res = _ctx->EvalAdd(*op1, *op2);
+      *res = _ctx->EvalAdd(*op1, op2_copy);
     }
   }
 

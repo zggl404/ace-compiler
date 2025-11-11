@@ -14,6 +14,24 @@ def ace_compile_and_link(cwd, onnx_file, cmplr_dir, installed, src_dir,
                          paper, lib, extra, acc, keep, debug, trace, log):
     '''
     Compile and link executable for onnx_file
+
+    Args:
+        cwd(str): current working directory
+        onnx_file(str): path of the onnx file
+        cmplr_dir(str): path of the dir that the ACE compiler is built or installed
+        installed(bool): if the ACE compiler is installed or located in build dir
+        src_dir(str): path that holds air-infra, nn-addon & fhe-cmplr
+        paper(str): conference paper configuration
+        lib(str): target library to link
+        extra(list[str]): extra ACE compilation options
+        acc(bool): compile for accuracy test
+        keep(bool): if intermediate (.t, .json) files are kept
+        debug(bool): print out debug info
+        trace(bool): if ACE trace is enabled
+        log(file): log file
+
+    Returns:
+        exec_file(str): encrypted executable of the input onnx_file
     '''
     # onnx_file : xxx/resnet20_cifar10_pre.onnx
     # onnx_name : resnet20_cifar10_pre
@@ -61,6 +79,10 @@ def ace_compile_and_link(cwd, onnx_file, cmplr_dir, installed, src_dir,
         write_log(info, log)
         info = ' '.join(cmds) + '\n'
         write_log(info, log)
+        for item in msg:
+            write_log(item + '\n', log)
+        for item in err:
+            write_log(item + '\n', log)
         return None
     # replace onnx.inc with onnx.c
     onnx_inc = get_onnx_inc_file(test, src_dir)
@@ -98,6 +120,10 @@ def ace_compile_and_link(cwd, onnx_file, cmplr_dir, installed, src_dir,
         write_log(info, log)
         info = ' '.join(cmds) + '\n'
         write_log(info, log)
+        for item in ret.stdout.decode().splitlines():
+            write_log(item + '\n', log)
+        for item in ret.stderr.decode().splitlines():
+            write_log(item + '\n', log)
         return None
     return exec_file
 
@@ -105,8 +131,26 @@ def ace_compile_and_link(cwd, onnx_file, cmplr_dir, installed, src_dir,
 def run_ace_compile(cwd, file_path, model_dir, build_dir, install_dir, src_dir,
                     paper, lib, extra, acc, keep, debug, trace, log):
     '''
-    Main function to compile ONNX models via ACE compiler
-     to encrypted executables
+    Main function to compile ONNX models via ACE compiler to encrypted executables
+
+    Args:
+        cwd(str): current working directory
+        file_path(str): path of the onnx file
+        model_dir(str): path of dir that holds onnx files to test
+        build_dir(str): path of the build dir of the ACE compiler
+        install_dir(str): path of the install dir of the ACE compiler
+        src_dir(str): path that holds air-infra, nn-addon & fhe-cmplr
+        paper(str): conference paper configuration
+        lib(str): target library to link
+        extra(list[str]): extra ACE compilation options
+        acc(bool): compile for accuracy test
+        keep(bool): if intermediate (.t, .json) files are kept
+        debug(bool): print out debug info
+        trace(bool): if ACE trace is enabled
+        log(file): log file
+
+    Returns:
+        res(list[str]): encrypted executables of the input onnx_files
     '''
     info = '-------- ACE'
     if acc:
@@ -150,7 +194,7 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--model', metavar='PATH', default='./model',
                         help='directory holds the onnx models to be compiled')
     parser.add_argument('-p', '--paper', choices=['cgo25', 'asplos25'],
-                        help='use paper configuration')
+                        help='configuration to reproduce paper results')
     parser.add_argument('-s', '--src', metavar='PATH', default='./',
                         help='directory that holds repos of air-infra, fhe-cmplr & nn-addon')
     parser.add_argument('-t', '--trace', action='store_false', default=True,

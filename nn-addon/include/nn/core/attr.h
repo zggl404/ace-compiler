@@ -41,10 +41,14 @@ public:
   static constexpr const char* VDN_IN_KS = "vdn_in_ks";
   // mask whose value is valid data len, 0 means no need masking
   static constexpr const char* MASK = "mask";
+  // slot whose value is valid data len
+  static constexpr const char* SLOT = "slot";
 
   // sharding
   static constexpr const char* SHARDING   = "sharding";
   static constexpr const char* ORIG_GROUP = "orig_group";
+
+  static constexpr const char* NGRAPH = "ngraph";
 };
 
 }  // namespace core

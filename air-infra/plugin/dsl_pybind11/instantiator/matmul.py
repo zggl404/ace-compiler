@@ -40,7 +40,7 @@ def kernel_impl():
     '''
     implementation of the kernel
     '''
-    def gemm_impl(input_tensor, kernel, bias):  # pylint:disable=W0612
+    def __main__(input_tensor, kernel, bias):  # pylint:disable=W0612 # noqa N807
         '''
         implementation of the gemm
         '''

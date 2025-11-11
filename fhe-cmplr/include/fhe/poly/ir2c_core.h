@@ -16,6 +16,7 @@
 #include "fhe/ckks/ir2c_core.h"
 #include "fhe/core/lower_ctx.h"
 #include "fhe/core/rt_timing.h"
+#include "fhe/poly/ir2c_ctx.h"
 #include "fhe/poly/opcode.h"
 #include "nn/core/data_scheme.h"
 
@@ -266,6 +267,9 @@ public:
         visitor->template Visit<RETV>(val);
       }
       ctx << ")";
+      return;
+    } else if (ctx.Is_poly_type(val->Rtype_id())) {
+      visitor->template Visit<RETV>(val);
       return;
     }
     if (val->Is_lib_call()) {

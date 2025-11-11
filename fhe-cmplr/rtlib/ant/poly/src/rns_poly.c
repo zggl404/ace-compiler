@@ -1271,3 +1271,33 @@ void Print_poly(FILE* fp, POLY poly) {
   // Print_poly_detail(fp, poly, NULL, FALSE);
   Print_poly_rawdata(fp, poly);
 }
+
+L_POLY Lpoly_from_poly(POLY poly, size_t idx) {
+  FMT_ASSERT(idx < Get_num_pq(poly), "idx overflow");
+  // Init lpoly from rns poly
+  L_POLY lpoly;
+  size_t degree = Get_rdgree(poly);
+  Init_lpoly_data(&lpoly, degree, Coeffs(poly, idx, degree));
+  Set_lpoly_ntt(&lpoly, Is_ntt(poly));
+  return lpoly;
+}
+
+L_POLY Lpoly_from_poly_arr(size_t size, POLY_ARR poly_arr, size_t idx) {
+  size_t num_pq = Get_q_cnt() + Get_p_cnt();
+  FMT_ASSERT(idx < size * num_pq, "idx overflow");
+  size_t poly_idx = idx / num_pq;
+  POLY   poly     = &poly_arr[poly_idx];
+  L_POLY lpoly;
+  size_t degree = Get_rdgree(poly);
+  // Init lpoly from rns poly
+  Init_lpoly_data(&lpoly, degree,
+                  Coeffs(poly, idx - poly_idx * num_pq, degree));
+  Set_lpoly_ntt(&lpoly, Is_ntt(poly));
+  return lpoly;
+}
+
+void Set_poly_data(POLY poly, L_POLY lpoly, size_t idx) {
+  size_t num_pq = Get_num_pq(poly);
+  FMT_ASSERT(idx < num_pq, "Set_poly_data_from_lpoly: idx overflow");
+  Set_coeffs(poly, idx, Get_rdgree(poly), Get_lpoly_coeffs(&lpoly));
+}

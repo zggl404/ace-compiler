@@ -139,7 +139,7 @@ public:
       return;
     }
 
-    // multiply strided_slice, need to fuse
+    // multiple strided_slice, need to fuse
     AIR_ASSERT(node->Child(0)->Opcode() ==
                OPCODE(nn::core::NN, nn::core::OPCODE::STRIDED_SLICE));
 

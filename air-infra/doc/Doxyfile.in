@@ -74,7 +74,4 @@ SOURCE_BROWSER          = YES
 GENERATE_HTML           = YES
 GENERATE_TREEVIEW       = YES
 
-# Extra files to include in HTML output
-HTML_EXTRA_FILES     = @CMAKE_CURRENT_SOURCE_DIR@/doc/html/PipelineACI.html \
-                       @CMAKE_CURRENT_SOURCE_DIR@/doc/html/AIRContainer.html \
-                       @CMAKE_CURRENT_SOURCE_DIR@/doc/html/PassManager.html
+HTML_HEADER             = @CMAKE_CURRENT_SOURCE_DIR@/doc/header.html

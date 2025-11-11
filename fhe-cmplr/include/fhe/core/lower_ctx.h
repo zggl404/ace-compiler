@@ -19,8 +19,10 @@
 #include "air/base/container.h"
 #include "air/base/st.h"
 #include "air/base/transform_ctx.h"
+#include "fhe/core/lower_cfg.h"
 #include "fhe/core/rt_context.h"
 #include "fhe/core/scheme_info.h"
+#include "nn/core/data_scheme.h"
 
 namespace fhe {
 namespace core {
@@ -133,10 +135,12 @@ public:
   static constexpr const char* QMUK_NAME      = "QMUK";
 
   static constexpr const char* QPRIMES_NAME    = "QPRIMES";
+  static constexpr const char* PPRIMES_NAME    = "PPRIMES";
   static constexpr const char* QLHINVMODQ_NAME = "QLHINVMODQ";
   static constexpr const char* QLHMODP_NAME    = "QLHMODP";
   static constexpr const char* QLINVMODQ_NAME  = "QLINVMODQ";
   static constexpr const char* QLHALFMODQ_NAME = "QLHALFMODQ";
+  static constexpr const char* Q0HALFMODQ_NAME = "Q0HALFMODQ";
   static constexpr const char* PHMODQ_NAME     = "PHMODQ";
   static constexpr const char* PHINVMODP_NAME  = "PHINVMODP";
   static constexpr const char* PINVMODQ_NAME   = "PINVMODQ";
@@ -150,6 +154,27 @@ public:
 
   //! @brief Get or create constant for Q primes
   air::base::CONSTANT_PTR Get_q(air::base::GLOB_SCOPE* gs);
+  //! @brief Get constant for Q primes
+  air::base::CONSTANT_PTR Get_q(air::base::GLOB_SCOPE* gs) const {
+    AIR_ASSERT(_q != air::base::CONSTANT_ID())
+    return gs->Constant(_q);
+  }
+
+  //! @brief Get or create constant for P primes
+  air::base::CONSTANT_PTR Get_p(air::base::GLOB_SCOPE* gs);
+  //! @brief Get constant for P primes
+  air::base::CONSTANT_PTR Get_p(air::base::GLOB_SCOPE* gs) const {
+    AIR_ASSERT(_p != air::base::CONSTANT_ID())
+    return gs->Constant(_p);
+  }
+
+  //! @brief Get prime value at specified index, the primes are
+  //! composed by Q_PRIMES + P_PRIMES, while idx greater than Q_PRIMES's
+  //! length, P prime will be returned
+  uint64_t Get_prime(air::base::GLOB_SCOPE* gs, uint32_t idx);
+
+  //! @brief Get prime value at specified index, assert if primes not yet setup
+  uint64_t Get_prime(air::base::GLOB_SCOPE* gs, uint32_t idx) const;
 
   //! @brief Get or create constant for qlhinvmodq used in HPOLY.precomp
   air::base::CONSTANT_PTR Get_qlhinvmodq(air::base::GLOB_SCOPE* gs,
@@ -173,6 +198,10 @@ public:
   air::base::CONSTANT_PTR Get_qlhalfmodq(air::base::GLOB_SCOPE* gs,
                                          uint32_t               idx);
 
+  //! @brief Get or create constant for q0halfmodq used in
+  //! HPOLY.bswitch(raise_mod)
+  air::base::CONSTANT_PTR Get_q0halfmodq(air::base::GLOB_SCOPE* gs);
+
   //! @brief Get or create constant for qhinvmodp used in HPOLY.mod_down
   air::base::CONSTANT_PTR Get_phinvmodp(air::base::GLOB_SCOPE* gs);
 
@@ -183,6 +212,11 @@ private:
   void Set_q(air::base::CONSTANT_PTR cst) {
     AIR_ASSERT_MSG(_q == air::base::CONSTANT_ID(), "Q constant already set");
     _q = cst->Id();
+  }
+
+  void Set_p(air::base::CONSTANT_PTR cst) {
+    AIR_ASSERT_MSG(_p == air::base::CONSTANT_ID(), "P constant already set");
+    _p = cst->Id();
   }
 
   void Set_phmodq(air::base::CONSTANT_PTR cst) {
@@ -228,6 +262,8 @@ private:
 
   // constant ID for q primes
   air::base::CONSTANT_ID _q = air::base::CONSTANT_ID();
+  // constant ID for p primes
+  air::base::CONSTANT_ID _p = air::base::CONSTANT_ID();
   // constant ID for $phat \mod q$
   air::base::CONSTANT_ID _phmodq = air::base::CONSTANT_ID();
   // constant ID for $phat^{-1} \mod p$
@@ -418,6 +454,11 @@ public:
   //! calls to Register_rt_context
   void Release_rt_context() const;
 
+  void Emit_cfg(air::base::FUNC_SCOPE* func_scope, std::ostream& ofile) {
+    _cfg.Emit_cfg(func_scope, Get_ctx_param());
+    _cfg.Dump(ofile);
+  }
+
 private:
   // REQUIRED UNDEFINED UNWANTED methods
   LOWER_CTX(const LOWER_CTX&);
@@ -439,6 +480,7 @@ private:
   air::base::TYPE_ID _fhe_type[FHE_TYPE_KIND::END];  // type id gen in fhe
   FHE_FUNC_INFO
   _fhe_func_info[FHE_FUNC::FHE_FUNC_END];  // info of func gen in fhe
+  LOWER_CFG _cfg;
 };
 
 //! @brief Context for FHE lowering phases

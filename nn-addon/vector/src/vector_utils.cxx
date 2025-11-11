@@ -683,6 +683,8 @@ void Masking_no_padding_stride_data_in_vec(int h, int w, int channel,
 
   // process stride
   if (stride > 1) {
+    // need to support stride > 2
+    AIR_ASSERT(stride == 2);
     for (int i = 0; i < channel; i++) {
       // start from padsize since above loop complete mask work for
       // padding

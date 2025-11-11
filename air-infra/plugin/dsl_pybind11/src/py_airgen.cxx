@@ -3,6 +3,7 @@
 #include <ostream>
 
 #include "air/core/opcode.h"
+#include "fhe/ckks/ckks_opcode.h"
 #include "nn/core/opcode.h"
 #include "nn/vector/vector_opcode.h"
 #include "nn/vector/vector_utils.h"
@@ -132,6 +133,27 @@ ADDR_DATUM_PTR PY_AIRGEN::Formal(int idx) {
   return ret;
 }
 
+ADDR_DATUM_PTR PY_AIRGEN::Ld_var(NODE_PTR node) {
+  AIR_ASSERT_MSG(node->Is_ld(), "node is not load");
+  return node->Addr_datum();
+}
+
+NODE_PTR PY_AIRGEN::New_call(FUNC_SCOPE* fs, std::vector<NODE_PTR> args,
+                             const SPOS& spos) {
+  SIGNATURE_TYPE_PTR func_sig =
+      fs->Owning_func()->Entry_point()->Type()->Cast_to_sig();
+  TYPE_PTR rtype = func_sig->Ret_param()->Type();
+  AIR_ASSERT_MSG(rtype != Null_ptr, "not support non-return call");
+  PREG_PTR retv   = _fs->New_preg(rtype);
+  STMT_PTR s_call = _fs->Container().New_call(fs->Owning_func()->Entry_point(),
+                                              retv, args.size(), spos);
+  for (size_t i = 0; i < args.size(); i++) {
+    _fs->Container().New_arg(s_call, i, args[i]);
+  }
+  Append(s_call);
+  return _fs->Container().New_ldp(retv, spos);
+}
+
 NODE_PTR PY_AIRGEN::New_zero(TYPE_PTR ty, const SPOS& spos) {
   NODE_PTR ret = _fs->Container().New_zero(ty, spos);
   return ret;
@@ -192,6 +214,17 @@ CONSTANT_PTR PY_AIRGEN::New_float_array_const(
   return ret;
 }
 
+CONSTANT_PTR PY_AIRGEN::New_int_array_const(const std::string& name, int asize,
+                                            TYPE_PTR             elem_type,
+                                            std::vector<int64_t> shape,
+                                            py::array_t<int>     buf,
+                                            const SPOS&          spos) {
+  py::buffer_info buf_info = buf.request();
+  CONSTANT_PTR    ret      = nn::vector::New_array_const(
+      Glob_scope(), name, asize, elem_type, shape, buf_info.ptr, spos);
+  return ret;
+}
+
 void PY_AIRGEN::Block_append(NODE_PTR block, STMT_PTR stmt) {
   STMT_LIST(block).Append(stmt);
 }
@@ -224,6 +257,20 @@ NODE_PTR PY_AIRGEN::New_array(CONSTANT_PTR ra_const, NODE_PTR& offset,
       _fs->Container().New_ldca(ra_const, POINTER_KIND::FLAT32, spos), 1, spos);
   _fs->Container().Set_array_idx(ra_array, 0, offset);
   return ra_array;
+}
+
+NODE_PTR PY_AIRGEN::New_array(ADDR_DATUM_PTR addr_datum, NODE_PTR& offset,
+                              const SPOS& spos) {
+  NODE_PTR ra_array = _fs->Container().New_array(
+      _fs->Container().New_lda(addr_datum, POINTER_KIND::FLAT32, spos), 1,
+      spos);
+  _fs->Container().Set_array_idx(ra_array, 0, offset);
+  return ra_array;
+}
+
+STMT_PTR PY_AIRGEN::New_ist(NODE_PTR& ra_array, NODE_PTR& val,
+                            const SPOS& spos) {
+  return _fs->Container().New_ist(ra_array, val, spos);
 }
 
 NODE_PTR PY_AIRGEN::New_ild(NODE_PTR& ra_array, const SPOS& spos) {

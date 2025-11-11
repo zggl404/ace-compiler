@@ -104,7 +104,8 @@ NODE_PTR SIHE_GEN::Gen_encode_mask(TYPE_PTR plain_type, double val,
   return encode;
 }
 
-NODE_PTR SIHE_GEN::Gen_bootstrap(NODE_PTR child, const SPOS& spos) {
+NODE_PTR SIHE_GEN::Gen_bootstrap(NODE_PTR child, int64_t slot,
+                                 const SPOS& spos) {
   CMPLR_ASSERT(child->Container() == Container(),
                "container of child must be same with that of bootstrap node");
   CMPLR_ASSERT(Lower_ctx()->Is_cipher_type(child->Rtype_id()),
@@ -114,6 +115,11 @@ NODE_PTR SIHE_GEN::Gen_bootstrap(NODE_PTR child, const SPOS& spos) {
   NODE_PTR bs_node =
       Container()->New_cust_node(bootstrap_op, child->Rtype(), spos);
   bs_node->Set_child(0, child);
+
+  std::vector<uint32_t> slots    = {(uint32_t)slot};
+  const char*           slot_key = nn::core::ATTR::SLOT;
+  bs_node->Set_attr(slot_key, slots.data(), slots.size());
+
   return bs_node;
 }
 

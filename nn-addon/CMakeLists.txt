@@ -33,7 +33,7 @@ option(BUILD_SHARED        "Control whether to build the shared libraries" OFF)
 option(BUILD_UNITTEST      "Control whether to build the unittest"          ON)
 option(BUILD_BENCH         "Control whether to build the benmark"           ON)
 option(BUILD_DOC           "Control whether to build API documentation"    OFF)
-option(NN_CODE_CHECK       "Control whether to check coding style"         OFF)
+option(NN_CODE_CHECK       "Control whether to check coding style"          ON)
 option(NN_BUILD_TEST       "Control whether to build the tests"             ON)
 option(NN_BUILD_EXAMPLE    "Control whether to build the examples"          ON)
 option(NN_INSTALL_APP      "Control whether to install the APPs"            ON)
@@ -121,11 +121,12 @@ endif()
 find_nn_extralib(EXTRA_LIBS)
 
 # generate domain opcodes for NN
+# the target `nn_od` will be created
 gen_domain_od(
   "$ENV{PACKAGE_BASE_DIR}/irgen/od/odgen.py"
   "${PROJECT_SOURCE_DIR}/core/od/opcode_def.yml"
   "${CMAKE_BINARY_DIR}/include/nn/core"
-  nn_od
+  nn
 )
 add_dependencies(nn_depend nn_od)
 

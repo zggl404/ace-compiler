@@ -66,7 +66,12 @@ public:
       if (opnd0->Opcode() == OPCODE(nn::core::NN, nn::core::OPCODE::MUL)) {
         // get float type constant value
         NODE_PTR scalar_operand = opnd0->Child(1);
-        float    scalar_val     = vgen.Get_scalar<float>(scalar_operand);
+        float    scalar_val;
+        if (scalar_operand->Const()->Is_float()) {
+          scalar_val = scalar_operand->Const()->Float_literal().Val_as_float();
+        } else {
+          scalar_val = vgen.Get_scalar<float>(scalar_operand);
+        }
 
         // opnd0->Child(0) is the variable
         TYPE_PTR etype = opnd0->Child(0)->Rtype()->Cast_to_arr()->Elem_type();
@@ -170,8 +175,8 @@ public:
     int              group  = groups[0];
     // Only support depthwise convolution for group>1
     if (group > 1) {
-      AIR_ASSERT_MSG((channel_in == group) && ctx.Conv_fast(),
-                     "depthwise convolution: channel_in == group && Conv_fast");
+      AIR_ASSERT_MSG((channel_in == group),
+                     "depthwise convolution: channel_in == group");
     } else {
       AIR_ASSERT_MSG(channel_in == channel_in_kernel,
                      "channel_in == channel_in_kernel");
@@ -184,6 +189,23 @@ public:
     NODE_PTR new_input1d = new_input;
     AIR_ASSERT_MSG(new_input->Rtype()->Is_array(),
                    "conv new_input is not an array type");
+
+    // hack here temporarily
+    if (ctx.Selective_ss() && (ctx.Decompose_mid_op() && ctx.Const_fold()) &&
+        ctx.Mask_fuse()) {
+      int64_t new_batch = 0, new_channel_in = 0, new_input_height = 0,
+              new_input_width = 0;
+      Get_array_nchw(new_input->Rtype(), new_batch, new_channel_in,
+                     new_input_height, new_input_width);
+      if ((input_height != new_input_height) ||
+          (input_width != new_input_width)) {
+        // std::cout << "stx hack in handle_conv=======\n";
+        input_height  = new_input_height;
+        input_width   = new_input_width;
+        output_height = input_height;
+        output_width  = input_width;
+      }
+    }
 
     int64_t kernel_size = kernel_height * kernel_width;
     int     outer       = 0;
@@ -339,7 +361,7 @@ public:
     // conv1 = input[input_size] "X" conv1_im2col_kernel[channel_in*kernel_size,
     // output_size] with "ra" rotation alignment.
 
-    bool    flag_conv_fast = (ctx.Conv_fast() && (channel_out >= channel_in));
+    bool    flag_conv_fast = (channel_out >= channel_in);
     int64_t output_size    = channel_out * input_height * input_width;
     int64_t input_size     = channel_in * input_height * input_width;
 
@@ -415,9 +437,8 @@ public:
                                        conv1_im2col_kernel[index].begin(),
                                        conv1_im2col_kernel[index].end());
               if (num_block > 1)
-                weight_im2col_vec.insert(
-                    weight_im2col_vec.end(), conv1_im2col_kernel[index].begin(),
-                    conv1_im2col_kernel[index].begin() + width_block_pad);
+                weight_im2col_vec.insert(weight_im2col_vec.end(),
+                                         block_pad.begin(), block_pad.end());
             }
           }
         }
@@ -537,6 +558,10 @@ public:
           output_height, output_width, kernel_height * kernel_width, stride,
           spos);
     // new_node->Rtype()->Print();
+
+    AIR_ASSERT(output_size < UINT32_MAX);
+    std::vector<uint32_t> slot = {(uint32_t)output_size};
+    new_node->Set_attr(core::ATTR::SLOT, slot.data(), slot.size());
     return new_node;
   }
 
@@ -570,7 +595,7 @@ public:
     NODE_PTR new_bias = visitor->template Visit<RETV>(node->Child(2));
     ctx.Trace_cmd(TF_LOWER, Trace_float_array, new_bias->Const(), "new_bias");
 
-    bool flag_gemm_fast = ctx.Gemm_fast();
+    bool flag_gemm_fast = true;
     ctx.Trace(TF_LOWER, "flag_gemm_fast=", flag_gemm_fast, "\n");
     if (!flag_gemm_fast) {
       NODE_PTR new_node =
@@ -649,7 +674,9 @@ public:
           // append shift buffer
           m_irma[row].insert(m_irma[row].end(), m_irma[row].cbegin(),
                              m_irma[row].cbegin() + sf);
-          m_irma_vec = m_irma_vec + m_irma[row];
+          // m_irma_vec = m_irma_vec + m_irma[row];
+          m_irma_vec.insert(m_irma_vec.end(), m_irma[row].begin(),
+                            m_irma[row].end());
         }
       }
     }
@@ -729,7 +756,7 @@ public:
     if (ctx.Mask_fuse()) {
       // when gemm is last op or valid data len == slot, no need masking
       // clear zero
-      if (!ctx.Is_last_op() && (valid_len != ctx.Get_slot())) {
+      if (need_mask && !ctx.Is_last_op() && (valid_len != ctx.Get_slot())) {
         // TODO: clean 0. suggest in FHE IR Level together with roll.
         vgen.Gen_clear_data_stmt(result, valid_len, b_ty_arr->Elem_type(),
                                  spos);
@@ -740,6 +767,10 @@ public:
     }
 
     NODE_PTR ld_result = cntr->New_ld(result, spos);
+
+    AIR_ASSERT(valid_len < UINT32_MAX);
+    std::vector<uint32_t> slot = {(uint32_t)valid_len};
+    ld_result->Set_attr(core::ATTR::SLOT, slot.data(), slot.size());
 
     return ld_result;
   }
@@ -822,13 +853,14 @@ public:
     NODE_PTR add_col_node = vgen.New_add(ld_row_add, tmp_roll_node2, spos);
 
     // masking [1,0,1,0..., 0,0,0,0..., 1,0,1,0..., 0,0,0,0...]
-    FPVEC avg_value_mask = Get_avg_value_mask(c_in, h, w, ks);
+    FPVEC   avg_value_mask = Get_avg_value_mask(c_in, h, w, ks);
+    int64_t input_size     = c_in * h * w;
 
-    std::vector<int64_t> avg_mask_shape{c_in * h * w};
+    std::vector<int64_t> avg_mask_shape{input_size};
     std::string          mask_name =
         std::string("avg_value_mask") + std::to_string(ctx.Get_num_vloop());
     CONSTANT_PTR mask_const =
-        New_array_const(gscope, mask_name, c_in * h * w, op_ty_arr->Elem_type(),
+        New_array_const(gscope, mask_name, input_size, op_ty_arr->Elem_type(),
                         avg_mask_shape, (void*)avg_value_mask.data(), spos);
     // new_ldc is LD avg value mask
     NODE_PTR avg_value_mask_node = cntr->New_ldc(mask_const, spos);
@@ -839,6 +871,10 @@ public:
     // intermediate average pool result which not considerring stride
     NODE_PTR avgpool_inter_node =
         vgen.New_mul(add_col_node, avg_value_mask_node, spos);
+
+    AIR_ASSERT(input_size < UINT32_MAX);
+    std::vector<uint32_t> slot = {(uint32_t)input_size};
+    avgpool_inter_node->Set_attr(core::ATTR::SLOT, slot.data(), slot.size());
 
     return avgpool_inter_node;
   }
@@ -917,7 +953,12 @@ public:
 
   template <typename RETV, typename VISITOR>
   RETV Handle_strided_slice(VISITOR* visitor, air::base::NODE_PTR node) {
-    TENSOR2VECTOR_CTX& ctx  = visitor->Context();
+    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+
+    if (ctx.Fusion_count()) {
+      ctx.Incr_ss_count();
+    }
+
     CONTAINER*         cntr = ctx.Container();
     TENSOR2VECTOR_UTIL vgen(ctx);
     AIR_ASSERT(node->Num_child() == 4);
@@ -1003,6 +1044,8 @@ public:
       NODE_PTR extraced_node = vgen.New_extract_valid_data(
           cntr->New_ld(x_row_var, spos), 0, ss_height, ss_width, 0, stride_row,
           1 /*is_start_pos_valid*/, spos);
+
+      // TODO: add slot attr when sharding is considered
       return extraced_node;
     }
 
@@ -1032,6 +1075,12 @@ public:
     NODE_PTR extraced_node = vgen.New_extract_valid_data(
         ld_result, padsize, ss_height, ss_width, kernal_shape, stride_row,
         (start_row == 0), spos);
+
+    int64_t output_size =
+        op_shape[1] * (ss_height / stride_row) * (ss_width / stride_row);
+    AIR_ASSERT(output_size < UINT32_MAX);
+    std::vector<uint32_t> slot = {(uint32_t)output_size};
+    extraced_node->Set_attr(core::ATTR::SLOT, slot.data(), slot.size());
 
     return extraced_node;
   }
@@ -1090,24 +1139,34 @@ public:
     std::vector<int> roll_num{(int)(-c_in * h * w)};
 
     TYPE_PTR rtype;
+    int64_t  output_size = 0;
     if ((axis_att_dim[0] == 2) && (input0_dim[1] == 1)) {
       std::vector<int64_t> rshape{c_out, input0_dim[1],
                                   input0_dim[2] + input1_dim[2], input0_dim[3]};
+      output_size = c_out * input0_dim[1] * (input0_dim[2] + input1_dim[2]) *
+                    input0_dim[3];
       rtype = New_array_type(cntr->Glob_scope(), "concat_axis2",
                              input1->Rtype()->Cast_to_arr()->Elem_type(),
                              rshape, spos);
     } else {  // axis=1
       std::vector<int64_t> rshape{c_out, input0_dim[1] + input1_dim[1],
                                   input0_dim[2], input0_dim[3]};
+      output_size = c_out * (input0_dim[1] + input1_dim[1]) * input0_dim[2] *
+                    input0_dim[3];
       rtype = New_array_type(cntr->Glob_scope(), "concat_axis1",
                              input1->Rtype()->Cast_to_arr()->Elem_type(),
                              rshape, spos);
     }
+
     NODE_PTR right_roll_input1 =
         vgen.New_roll(input1, cntr->New_intconst(s32_type, -c_in * h * w, spos),
                       roll_num, spos, rtype);
     NODE_PTR concat_node = vgen.New_add(input0, right_roll_input1, spos);
 
+    AIR_ASSERT(output_size != 0);
+    AIR_ASSERT(output_size < UINT32_MAX);
+    std::vector<uint32_t> slot = {(uint32_t)output_size};
+    concat_node->Set_attr(core::ATTR::SLOT, slot.data(), slot.size());
     return concat_node;
   }
 };

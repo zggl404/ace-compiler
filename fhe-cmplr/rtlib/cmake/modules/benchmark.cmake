@@ -8,7 +8,14 @@
 # Build external benchmark project dependent function
 function(build_external_benchmark)
 
-  set(REPO_BENCH_URL      "https://github.com/google/benchmark.git")
+  set(BENCH_URL      "https://git:$ENV{CI_TOKEN}@code.alipay.com/opencc/benchmark.git")
+  set(BENCH_URL_SSH  "git@code.alipay.com:opencc/benchmark.git")
+  if(EXTERNAL_URL_SSH)
+    set(REPO_BENCH_URL ${BENCH_URL_SSH})
+  else()
+    set(REPO_BENCH_URL ${BENCH_URL})
+  endif()
+
   message(STATUS "Cloning External Repository   : ${REPO_BENCH_URL}")
 
   include(ExternalProject)

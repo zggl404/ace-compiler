@@ -30,5 +30,11 @@ CKKS_OPCODE(BOOTSTRAP,  bootstrap,  1, 0, PROP_EXPR | PROP_TYPE | PROP_ATTR | PR
 CKKS_OPCODE(SCALE,      scale,      1, 0, PROP_EXPR | PROP_TYPE)
 CKKS_OPCODE(LEVEL,      level,      1, 0, PROP_EXPR | PROP_TYPE)
 CKKS_OPCODE(BATCH_SIZE, batch_size, 1, 0, PROP_EXPR | PROP_TYPE)
+CKKS_OPCODE(RAISE_MOD,  raise_mod,  2, 0, PROP_EXPR | PROP_TYPE)
+CKKS_OPCODE(MUL_MONO,   mul_mono,   2, 0, PROP_EXPR | PROP_TYPE)
+CKKS_OPCODE(CONJUGATE,  conjugate,  1, 0, PROP_EXPR | PROP_TYPE)
+
+// free opcode to free ciphertext
+CKKS_OPCODE(FREE,       free,       1, 0, PROP_STMT | PROP_TYPE | PROP_LIB_CALL)
 
 #undef CKKS_OPCODE

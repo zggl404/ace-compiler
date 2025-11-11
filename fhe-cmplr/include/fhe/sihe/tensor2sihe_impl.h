@@ -153,6 +153,13 @@ RETV TENSOR2SIHE_IMPL::Handle_relu(VISITOR* visitor, NODE_PTR node) {
   TYPE_PTR rtype = node->Rtype();
   AIR_ASSERT(rtype->Is_array());
 
+  std::vector<int64_t> shape = rtype->Cast_to_arr()->Shape();
+  int64_t              slot  = 1;
+  for (const int64_t& elem : shape) {
+    AIR_ASSERT(elem > 0);
+    slot *= elem;
+  }
+
   VECTOR2SIHE_CTX&      ctx       = visitor->Context();
   air::base::CONTAINER* cntr      = ctx.Container();
   core::LOWER_CTX&      lower_ctx = ctx.Lower_ctx();
@@ -166,7 +173,7 @@ RETV TENSOR2SIHE_IMPL::Handle_relu(VISITOR* visitor, NODE_PTR node) {
   // 1. bootstapping before relu: bs_tmp = SIHE.bootstrap(op0)
   PREG_PTR bs_tmp = func_scope->New_preg(cipher_type);
   {
-    NODE_PTR bs_node    = sihe_gen.Gen_bootstrap(op0, spos);
+    NODE_PTR bs_node    = sihe_gen.Gen_bootstrap(op0, slot, spos);
     STMT_PTR st_bs_node = cntr->New_stp(bs_node, bs_tmp, spos);
     visitor->Context().Prepend(st_bs_node);
     if (ctx.Rt_validate()) {

@@ -73,6 +73,8 @@ userDefinedVEnums:
       No_Input_File: 7
       No_Output_Var: 8
       IR_Verify_Error: 9
+      Output_File_Open_Err: 10
+      Output_File_Open_Err_Fatal: 11
 
 structureDef: |
     typedef struct {

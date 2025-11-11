@@ -9,6 +9,7 @@
 #ifndef AIR_DRIVER_DRIVER_CTX_H
 #define AIR_DRIVER_DRIVER_CTX_H
 
+#include <filesystem>
 #include <unordered_map>
 
 #include "air/base/st.h"
@@ -90,6 +91,30 @@ public:
   //! @brief Get extra output file name
   std::string Ext_ofile(const char* ext) const {
     return _option_mgr.Ofile(ext);
+  }
+
+  //! @brief Get default assembly file name
+  std::string Def_sfile() const {
+    std::string str = Ifile() == nullptr
+                          ? DFILE_PREFIX
+                          : std::filesystem::path(Ifile()).filename().string();
+    return str + SFILE_SUFFIX;
+  }
+
+  //! @brief Get default c file name
+  std::string Def_cfile() const {
+    std::string str = Ifile() == nullptr
+                          ? DFILE_PREFIX
+                          : std::filesystem::path(Ifile()).filename().string();
+    return str + CFILE_SUFFIX;
+  }
+
+  //! @brief Get configure file name
+  std::string Def_cfg_file() const {
+    std::string str = Ifile() == nullptr
+                          ? DFILE_PREFIX
+                          : std::filesystem::path(Ifile()).filename().string();
+    return str + CFG_FILE_SUFFIX;
   }
 
   //! @brief Access global config items

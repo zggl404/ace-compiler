@@ -306,6 +306,11 @@ static inline size_t Get_ciph3_prime_p_cnt(CIPHERTEXT3* ciph) {
   return ciph->_c0_poly._num_primes_p;
 }
 
+//! @brief Get the number of p and q primes from ciphertext
+static inline size_t Get_ciph3_num_pq(CIPHERTEXT3* ciph) {
+  return Get_num_pq(Get_ciph3_c0(ciph));
+}
+
 //! @brief Get slots from ciphertext3
 static inline uint32_t Get_ciph3_slots(CIPHERTEXT3* ciph) {
   return ciph->_slots;

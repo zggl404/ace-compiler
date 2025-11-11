@@ -14,6 +14,12 @@ from ace_util import *  # noqa F403
 def run_parallel(all_cmds, image_num, log, trace):
     '''
     Run encrypted computations in parallel with given image numbers
+
+    Args:
+        all_cmds(list[list[str]]): all commands to run
+        image_num(int): number of images to test
+        log(file): log file
+        trace(bool): if runtime trace is enabled
     '''
     test_set = [i[3] for i in all_cmds]
     num_cpus, num_process = calculate_process_num(image_num, test_set, log)
@@ -65,6 +71,16 @@ def run_parallel(all_cmds, image_num, log, trace):
 def run_accuracy(exec_files, cifar10_dir, cifar100_dir, index, image_num, debug, trace, log):
     '''
     Main function to run encrypted computations in parallel
+
+    Args:
+        exec_files(list[str]): encrypted executables to run
+        cifar10_dir(str): path of the dir that holds the cifar10 data file
+        cifar100_dir(str): path of the dir that holds the cifar100 data file
+        index(int): starting index in the cifar data set
+        image_num(int): number of images to test
+        debug(bool): print out debug info
+        trace(bool): if runtime trace is enabled
+        log(file): log file
     '''
     info = '-------- ACE Accuracy --------\n'
     write_log(info, log)

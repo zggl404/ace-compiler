@@ -7,7 +7,14 @@
 
 function(seal_find_package version) 
   if(${version} STREQUAL BTS)
-    set(REPO_SEALBTS_URL      "https://github.com/microsoft/SEAL.git")
+    set(SEALBTS_URL      "https://code.alipay.com/fhe/SEAL.git")
+    set(SEALBTS_URL_SSH  "git@code.alipay.com:fhe/SEAL.git")
+    if(SEALBTS_URL_SSH)
+      set(REPO_SEALBTS_URL ${SEALBTS_URL_SSH})
+    else()
+      set(REPO_SEALBTS_URL ${SEALBTS_URL})
+    endif()
+
     message(STATUS "Cloning External Repository   : ${REPO_SEALBTS_URL}")
   
     include(ExternalProject)

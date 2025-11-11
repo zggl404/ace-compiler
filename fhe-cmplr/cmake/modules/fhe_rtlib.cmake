@@ -28,10 +28,12 @@ function(build_rtlib)
               -DRTLIB_ENABLE_SEAL=${FHE_ENABLE_SEAL}
               -DRTLIB_ENABLE_SEAL_BTS=${FHE_ENABLE_SEAL_BTS}
               -DRTLIB_ENABLE_OPENFHE=${FHE_ENABLE_OPENFHE}
+	      -DRTLIB_ENABLE_CUDA=${FHE_ENABLE_CUDA}
               -DRTLIB_ENABLE_LINUX=ON
               -DBUILD_WITH_OPENMP=${BUILD_WITH_OPENMP}
               -DPACKAGE_BASE_DIR=$ENV{PACKAGE_BASE_DIR}
               -DPACKAGE_INC_DIR_TF=${PACKAGE_INC_DIR_TF}
+              -DEXTERNAL_URL_SSH=${EXTERNAL_URL_SSH}
               -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
     UPDATE_COMMAND ""
     BUILD_ALWAYS ON
@@ -43,6 +45,7 @@ function(build_rtlib)
                       <BINARY_DIR>/ant/libFHErt_ant_encode.a
                       <BINARY_DIR>/seal/libFHErt_seal.a
                       <BINARY_DIR>/openfhe/libFHErt_openfhe.a
+                      <BINARY_DIR>/phantom/libFHErt_phantom.a
   )
   ExternalProject_Get_Property(fhe_rtlib SOURCE_DIR BINARY_DIR)
 
@@ -59,7 +62,7 @@ function(build_rtlib)
     IMPORTED_LOCATION "${BINARY_DIR}/ant/libFHErt_ant_encode.a"
   )
 
-  # for seal & openfhe
+  # for seal & openfhe & phantom
   if(FHE_ENABLE_SEAL)
     add_library(FHErt_seal STATIC IMPORTED GLOBAL)
     set_target_properties(FHErt_seal PROPERTIES
@@ -74,6 +77,13 @@ function(build_rtlib)
     )
     install(FILES ${BINARY_DIR}/openfhe/libFHErt_openfhe.a DESTINATION rtlib/lib)
   endif()
+  if(FHE_ENABLE_PHANTOM)
+    add_library(FHErt_phantom STATIC IMPORTED GLOBAL)
+    set_target_properties(FHErt_phantom PROPERTIES
+      IMPORTED_LOCATION "${BINARY_DIR}/phantom/libFHErt_phantom.a"
+    )
+    install(FILES ${BINARY_DIR}/phantom/libFHErt_phantom.a DESTINATION rtlib/lib)
+  endif()
 
   add_test(NAME test_fhe_rtlib COMMAND ${CMAKE_COMMAND} --build ${BINARY_DIR} --target test)
 
@@ -86,11 +96,13 @@ function(build_rtlib)
   install(FILES ${BINARY_DIR}/common/libFHErt_common.a DESTINATION rtlib/lib)
   install(FILES ${BINARY_DIR}/ant/libFHErt_ant.a DESTINATION rtlib/lib)
   install(FILES ${BINARY_DIR}/ant/libFHErt_ant_encode.a DESTINATION rtlib/lib)
+
 endfunction()
 
 if(NOT TARGET fhe_rtlib)
   build_rtlib()
   add_dependencies(fhe_depend fhe_rtlib)
+  add_dependencies(fhe_rtlib ${NN_LIBS})
 
   find_library(M_LIBRARY NAMES m)
   find_library(GMP_LIBRARY NAMES gmp libgmp)

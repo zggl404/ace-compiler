@@ -32,6 +32,11 @@ function test_relu_resbm()
     echo "ERROR: redundant rescale"
     exit 1
   fi
+  lvl0_cnt=`grep "\[level=0" relu.t | wc -l`
+  if [ ${lvl0_cnt} -gt 0 ]; then
+    echo "ERROR: node with invalid level"
+    exit 1
+  fi
 }
 
 function test_relu_resbm_li8()
@@ -53,12 +58,17 @@ function test_relu_resbm_li8()
     echo "ERROR: redundant rescale"
     exit 1
   fi
+  lvl0_cnt=`grep "\[level=0" relu.t | wc -l`
+  if [ ${lvl0_cnt} -gt 0 ]; then
+    echo "ERROR: node with invalid level"
+    exit 1
+  fi
 }
 
 function test_resnet20_cifar10()
 {
   bld_dir=$1
-  VEC_OPT="-VEC:conv_fast:gemm_fast"
+  VEC_OPT=""
   SIHE_OPT="-SIHE:relu_vr_def=2.0"
   CKKS_OPT="-CKKS:mxbl=16:mbc=2:sbm:tsbp"
   P2C_OPT="-P2C:df=tmp.data"
@@ -78,7 +88,7 @@ function test_conv2d()
 {
   bld_dir=$1
   fn=conv2d
-  ${bld_dir}/driver/fhe_cmplr -SIHE:b2ir=./${fn}.onnx.sihe -CKKS:tia ./${fn}.onnx
+  ${bld_dir}/driver/fhe_cmplr -CKKS:tia ./${fn}.onnx
   bts_cnt=`grep CKKS.bootstrap ${fn}.t | wc -l`
   if [ ${bts_cnt} -ne 0 ]; then
     echo "ERROR: redundant bootstrap"
@@ -89,9 +99,14 @@ function test_conv2d()
     echo "ERROR: redundant rescale"
     exit 1
   fi
-  ms_cnt==`grep CKKS.modswitch ${fn}.t | wc -l`
+  ms_cnt=`grep CKKS.modswitch ${fn}.t | wc -l`
   if [ ${ms_cnt} -ne 0 ]; then
     echo "ERROR:redundant modswitch"
+    exit 1
+  fi
+  lvl0_cnt=`grep "\[level=0" ${fn}.t | wc -l`
+  if [ ${lvl0_cnt} -gt 0 ]; then
+    echo "ERROR: node with invalid level"
     exit 1
   fi
 }
@@ -107,8 +122,13 @@ function test_conv2d_resbm()
     exit 1
   fi
   rs_cnt=`grep CKKS.rescale ${fn}.t | wc -l`
-  if [ ${rs_cnt} -gt 3 ]; then
+  if [ ${rs_cnt} -gt 4 ]; then
     echo "ERROR: redundant rescale"
+    exit 1
+  fi
+  lvl0_cnt=`grep "\[level=0" ${fn}.t | wc -l`
+  if [ ${lvl0_cnt} -gt 0 ]; then
+    echo "ERROR: node with invalid level"
     exit 1
   fi
 }

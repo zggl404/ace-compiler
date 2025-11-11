@@ -291,6 +291,13 @@ RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
   NODE_PTR    new_child      = visitor->template Visit<RETV>(child).Node();
   const SPOS& spos           = node->Spos();
   NODE_PTR    ckks_bootstrap = ckks_gen.Gen_bootstrap(new_child, spos);
+
+  const char*     slot_key   = nn::core::ATTR::SLOT;
+  uint32_t        slot_count = 0;
+  const uint32_t* slot_idx   = node->Attr<uint32_t>(slot_key, &slot_count);
+  AIR_ASSERT(slot_key != nullptr && slot_count > 0);
+  ckks_bootstrap->Set_attr(slot_key, slot_idx, slot_count);
+
   return RETV(ckks_bootstrap);
 }
 

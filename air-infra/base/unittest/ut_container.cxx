@@ -134,6 +134,7 @@ protected:
   void Run_test_verify_func_main();
   void Run_test_verify_fail();
   void Run_test_func_entry_node();
+  void Run_test_func_no_ret();
 
   GLOB_SCOPE* _glob;
   FUNC_SCOPE* _fs_add;
@@ -713,6 +714,29 @@ void TEST_CONTAINER::Run_test_func_entry_node() {
   EXPECT_EQ(result, expected);
 }
 
+void TEST_CONTAINER::Run_test_func_no_ret() {
+  STR_PTR  name = _glob->New_str("No_ret");
+  FUNC_PTR func = _glob->New_func(name, SPOS());
+  func->Set_parent(_glob->Comp_env_id());
+  SIGNATURE_TYPE_PTR sig   = _glob->New_sig_type();
+  TYPE_PTR           rtype = _glob->Prim_type(PRIMITIVE_TYPE::VOID);
+  PREG_PTR           retv  = _fs_add->New_preg(rtype);
+  _glob->New_ret_param(rtype, sig);
+  sig->Set_complete();
+  ENTRY_PTR  entry = _glob->New_entry_point(sig, func, name, SPOS());
+  CONTAINER* cntr  = &_fs_add->Container();
+  STMT_PTR   stmt  = cntr->New_call(entry, retv, 0, SPOS());
+
+  EXPECT_FALSE(stmt->Node()->Entry()->Has_retv());
+  EXPECT_TRUE(retv->Id() == stmt->Node()->Ret_preg_id());
+
+  stmt = cntr->New_call(entry, PREG_PTR(), 0, SPOS());
+  EXPECT_FALSE(stmt->Node()->Entry()->Has_retv());
+
+  stmt = cntr->New_call(entry, Null_ptr, 0, SPOS());
+  EXPECT_FALSE(stmt->Node()->Entry()->Has_retv());
+}
+
 TEST_F(TEST_CONTAINER, ctor_dtor) { Run_test_ctor_dtor(); }
 TEST_F(TEST_CONTAINER, stmt_list_prepend) { Run_test_stmt_list_prepend(); }
 TEST_F(TEST_CONTAINER, stmt_list_append) { Run_test_stmt_list_append(); }
@@ -725,3 +749,4 @@ TEST_F(TEST_CONTAINER, verify_func_add) { Run_test_verify_func_add(); }
 TEST_F(TEST_CONTAINER, verify_func_main) { Run_test_verify_func_main(); }
 TEST_F(TEST_CONTAINER, verify_fail) { Run_test_verify_fail(); }
 TEST_F(TEST_CONTAINER, func_entry_node) { Run_test_func_entry_node(); }
+TEST_F(TEST_CONTAINER, func_no_ret) { Run_test_func_no_ret(); }

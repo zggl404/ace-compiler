@@ -93,6 +93,16 @@ public:
   // declare trace API for detail tracing
   DECLARE_TRACE_DETAIL_API(_config, _driver_ctx)
 
+  PREG_MAP& Get_t2v_preg_map() { return _t2v_preg_map; }
+  void      Insert_t2v_preg_map(std::pair<uint32_t, uint32_t> preg_pair) {
+    _t2v_preg_map.insert(preg_pair);
+  }
+
+  std::vector<NODE_ID>& Get_ngraph_avgpool_wl() { return _ngraph_avgpool_wl; }
+  void Init_ngraph_avgpool_wl(std::vector<NODE_ID> avgpool_wl) {
+    _ngraph_avgpool_wl = avgpool_wl;
+  }
+
   STMT_LIST Get_insertpoint(int outer) {
     AIR_ASSERT_MSG(_n_blk.size() >= outer + 1,
                    "outer is larger than block stack");
@@ -152,11 +162,18 @@ public:
     _cur_func_scope = func_scope;
   }
 
+  void Incr_ss_count() { _ss_count++; }
+
+  uint32_t Get_ss_count() { return _ss_count; }
+
 private:
   VECTOR_CTX&                    _ctx;
   const air::driver::DRIVER_CTX* _driver_ctx;
   const VECTOR_CONFIG&           _config;
   FUNC_SCOPE*                    _cur_func_scope;
+  PREG_MAP                       _t2v_preg_map;
+  std::vector<NODE_ID>           _ngraph_avgpool_wl;
+  uint32_t                       _ss_count = 0;
 };
 
 }  // namespace vector

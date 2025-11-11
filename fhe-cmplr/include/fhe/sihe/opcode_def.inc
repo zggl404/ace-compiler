@@ -25,7 +25,7 @@ SIHE_OPCODE(RELU_MSG,   relu_msg,   1, 0, PROP_EXPR | PROP_TYPE | PROP_ATTR | PR
 // encode opcode transform vector to plaintext:
 SIHE_OPCODE(ENCODE,     encode,     2, 0, PROP_EXPR | PROP_ATTR | PROP_TYPE)
 
-SIHE_OPCODE(BOOTSTRAP,  bootstrap,  1, 0, PROP_EXPR | PROP_TYPE)
+SIHE_OPCODE(BOOTSTRAP,  bootstrap,  1, 0, PROP_EXPR | PROP_ATTR | PROP_TYPE)
 
 SIHE_OPCODE(BOOTSTRAP_MSG, bootstrap_msg, 1, 0, PROP_EXPR | PROP_ATTR | PROP_LIB_CALL)
 

@@ -256,7 +256,7 @@ class CXXAPICodeGen:
         ''' Generate the namespace for the domain '''
         res = "::".join(NAMESPACE)
         return f"namespace {res} {{\n"
-    
+
     def gen_constructor(self):
         ''' Generate the constructor for the API class '''
         cls_name = f"{self.domain.name.upper()}_API"
@@ -296,7 +296,7 @@ class CXXAPICodeGen:
             5: "quint",
             6: "sext",
         }
-        is_invalid = lambda op: op.name == 'invalid'
+        def is_invalid(op): return op.name == 'invalid'
         if is_invalid(op):
             # get glob_scope
             res += f"{IDT}GLOB_SCOPE& glob_scope = _dsl.Get_cur_func_scope()->Glob_scope();\n"
@@ -338,6 +338,18 @@ class CXXAPICodeGen:
         res += "};\n\n"
         return res
 
+    def gen_binding(self):
+        ''' Generate the binding code for the domain '''
+        cls_name = f"{self.domain.name.upper()}_API"
+        def cap(s): return s if s[0].isupper() else s.capitalize()
+        res = f"py::class_<{cls_name}>(m, \"{cap(self.domain.name)}API\")\n"
+        res += f"{IDT}.def(py::init<{API_GEN_DIRVER}&>())\n"
+        ret_policy = "py::return_value_policy::reference"
+        for op in self.domain.ops:
+            op_name = op.name.capitalize()
+            res += f"{IDT}.def(\"{op.name}\", &{cls_name}::{op_name}, {ret_policy})\n"
+        return res[:-1] + ";\n"
+
     def gen_header_file(self):
         ''' Generate the header file for the domain '''
         res = self.gen_header()
@@ -375,6 +387,11 @@ class CXXAPICodeGen:
         with open(cxx_path, 'w', encoding='utf-8') as f:
             f.write(res)
         self.run_clang_format(cxx_path, cfg_file=self.config.clang_format_cfg)
+
+        res = self.gen_binding()
+        binding_path = output_dir + f"/{self.domain.name.lower()}_binding.h"
+        with open(binding_path, 'w', encoding='utf-8') as f:
+            f.write(res)
         # print(res)
 
 

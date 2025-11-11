@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 
+#include "util/modular.h"
 #include "util/type.h"
 
 //! @brief defines APIs for HPU CREG instructions
@@ -28,6 +29,11 @@ void Gen_mod3s_regs(int64_t* qmuk_data, size_t size);
 //! @param mode: 0 for NTT, 1 for COE (input)
 //! @return DSA_CR_AUTOU value (output)
 int64_t Gen_autou_creg(int32_t rot_idx, uint64_t poly_degree, bool mode);
+
+//! @brief Get modulus for qmuk_data at given idx
+//! @param qmuk_data array pointer that stores the generated modulus value
+//! @param idx index of Q and P primes
+MODULUS* Ldmod(uint64_t* qmuk_data, size_t idx);
 
 #ifdef __cplusplus
 }

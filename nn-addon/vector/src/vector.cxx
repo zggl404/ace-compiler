@@ -11,14 +11,17 @@
 #include "air/base/visitor.h"
 #include "air/core/handler.h"
 #include "nn/core/handler.h"
+#include "nn/vector/cf.h"
+#include "nn/vector/cf_simp.h"
 #include "nn/vector/copy_prop.h"
 #include "nn/vector/core_handler.h"
 #include "nn/vector/handler.h"
 #include "nn/vector/mask_fusion.h"
 #include "nn/vector/mv2v_handler.h"
+#include "nn/vector/ngraph_pattern.h"
 #include "nn/vector/selective_strided_slice.h"
 #include "nn/vector/sharding_opt.h"
-#include "nn/vector/simp.h"
+// #include "nn/vector/simp.h"
 #include "nn/vector/strided_slice_fusion.h"
 #include "nn/vector/t2mv_handler.h"
 #include "nn/vector/t2vslice_handler.h"
@@ -45,7 +48,7 @@ static void Instrument_nn_ir(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
       NODE_PTR         body = (*it).Container().Entry_node();
       TENSOR_INSTR_CTX ctx(cfg);
       air::base::VISITOR<TENSOR_INSTR_CTX,
-                         air::core::HANDLER<TENSOR_INSTR_CORE_HANDLER> >
+                         air::core::HANDLER<TENSOR_INSTR_CORE_HANDLER>>
           trav(ctx);
       trav.Visit<void>(body);
     }
@@ -65,10 +68,273 @@ static void Analyze_vec_context(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
     nn::vector::VEC_ANALYZE_CTX trav_ctx(&cntr, ctx, driver_ctx, cfg);
     air::base::VISITOR<nn::vector::VEC_ANALYZE_CTX,
                        air::core::HANDLER<air::core::DEFAULT_HANDLER>,
-                       nn::core::HANDLER<nn::vector::VEC_ANALYZE_HANDLER> >
+                       nn::core::HANDLER<nn::vector::VEC_ANALYZE_HANDLER>>
         trav(trav_ctx);
     trav.Visit<void>(body);
   }
+}
+
+static GLOB_SCOPE* Stride_slice_opt(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
+                                    const air::driver::DRIVER_CTX* driver_ctx,
+                                    const VECTOR_CONFIG&           cfg) {
+  // Handle pad/stride in conv/pool
+  GLOB_SCOPE* new_glob = new GLOB_SCOPE(glob->Id(), true);
+  AIR_ASSERT(new_glob != nullptr);
+  new_glob->Clone(*glob);
+  for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
+       it != glob->End_func_scope(); ++it) {
+    FUNC_SCOPE* func     = &(*it);
+    FUNC_SCOPE* new_func = &new_glob->New_func_scope(func->Id());
+    new_func->Clone(*func);
+    CONTAINER& cntr = new_func->Container();
+
+    NODE_PTR                      body = func->Container().Entry_node();
+    nn::vector::TENSOR2VECTOR_CTX trav_ctx(&cntr, ctx, driver_ctx, cfg);
+
+    air::base::VISITOR<nn::vector::TENSOR2VECTOR_CTX,
+                       air::core::HANDLER<CORE_HANDLER>,
+                       nn::core::HANDLER<nn::vector::T2VSLICE_HANDLER>>
+                            trav(trav_ctx);
+    air::base::HANDLER_RETV retv = trav.Visit<air::base::HANDLER_RETV>(body);
+    AIR_ASSERT(retv.Node() != air::base::Null_ptr && retv.Node()->Is_entry());
+    new_func->Set_entry_stmt(retv.Node()->Stmt());
+    // new_func->Print();
+
+    if (cfg.Selective_ss()) {
+      nn::vector::SS_FUSION_CTX ss_fusion_ctx(new_func, ctx, driver_ctx, cfg);
+      ss_fusion_ctx.Build_ssa();
+      ss_fusion_ctx.Build_dfg();
+      // ss_fusion_ctx.Topo_sort();
+
+      SS_SFT_MAP sft_map = ss_fusion_ctx.Find_fusion_target();
+
+      // do selective ss: through partial copy prop and simplifications.
+      nn::vector::SELECTIVE_STRIDED_SLICE_CTX sss_trav_ctx(
+          new_func, ctx, driver_ctx, cfg, sft_map);
+      sss_trav_ctx.Build_ssa();
+      air::base::VISITOR<
+          nn::vector::SELECTIVE_STRIDED_SLICE_CTX,
+          air::core::HANDLER<nn::vector::SELECTIVE_STRIDED_SLICE_CORE_HANDLER>,
+          nn::core::HANDLER<nn::core::DEFAULT_HANDLER>>
+               trav(sss_trav_ctx);
+      NODE_PTR body = new_func->Container().Entry_node();
+      trav.Visit<void>(body);
+
+      // new_func->Print();
+    }
+  }
+
+  delete glob;
+  return new_glob;
+}
+
+static void Constant_folding_opt(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
+                                 const air::driver::DRIVER_CTX* driver_ctx,
+                                 const VECTOR_CONFIG&           cfg) {
+  if (cfg.Const_fold() || cfg.Ngraph_cf()) {
+    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
+         it != glob->End_func_scope(); ++it) {
+      FUNC_SCOPE* func = &(*it);
+
+      // 1. do normalization
+      nn::vector::COPY_PROP_CTX cp_ctx(func, ctx, driver_ctx, cfg);
+      cp_ctx.Build_ssa();
+      cp_ctx.Build_dfg();
+      air::base::VISITOR<
+          nn::vector::COPY_PROP_CTX,
+          air::core::HANDLER<air::core::DEFAULT_HANDLER>,
+          nn::core::HANDLER<nn::vector::NORMALIZE_HANDLER>,
+          nn::vector::HANDLER<nn::vector::NORMALIZE_VECTOR_HANDLER>>
+               cp_trav(cp_ctx);
+      NODE_PTR cp_body = func->Container().Entry_node();
+      cp_trav.Visit<void>(cp_body);
+      // func->Print();
+
+      // 2. do constant folding
+      nn::vector::CF_SIMP_CTX cf_simp_ctx(func, ctx, driver_ctx, cfg);
+      cf_simp_ctx.Build_ssa();
+      cf_simp_ctx.Build_dfg();
+      air::base::VISITOR<
+          nn::vector::CF_SIMP_CTX,
+          air::core::HANDLER<air::core::DEFAULT_HANDLER>,
+          nn::core::HANDLER<nn::vector::CF_SIMP_NN_HANDLER>,
+          nn::vector::HANDLER<nn::vector::CF_SIMP_VECTOR_HANDLER>>
+               cf_simp_trav(cf_simp_ctx);
+      NODE_PTR simp_body = func->Container().Entry_node();
+      cf_simp_trav.Visit<void>(simp_body);
+      // func->Print();
+
+      CF_MAP cf_map = cf_simp_ctx.Cf_analyze();
+
+      uint32_t cff_start_count = 0;
+      if (cfg.Fusion_count()) {
+        cff_start_count = ctx.Get_fusion_count();
+      }
+
+      // do constant folding: through partial copy prop and simplifications.
+      nn::vector::CF_CTX cf_ctx(func, ctx, driver_ctx, cfg, cf_map);
+      cf_ctx.Build_ssa();
+      air::base::VISITOR<nn::vector::CF_CTX,
+                         air::core::HANDLER<nn::vector::CF_CORE_HANDLER>,
+                         nn::core::HANDLER<nn::core::DEFAULT_HANDLER>,
+                         nn::vector::HANDLER<nn::vector::DEFAULT_HANDLER>>
+               cf_trav(cf_ctx);
+      NODE_PTR body = func->Container().Entry_node();
+      cf_trav.Visit<void>(body);
+
+      if (cfg.Fusion_count()) {
+        uint32_t cff_count = ctx.Get_fusion_count();
+        std::cout << "constant folding fusion count: "
+                  << cff_count - cff_start_count << std::endl;
+      }
+      // func->Print();
+
+      // // 1. do copy propagation first
+      // nn::vector::COPY_PROP_CTX cp_trav_ctx(func, ctx, driver_ctx, cfg);
+      // cp_trav_ctx.Build_ssa();
+      // air::base::VISITOR<nn::vector::COPY_PROP_CTX,
+      //                    air::core::HANDLER<nn::vector::COPY_PROP_CORE_HANDLER>,
+      //                    nn::core::HANDLER<nn::core::DEFAULT_HANDLER>,
+      //                    nn::vector::HANDLER<nn::vector::DEFAULT_HANDLER> >
+      //          cp_trav(cp_trav_ctx);
+      // NODE_PTR cp_body = func->Container().Entry_node();
+      // cp_trav.Visit<void>(cp_body);
+
+      // // 2. do constant folding
+      // nn::vector::SIMP_CTX simp_trav_ctx(func, ctx, driver_ctx, cfg);
+      // simp_trav_ctx.Build_ssa();
+      // air::base::VISITOR<nn::vector::SIMP_CTX,
+      //                    air::core::HANDLER<nn::vector::SIMP_CORE_HANDLER> >
+      //          simp_trav(simp_trav_ctx);
+      // NODE_PTR simp_body = func->Container().Entry_node();
+      // simp_trav.Visit<void>(simp_body);
+      // // func->Print();
+    }
+  }
+}
+
+static void Mask_fusing_opt(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
+                            const air::driver::DRIVER_CTX* driver_ctx,
+                            const VECTOR_CONFIG&           cfg) {
+  if (cfg.Mask_fuse()) {
+    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
+         it != glob->End_func_scope(); ++it) {
+      FUNC_SCOPE* func = &(*it);
+
+      nn::vector::MASK_FUSION_CTX mf_trav_ctx(func, ctx, driver_ctx, cfg);
+      mf_trav_ctx.Build_ssa();
+      mf_trav_ctx.Build_dfg();
+
+      air::base::VISITOR<nn::vector::MASK_FUSION_CTX,
+                         air::core::HANDLER<air::core::DEFAULT_HANDLER>,
+                         nn::core::HANDLER<nn::vector::MASK_FUSION_HANDLER>,
+                         nn::vector::HANDLER<nn::vector::DEFAULT_HANDLER>>
+               trav(mf_trav_ctx);
+      NODE_PTR body = func->Container().Entry_node();
+      trav.Visit<void>(body);
+
+      uint32_t mff_start_count = 0;
+      if (cfg.Fusion_count()) {
+        mff_start_count = ctx.Get_fusion_count();
+      }
+
+      mf_trav_ctx.Mask_fusion();
+
+      if (cfg.Fusion_count()) {
+        uint32_t mff_count = ctx.Get_fusion_count();
+        std::cout << "masking fusion count: " << mff_count - mff_start_count
+                  << std::endl;
+      }
+      // func->Print();
+    }
+  }
+}
+
+static GLOB_SCOPE* T2mv_opt(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
+                            const air::driver::DRIVER_CTX* driver_ctx,
+                            const VECTOR_CONFIG&           cfg) {
+  std::vector<NODE_ID> ngraph_avgpool_wl;
+  if (cfg.Ngraph_cf()) {
+    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
+         it != glob->End_func_scope(); ++it) {
+      FUNC_SCOPE* func = &(*it);
+
+      nn::vector::NGRAPH_PATTERN_CTX np_trav_ctx(func, ctx, driver_ctx, cfg);
+      np_trav_ctx.Build_ssa();
+
+      air::base::VISITOR<nn::vector::NGRAPH_PATTERN_CTX,
+                         air::core::HANDLER<air::core::DEFAULT_HANDLER>,
+                         nn::core::HANDLER<nn::vector::NGRAPH_PATTERN_HANDLER>>
+               trav(np_trav_ctx);
+      NODE_PTR body = func->Container().Entry_node();
+      trav.Visit<void>(body);
+
+      std::vector<NODE_ID> temp_avgpool_wl = np_trav_ctx.Get_avgpool_worklist();
+      ngraph_avgpool_wl.insert(ngraph_avgpool_wl.end(), temp_avgpool_wl.begin(),
+                               temp_avgpool_wl.end());
+    }
+  }
+
+  if (cfg.Decompose_mid_op()) {
+    GLOB_SCOPE* new_glob = new GLOB_SCOPE(glob->Id(), true);
+    AIR_ASSERT(new_glob != nullptr);
+    new_glob->Clone(*glob);
+    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
+         it != glob->End_func_scope(); ++it) {
+      FUNC_SCOPE* func     = &(*it);
+      FUNC_SCOPE* new_func = &new_glob->New_func_scope(func->Id());
+      new_func->Clone(*func);
+      CONTAINER& cntr = new_func->Container();
+
+      nn::vector::TENSOR2VECTOR_CTX trav_ctx(&cntr, ctx, driver_ctx, cfg);
+      trav_ctx.Init_ngraph_avgpool_wl(ngraph_avgpool_wl);
+      air::base::VISITOR<nn::vector::TENSOR2VECTOR_CTX,
+                         air::core::HANDLER<air::core::DEFAULT_HANDLER>,
+                         nn::core::HANDLER<nn::vector::T2MV_HANDLER>>
+                              trav(trav_ctx);
+      NODE_PTR                body = func->Container().Entry_node();
+      air::base::HANDLER_RETV retv = trav.Visit<air::base::HANDLER_RETV>(body);
+      AIR_ASSERT(retv.Node() != air::base::Null_ptr && retv.Node()->Is_entry());
+      new_func->Set_entry_stmt(retv.Node()->Stmt());
+      // new_func->Print();
+    }
+    delete glob;
+    return new_glob;
+  }
+  return glob;
+}
+
+static GLOB_SCOPE* Mv2v_opt(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
+                            const air::driver::DRIVER_CTX* driver_ctx,
+                            const VECTOR_CONFIG&           cfg) {
+  if (cfg.Decompose_mid_op()) {
+    // Lower middle level vector ops in IR to low level vector ops, currently
+    // only roll_sum op is lowered.
+    GLOB_SCOPE* new_glob = new GLOB_SCOPE(glob->Id(), true);
+    AIR_ASSERT(new_glob != nullptr);
+    new_glob->Clone(*glob);
+    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
+         it != glob->End_func_scope(); ++it) {
+      FUNC_SCOPE* func     = &(*it);
+      FUNC_SCOPE* new_func = &new_glob->New_func_scope(func->Id());
+      new_func->Clone(*func);
+      CONTAINER& cntr = new_func->Container();
+
+      nn::vector::TENSOR2VECTOR_CTX trav_ctx(&cntr, ctx, driver_ctx, cfg);
+      air::base::VISITOR<nn::vector::TENSOR2VECTOR_CTX,
+                         air::core::HANDLER<air::core::DEFAULT_HANDLER>,
+                         nn::vector::HANDLER<nn::vector::MV2V_HANDLER>,
+                         nn::core::HANDLER<nn::core::DEFAULT_HANDLER>>
+               trav(trav_ctx);
+      NODE_PTR body = func->Container().Entry_node();
+      NODE_PTR retv = trav.Visit<NODE_PTR>(body);
+      AIR_ASSERT(retv != air::base::Null_ptr && retv->Is_entry());
+      new_func->Set_entry_stmt(retv->Stmt());
+    }
+    delete glob;
+    return new_glob;
+  }
+  return glob;
 }
 
 static GLOB_SCOPE* Lower_to_vector(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
@@ -89,12 +355,21 @@ static GLOB_SCOPE* Lower_to_vector(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
     air::base::VISITOR<nn::vector::TENSOR2VECTOR_CTX,
                        air::core::HANDLER<nn::vector::CORE_HANDLER>,
                        nn::vector::HANDLER<nn::vector::DEFAULT_HANDLER>,
-                       nn::core::HANDLER<nn::vector::TENSOR2VECTOR_HANDLER> >
+                       nn::core::HANDLER<nn::vector::TENSOR2VECTOR_HANDLER>>
              trav(trav_ctx);
     NODE_PTR body = func->Container().Entry_node();
     NODE_PTR retv = trav.Visit<NODE_PTR>(body);
     AIR_ASSERT(retv != air::base::Null_ptr && retv->Is_entry());
     new_func->Set_entry_stmt(retv->Stmt());
+
+    if (cfg.Fusion_count()) {
+      uint32_t ss_final_count  = trav_ctx.Get_ss_count();
+      uint32_t ss_orig_count   = ctx.Get_ss_worklist().size();
+      uint32_t ss_fusion_count = ss_orig_count - ss_final_count;
+      std::cout << "strided_slice fusion count: " << ss_fusion_count
+                << std::endl;
+      ctx.Incr_fusion_count(ss_fusion_count);
+    }
   }
 
   delete glob;
@@ -110,160 +385,24 @@ GLOB_SCOPE* Vector_driver(GLOB_SCOPE* glob, VECTOR_CTX& ctx,
 
   Analyze_vec_context(tmp_glob, ctx, driver_ctx, cfg);
 
-  // Handle pad/stride in conv/pool
-  GLOB_SCOPE* new_slice_glob = new GLOB_SCOPE(tmp_glob->Id(), true);
-  AIR_ASSERT(new_slice_glob != nullptr);
-  new_slice_glob->Clone(*tmp_glob);
-  for (GLOB_SCOPE::FUNC_SCOPE_ITER it = tmp_glob->Begin_func_scope();
-       it != tmp_glob->End_func_scope(); ++it) {
-    FUNC_SCOPE* func     = &(*it);
-    FUNC_SCOPE* new_func = &new_slice_glob->New_func_scope(func->Id());
-    new_func->Clone(*func);
-    CONTAINER& cntr = new_func->Container();
+  tmp_glob = Stride_slice_opt(tmp_glob, ctx, driver_ctx, cfg);
 
-    NODE_PTR                      body = func->Container().Entry_node();
-    nn::vector::TENSOR2VECTOR_CTX trav_ctx(&cntr, ctx, driver_ctx, cfg);
+  tmp_glob = T2mv_opt(tmp_glob, ctx, driver_ctx, cfg);
 
-    air::base::VISITOR<nn::vector::TENSOR2VECTOR_CTX,
-                       air::core::HANDLER<CORE_HANDLER>,
-                       nn::core::HANDLER<nn::vector::T2VSLICE_HANDLER> >
-                            trav(trav_ctx);
-    air::base::HANDLER_RETV retv = trav.Visit<air::base::HANDLER_RETV>(body);
-    AIR_ASSERT(retv.Node() != air::base::Null_ptr && retv.Node()->Is_entry());
-    new_func->Set_entry_stmt(retv.Node()->Stmt());
-    // new_func->Print();
+  Constant_folding_opt(tmp_glob, ctx, driver_ctx, cfg);
 
-    if (cfg.Selective_ss()) {
-      nn::vector::SS_FUSION_CTX ss_fusion_ctx(new_func, ctx, driver_ctx, cfg);
-      ss_fusion_ctx.Build_ssa();
-      ss_fusion_ctx.Build_dfg();
+  Mask_fusing_opt(tmp_glob, ctx, driver_ctx, cfg);
 
-      SS_SFT_MAP sft_map = ss_fusion_ctx.Find_fusion_target();
+  tmp_glob = Lower_to_vector(tmp_glob, ctx, driver_ctx, cfg);
 
-      // do selective ss: through partial copy prop and simplifications.
-      nn::vector::SELECTIVE_STRIDED_SLICE_CTX sss_trav_ctx(
-          new_func, ctx, driver_ctx, cfg, sft_map);
-      sss_trav_ctx.Build_ssa();
-      air::base::VISITOR<
-          nn::vector::SELECTIVE_STRIDED_SLICE_CTX,
-          air::core::HANDLER<nn::vector::SELECTIVE_STRIDED_SLICE_CORE_HANDLER>,
-          nn::core::HANDLER<nn::core::DEFAULT_HANDLER> >
-               trav(sss_trav_ctx);
-      NODE_PTR body = new_func->Container().Entry_node();
-      trav.Visit<void>(body);
-    }
+  tmp_glob = Mv2v_opt(tmp_glob, ctx, driver_ctx, cfg);
+
+  if (cfg.Fusion_count()) {
+    uint32_t fusion_count = ctx.Get_fusion_count();
+    std::cout << "total fusion count: " << fusion_count << std::endl;
   }
 
-  delete tmp_glob;
-  tmp_glob = new_slice_glob;
-
-  if (cfg.Decompose_mid_op()) {
-    // Decompose several NN operators to middle level vector operators.
-    GLOB_SCOPE* mv_glob = new GLOB_SCOPE(tmp_glob->Id(), true);
-    AIR_ASSERT(mv_glob != nullptr);
-    mv_glob->Clone(*tmp_glob);
-    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = tmp_glob->Begin_func_scope();
-         it != tmp_glob->End_func_scope(); ++it) {
-      FUNC_SCOPE* func     = &(*it);
-      FUNC_SCOPE* new_func = &mv_glob->New_func_scope(func->Id());
-      new_func->Clone(*func);
-      CONTAINER& cntr = new_func->Container();
-
-      nn::vector::TENSOR2VECTOR_CTX trav_ctx(&cntr, ctx, driver_ctx, cfg);
-      air::base::VISITOR<nn::vector::TENSOR2VECTOR_CTX,
-                         air::core::HANDLER<nn::vector::CORE_HANDLER>,
-                         nn::core::HANDLER<nn::vector::T2MV_HANDLER> >
-                              trav(trav_ctx);
-      NODE_PTR                body = func->Container().Entry_node();
-      air::base::HANDLER_RETV retv = trav.Visit<air::base::HANDLER_RETV>(body);
-      AIR_ASSERT(retv.Node() != air::base::Null_ptr && retv.Node()->Is_entry());
-      new_func->Set_entry_stmt(retv.Node()->Stmt());
-      // new_func->Print();
-    }
-    delete tmp_glob;
-    tmp_glob = mv_glob;
-  }
-
-  // constant folding
-  if (cfg.Const_fold()) {
-    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = tmp_glob->Begin_func_scope();
-         it != tmp_glob->End_func_scope(); ++it) {
-      FUNC_SCOPE* func = &(*it);
-
-      // 1. do copy propagation first
-      nn::vector::COPY_PROP_CTX cp_trav_ctx(func, ctx, driver_ctx, cfg);
-      cp_trav_ctx.Build_ssa();
-      air::base::VISITOR<nn::vector::COPY_PROP_CTX,
-                         air::core::HANDLER<nn::vector::COPY_PROP_CORE_HANDLER>,
-                         nn::core::HANDLER<nn::core::DEFAULT_HANDLER>,
-                         nn::vector::HANDLER<nn::vector::DEFAULT_HANDLER> >
-               cp_trav(cp_trav_ctx);
-      NODE_PTR cp_body = func->Container().Entry_node();
-      cp_trav.Visit<void>(cp_body);
-
-      // 2. do constant folding
-      nn::vector::SIMP_CTX simp_trav_ctx(func, ctx, driver_ctx, cfg);
-      simp_trav_ctx.Build_ssa();
-      air::base::VISITOR<nn::vector::SIMP_CTX,
-                         air::core::HANDLER<nn::vector::SIMP_CORE_HANDLER> >
-               simp_trav(simp_trav_ctx);
-      NODE_PTR simp_body = func->Container().Entry_node();
-      simp_trav.Visit<void>(simp_body);
-      // func->Print();
-    }
-  }
-
-  if (cfg.Mask_fuse()) {
-    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = tmp_glob->Begin_func_scope();
-         it != tmp_glob->End_func_scope(); ++it) {
-      FUNC_SCOPE* func = &(*it);
-
-      nn::vector::MASK_FUSION_CTX mf_trav_ctx(func, ctx, driver_ctx, cfg);
-      mf_trav_ctx.Build_ssa();
-      mf_trav_ctx.Build_dfg();
-
-      air::base::VISITOR<nn::vector::MASK_FUSION_CTX,
-                         air::core::HANDLER<air::core::DEFAULT_HANDLER>,
-                         nn::core::HANDLER<nn::vector::MASK_FUSION_HANDLER> >
-               trav(mf_trav_ctx);
-      NODE_PTR body = func->Container().Entry_node();
-      trav.Visit<void>(body);
-
-      mf_trav_ctx.Mask_fusion();
-      // func->Print();
-    }
-  }
-
-  GLOB_SCOPE* n2lv_glob  = Lower_to_vector(tmp_glob, ctx, driver_ctx, cfg);
-  GLOB_SCOPE* final_glob = n2lv_glob;
-
-  if (cfg.Decompose_mid_op()) {
-    // Lower middle level vector ops in IR to low level vector ops, currently
-    // only roll_sum op is lowered.
-    final_glob = new GLOB_SCOPE(n2lv_glob->Id(), true);
-    AIR_ASSERT(final_glob != nullptr);
-    final_glob->Clone(*n2lv_glob);
-    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = n2lv_glob->Begin_func_scope();
-         it != n2lv_glob->End_func_scope(); ++it) {
-      FUNC_SCOPE* func     = &(*it);
-      FUNC_SCOPE* new_func = &final_glob->New_func_scope(func->Id());
-      new_func->Clone(*func);
-      CONTAINER& cntr = new_func->Container();
-
-      nn::vector::TENSOR2VECTOR_CTX trav_ctx(&cntr, ctx, driver_ctx, cfg);
-      air::base::VISITOR<nn::vector::TENSOR2VECTOR_CTX,
-                         air::core::HANDLER<nn::vector::CORE_HANDLER>,
-                         nn::vector::HANDLER<nn::vector::MV2V_HANDLER>,
-                         nn::core::HANDLER<nn::core::DEFAULT_HANDLER> >
-               trav(trav_ctx);
-      NODE_PTR body = func->Container().Entry_node();
-      NODE_PTR retv = trav.Visit<NODE_PTR>(body);
-      AIR_ASSERT(retv != air::base::Null_ptr && retv->Is_entry());
-      new_func->Set_entry_stmt(retv->Stmt());
-    }
-    delete n2lv_glob;
-  }
-  return final_glob;
+  return tmp_glob;
 }
 
 }  // namespace vector

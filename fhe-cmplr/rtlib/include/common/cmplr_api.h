@@ -41,6 +41,10 @@ void Finalize_context_for_cmplr();
 //! @return size_t
 size_t Get_q_cnt();
 
+//! @brief Retrieve the count of elements in P primes
+//! @return size_t
+size_t Get_p_cnt();
+
 //! @brief Retrieve the count of elements in the third dimension of the $q_lhat
 //! \mod p$.
 //! @param q_idx Index for the first dimension, indicating the q index
@@ -57,6 +61,11 @@ size_t Get_phmodq_dim1_cnt();
 //! @param primes memory to store the fetched values
 //! @return size of q primes
 size_t Fetch_q_primes(uint64_t* primes);
+
+//! @brief Retrieve the p prime values
+//! @param primes memory to store the fetched values
+//! @return size of p primes
+size_t Fetch_p_primes(uint64_t* primes);
 
 //! @brief Retrieve the $q_lhat^{-1} \mod q_i$ values based on the specified
 //! indices. $q_lhat^{-1} \mod q_i$ values are 3D vector.

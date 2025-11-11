@@ -107,6 +107,7 @@ public:
   using MUL_LEV_STACK = std::list<uint32_t>;
   using SSA_CONTAINER = air::opt::SSA_CONTAINER;
   using SSA_VER_ID    = air::opt::SSA_VER_ID;
+  using VER_SET       = std::set<SSA_VER_ID>;
 
   CTX_PARAM_ANA_CTX(const air::driver::DRIVER_CTX* driver_ctx,
                     const ckks::CKKS_CONFIG* config, LOWER_CTX* ctx,
@@ -151,6 +152,16 @@ public:
     return 0;
   }
 
+  //! @brief Set mul_level of SSA_VER ver is undetermined.
+  void           Record_undeterm(SSA_VER_ID ver) { _undeterm_ver.insert(ver); }
+  const VER_SET& Undeterm_ssa_ver(void) const { return _undeterm_ver; }
+
+  //! @brief Clear recorded SSA_VERs with undetermined mul_level.
+  void Clear_undeterm_ssa_ver(void) { _undeterm_ver.clear(); }
+  //! @brief Check if the loop needs be traversed again. Return true if any
+  //! SSA_VER has an undetermined mul_level; otherwise, return false.
+  bool Trav_loop_again(void) const { return !_undeterm_ver.empty(); }
+
   STMT_PTR Gen_modswitch(air::opt::SSA_SYM_PTR sym, uint32_t mul_lev,
                          uint32_t in_lev, SPOS spos);
 
@@ -161,6 +172,8 @@ public:
 
   DECLARE_TRACE_DETAIL_API((*_config), _driver_ctx)
   DECLARE_CKKS_OPTION_CONFIG_ACCESS_API((*_config))
+
+  constexpr static uint32_t INVALID_LVL = 0;
 
 private:
   // REQUIRED UNDEFINED UNWANTED methods
@@ -178,6 +191,7 @@ private:
   IV_INFO_STACK  _iv_info;  // iv info of nested loops. top is iv of inner loop
   MUL_LEV_STACK  _mul_lev_stack;  // stack records mul_level of parent node
   ROTATE_IDX_SET _rot_idx;        // rotate index of current function
+  VER_SET        _undeterm_ver;   // SSA_VERs with undetermined mul_level
   FUNC_SCOPE*    _func_scope;     // current function scope
   SSA_CONTAINER* _ssa_cntr;
   const ckks::CKKS_CONFIG*       _config;
@@ -357,20 +371,47 @@ RETV CORE_ANA_IMPL::Handle_do_loop(VISITOR* visitor, NODE_PTR do_loop) {
   // operands
   Fixup_phi_res(ana_ctx, do_loop);
 
-  //  1. handle phi opnd from back edge
-  Handle_phi_list<RETV>(visitor, do_loop, air::opt::BACK_EDGE_PHI_OPND_ID);
+  uint32_t undeterm_ssa_ver_cnt = UINT32_MAX;
+  if (ana_ctx.Loop_level() == 1) {
+    ana_ctx.Clear_undeterm_ssa_ver();
+  }
+  bool trav_loop = true;
+  while (trav_loop) {
+    //  1. handle phi opnd from back edge
+    Handle_phi_list<RETV>(visitor, do_loop, air::opt::BACK_EDGE_PHI_OPND_ID);
 
-  // 2. handle loop body
-  constexpr uint32_t LOOP_BODY_ID = 3;
-  NODE_PTR           loop_body    = do_loop->Child(LOOP_BODY_ID);
-  AIR_ASSERT(loop_body->Is_block());
-  RETV res = Handle_block<RETV>(visitor, loop_body);
+    // 2. handle loop body
+    constexpr uint32_t LOOP_BODY_ID = 3;
+    NODE_PTR           loop_body    = do_loop->Child(LOOP_BODY_ID);
+    AIR_ASSERT(loop_body->Is_block());
+    Handle_block<RETV>(visitor, loop_body);
 
-  // 3. handle phi opnd defined before do_loop
-  Handle_phi_list<RETV>(visitor, do_loop, air::opt::PREHEADER_PHI_OPND_ID);
+    // 3. handle phi opnd defined before do_loop
+    Handle_phi_list<RETV>(visitor, do_loop, air::opt::PREHEADER_PHI_OPND_ID);
+    if ((ana_ctx.Loop_level() == 1) && ana_ctx.Trav_loop_again()) {
+      trav_loop = true;
+      // trace SSA_VERs with undetermined mul_level.
+      const CTX_PARAM_ANA_CTX::VER_SET& undeterm_ssa_ver =
+          ana_ctx.Undeterm_ssa_ver();
+      AIR_ASSERT_MSG(undeterm_ssa_ver.size() < undeterm_ssa_ver_cnt,
+                     "traverse the loop body without updating the mul_level of "
+                     "any SSA_VER.");
+      undeterm_ssa_ver_cnt = undeterm_ssa_ver.size();
+      ana_ctx.Trace(ckks::TRACE_DETAIL::TD_CKKS_LEVEL_MGT, undeterm_ssa_ver_cnt,
+                    " SSA_VERs need update mul_level:\n");
+      for (SSA_VER_ID ver_id : undeterm_ssa_ver) {
+        ana_ctx.Trace(ckks::TRACE_DETAIL::TD_CKKS_LEVEL_MGT, "    ",
+                      ana_ctx.Ssa_cntr()->Ver(ver_id)->To_str(), "\n");
+      }
+      // clear SSA_VERs with undetermined mul_level for next iteration.
+      ana_ctx.Clear_undeterm_ssa_ver();
+    } else {
+      trav_loop = false;
+    }
+  }
 
   ana_ctx.Pop_iv_info();
-  return RETV{res.Mul_level_inc(), 0};
+  return RETV();
 }
 
 template <typename RETV, typename VISITOR>
@@ -379,8 +420,17 @@ RETV CORE_ANA_IMPL::Handle_idname(VISITOR*            visitor,
   CTX_PARAM_ANA_CTX& ana_ctx  = visitor->Context();
   SSA_CONTAINER*     ssa_cntr = ana_ctx.Ssa_cntr();
   SSA_VER_ID         ver_id   = ssa_cntr->Node_ver_id(formal->Id());
-  // AIR_ASSERT_MSG(ver_id == ssa_cntr->Node_sym(formal->Id())->Zero_ver_id(),
-  //                "idname not using zero version");
+
+  LOWER_CTX* lower_ctx = ana_ctx.Lower_ctx();
+  TYPE_ID    type = formal->Addr_datum()->Type_id();
+  if (!lower_ctx->Is_cipher3_type(type) &&
+      !lower_ctx->Is_cipher_type(type) &&
+      !lower_ctx->Is_plain_type(type)) {
+    ana_ctx.Trace(ckks::TRACE_DETAIL::TD_CKKS_LEVEL_MGT,
+          std::string(ana_ctx.Indent(), '+'),
+          "skip non-CIPHER/PLAIN idname: ", ssa_cntr->Ver(ver_id)->To_str(), "\n");
+    return RETV{false, 0};
+  }
 
   uint32_t mul_level     = ana_ctx.Get_mul_level_of_ssa_ver(ver_id);
   uint32_t opnd_lev      = ana_ctx.Input_level();
@@ -419,7 +469,11 @@ RETV CORE_ANA_IMPL::Handle_ld(VISITOR* visitor, NODE_PTR ld_node) {
 
   air::opt::SSA_VER_PTR ver = ana_ctx.Ssa_cntr()->Node_ver(ld_node->Id());
   uint32_t              ver_mul_level = ana_ctx.Top_mul_level();
-  bool                  mul_level_changed =
+  if (ver_mul_level == CTX_PARAM_ANA_CTX::INVALID_LVL) {
+    ana_ctx.Record_undeterm(ver->Id());
+    return RETV();
+  }
+  bool mul_level_changed =
       ana_ctx.Update_mul_level_of_ssa_ver(ver->Id(), ver_mul_level);
   ana_ctx.Set_node_mul_level(ld_node, ver_mul_level);
 
@@ -443,7 +497,11 @@ RETV CORE_ANA_IMPL::Handle_ldp(VISITOR* visitor, NODE_PTR ldp_node) {
 
   air::opt::SSA_VER_PTR ver = ana_ctx.Ssa_cntr()->Node_ver(ldp_node->Id());
   uint32_t              ver_mul_level = ana_ctx.Top_mul_level();
-  bool                  mul_level_changed =
+  if (ver_mul_level == CTX_PARAM_ANA_CTX::INVALID_LVL) {
+    ana_ctx.Record_undeterm(ver->Id());
+    return RETV();
+  }
+  bool mul_level_changed =
       ana_ctx.Update_mul_level_of_ssa_ver(ver->Id(), ver_mul_level);
   ana_ctx.Set_node_mul_level(ldp_node, ver_mul_level);
 
@@ -473,7 +531,11 @@ RETV CORE_ANA_IMPL::Handle_ild(VISITOR* visitor, NODE_PTR ild_node) {
 
   air::opt::SSA_VER_PTR ver = ana_ctx.Ssa_cntr()->Node_ver(ild_node->Id());
   uint32_t              ver_mul_level = ana_ctx.Top_mul_level();
-  bool                  mul_level_changed =
+  if (ver_mul_level == CTX_PARAM_ANA_CTX::INVALID_LVL) {
+    ana_ctx.Record_undeterm(ver->Id());
+    return RETV();
+  }
+  bool mul_level_changed =
       ana_ctx.Update_mul_level_of_ssa_ver(ver->Id(), ver_mul_level);
   ana_ctx.Set_node_mul_level(ild_node, ver_mul_level);
 
@@ -491,7 +553,17 @@ RETV CORE_ANA_IMPL::Handle_st(VISITOR* visitor, NODE_PTR st_node) {
   CTX_PARAM_ANA_CTX& ana_ctx = visitor->Context();
   SSA_VER_ID         ver_id  = ana_ctx.Ssa_cntr()->Node_ver_id(st_node->Id());
   uint32_t           ver_mul_level = ana_ctx.Get_mul_level_of_ssa_ver(ver_id);
-  ana_ctx.Set_node_mul_level(st_node, ver_mul_level);
+
+  TYPE_ID          type_id   = st_node->Addr_datum()->Type_id();
+  const LOWER_CTX* lower_ctx = ana_ctx.Lower_ctx();
+  if (lower_ctx->Is_cipher_type(type_id) ||
+      lower_ctx->Is_cipher3_type(type_id)) {
+    if (ver_mul_level == CTX_PARAM_ANA_CTX::INVALID_LVL) {
+      ana_ctx.Record_undeterm(ver_id);
+    } else {
+      ana_ctx.Set_node_mul_level(st_node, ver_mul_level);
+    }
+  }
 
   ana_ctx.Trace(ckks::TRACE_DETAIL::TD_CKKS_LEVEL_MGT,
                 std::string(ana_ctx.Indent(), ' '),
@@ -530,7 +602,17 @@ RETV CORE_ANA_IMPL::Handle_stp(VISITOR* visitor, NODE_PTR stp_node) {
   CTX_PARAM_ANA_CTX& ana_ctx = visitor->Context();
   SSA_VER_ID         ver_id  = ana_ctx.Ssa_cntr()->Node_ver_id(stp_node->Id());
   uint32_t           ver_mul_level = ana_ctx.Get_mul_level_of_ssa_ver(ver_id);
-  ana_ctx.Set_node_mul_level(stp_node, ver_mul_level);
+
+  TYPE_ID          type_id   = stp_node->Preg()->Type_id();
+  const LOWER_CTX* lower_ctx = ana_ctx.Lower_ctx();
+  if (lower_ctx->Is_cipher_type(type_id) ||
+      lower_ctx->Is_cipher3_type(type_id)) {
+    if (ver_mul_level == CTX_PARAM_ANA_CTX::INVALID_LVL) {
+      ana_ctx.Record_undeterm(ver_id);
+    } else {
+      ana_ctx.Set_node_mul_level(stp_node, ver_mul_level);
+    }
+  }
 
   ana_ctx.Trace(ckks::TRACE_DETAIL::TD_CKKS_LEVEL_MGT,
                 std::string(ana_ctx.Indent(), ' '),
@@ -577,6 +659,10 @@ RETV CORE_ANA_IMPL::Handle_ist(VISITOR* visitor, NODE_PTR ist_node) {
       !lower_ctx->Is_cipher3_type(access_type_id)) {
     return RETV{false, 0};
   }
+  if (res_mul_level == CTX_PARAM_ANA_CTX::INVALID_LVL) {
+    ana_ctx.Record_undeterm(res_ver_id);
+    return RETV{false, 0};
+  }
 
   AIR_ASSERT(ana_ctx.Get_mul_lev_stack().empty());
   ana_ctx.Push_mul_level(res_mul_level);
@@ -596,9 +682,18 @@ RETV CORE_ANA_IMPL::Handle_call(VISITOR* visitor, NODE_PTR call_node) {
                  "only support function call return ciphertext");
 
   // 1. get mul_level of retv
-  SSA_VER_ID retv_ver_id    = ana_ctx.Ssa_cntr()->Node_ver_id(call_node->Id());
-  uint32_t   retv_mul_level = ana_ctx.Get_mul_level_of_ssa_ver(retv_ver_id);
-  ana_ctx.Set_node_mul_level(call_node, retv_mul_level);
+  SSA_VER_ID retv_ver_id     = ana_ctx.Ssa_cntr()->Node_ver_id(call_node->Id());
+  uint32_t   retv_mul_level  = ana_ctx.Get_mul_level_of_ssa_ver(retv_ver_id);
+  TYPE_ID    type_id         = retv_preg->Type_id();
+  const LOWER_CTX* lower_ctx = ana_ctx.Lower_ctx();
+  if (lower_ctx->Is_cipher_type(type_id) ||
+      lower_ctx->Is_cipher3_type(type_id)) {
+    if (retv_mul_level == CTX_PARAM_ANA_CTX::INVALID_LVL) {
+      ana_ctx.Record_undeterm(retv_ver_id);
+    } else {
+      ana_ctx.Set_node_mul_level(call_node, retv_mul_level);
+    }
+  }
 
   // 2. get mul_level consumed by called function from attribute.
   const uint32_t* mul_depth_ptr =

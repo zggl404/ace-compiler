@@ -45,6 +45,12 @@ public:
     _mf_wl.push_back(std::make_pair(node, mask_len));
   }
 
+  void Incr_fusion_count() { _fusion_count++; }
+
+  void Incr_fusion_count(uint32_t count) { _fusion_count += count; }
+
+  uint32_t Get_fusion_count() { return _fusion_count; }
+
   MF_WORKLIST Get_mf_worklist() { return _mf_wl; }
 
   void Register_ss_node(NODE_ID node) { _ss_wl.push_back(node); }
@@ -59,6 +65,7 @@ private:
   uint32_t    _slot;
   MF_WORKLIST _mf_wl;  // used for mask fusion
   SS_WORKLIST _ss_wl;  // used for strided_slice fusion
+  uint32_t    _fusion_count = 0;
 };
 
 //! @brief Macro to define API to access context

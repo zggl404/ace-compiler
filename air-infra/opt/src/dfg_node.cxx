@@ -137,6 +137,14 @@ void DFG_NODE::Set_opnd(uint32_t id, DFG_NODE_ID opnd) {
   Set_opnd(id, Cntr()->Node(opnd));
 }
 
+uint32_t DFG_NODE::Succ_count() const {
+  uint32_t count = 0;
+  for (DFG_EDGE_ITER iter = Begin_succ(); iter != End_succ(); ++iter) {
+    count++;
+  }
+  return count;
+}
+
 void DFG_NODE::Print(std::ostream& os, uint32_t indent = 0) const {
   std::string ind(indent, ' ');
   os << ind << To_str();

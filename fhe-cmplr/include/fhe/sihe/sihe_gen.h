@@ -45,7 +45,7 @@ public:
   //! @brief Generate encode node for mask operation.
   NODE_PTR Gen_encode_mask(TYPE_PTR plain_type, double val, NODE_PTR len,
                            const SPOS& spos);
-  NODE_PTR Gen_bootstrap(NODE_PTR child, const SPOS& spos);
+  NODE_PTR Gen_bootstrap(NODE_PTR child, int64_t slot, const SPOS& spos);
   void     Register_sihe_types();
 
 private:

@@ -169,7 +169,7 @@ public:
           rhs->Opcode() == air::core::OPC_LDA) {
         CMPLR_DEV_WARN("TODO: find right place to free %s.\n",
                        rhs->Addr_datum()->Name()->Char_str());
-	_pass.Mark_var_freed(rhs->Addr_datum());
+        _pass.Mark_var_freed(rhs->Addr_datum());
       }
     } else if (node->Opcode() == air::core::OPC_CALL &&
                strcmp(node->Entry()->Name()->Char_str(), "Rotate") == 0 &&
@@ -242,8 +242,10 @@ public:
   RETV Handle_node(VISITOR* visitor, air::base::NODE_PTR node) {
     if (node->Has_sym()) {
       air::base::ADDR_DATUM_PTR var = node->Addr_datum();
-      bool is_entry = node->Func_scope()->Owning_func()->Entry_point()->Is_program_entry();
-      if ((!is_entry && var->Is_formal()) || Parent(1)->Opcode() == air::core::OPC_RETV) {
+      bool                      is_entry =
+          node->Func_scope()->Owning_func()->Entry_point()->Is_program_entry();
+      if ((!is_entry && var->Is_formal()) ||
+          Parent(1)->Opcode() == air::core::OPC_RETV) {
         // don't free formal excpet main and return value
         _pass.Mark_var_freed(var);
         return;

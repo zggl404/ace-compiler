@@ -33,11 +33,23 @@ public:
   RETV Handle_average_pool(VISITOR* visitor, air::base::NODE_PTR node) {
     // decompose NN.average_pool to VECTOR.roll_sum and VECTOR.multiply
     // when has PROLL attribute, attach PROLL attribute to roll_sum op.
-    TENSOR2VECTOR_CTX& ctx  = visitor->Context();
-    CONTAINER*         cntr = ctx.Container();
-    VECTOR_GEN         vgen(cntr);
-    GLOB_SCOPE*        gscope = cntr->Glob_scope();
-    SPOS               spos   = node->Spos();
+    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+
+    bool ngraph_pattern = false;
+    if (ctx.Ngraph_cf()) {
+      std::vector<NODE_ID> ngraph_avgpool_wl = ctx.Get_ngraph_avgpool_wl();
+      if (std::find(ngraph_avgpool_wl.begin(), ngraph_avgpool_wl.end(),
+                    node->Id()) == ngraph_avgpool_wl.end()) {
+        NODE_PTR new_node = visitor->template Handle_node<RETV>(node).Node();
+        return RETV(new_node);
+      }
+      ngraph_pattern = true;
+    }
+
+    CONTAINER*  cntr = ctx.Container();
+    VECTOR_GEN  vgen(cntr);
+    GLOB_SCOPE* gscope = cntr->Glob_scope();
+    SPOS        spos   = node->Spos();
 
     NODE_PTR new_node = visitor->template Handle_node<RETV>(node).Node();
     TYPE_PTR elem_type =
@@ -84,16 +96,28 @@ public:
     NODE_PTR average_node = cntr->New_ldc(average_const, spos);
 
     NODE_PTR vmulc_node = vgen.New_mul(roll_sum_node, average_node, spos);
+
+    if (ngraph_pattern) {
+      std::vector<int> ngraph_opt = {1};
+      vmulc_node->Set_attr(core::ATTR::NGRAPH, ngraph_opt.data(),
+                           ngraph_opt.size());
+    }
     return RETV(vmulc_node);
   }
 
   template <typename RETV, typename VISITOR>
   RETV Handle_global_average_pool(VISITOR* visitor, air::base::NODE_PTR node) {
     // decompose NN.global_avgerage_pool to VECTOR.roll_sum and VECTOR.multiply
-    TENSOR2VECTOR_CTX& ctx    = visitor->Context();
-    CONTAINER*         cntr   = ctx.Container();
-    GLOB_SCOPE*        gscope = cntr->Glob_scope();
-    SPOS               spos   = node->Spos();
+    TENSOR2VECTOR_CTX& ctx = visitor->Context();
+
+    if (ctx.Ngraph_cf()) {
+      NODE_PTR new_node = visitor->template Handle_node<RETV>(node).Node();
+      return new_node;
+    }
+
+    CONTAINER*  cntr   = ctx.Container();
+    GLOB_SCOPE* gscope = cntr->Glob_scope();
+    SPOS        spos   = node->Spos();
 
     NODE_PTR new_node  = visitor->template Handle_node<RETV>(node).Node();
     NODE_PTR new_input = new_node->Child(0);

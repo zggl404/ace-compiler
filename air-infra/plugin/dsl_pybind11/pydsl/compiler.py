@@ -13,6 +13,8 @@ from typing import Dict
 from typing import Optional
 import numpy as np  # noqa T484
 from air_dsl import *  # noqa T484
+import sys
+import traceback
 
 from pydsl.protocols import handle_compile_time_callable  # noqa T484
 from pydsl.scope import ScopeStack  # noqa T484
@@ -192,7 +194,15 @@ class ToAIR(ast.NodeVisitor):
     _scope_stack: ScopeStack = None
 
     def visit(self, node):
-        return super().visit(node)
+        try:
+            return super().visit(node)
+        except Exception as e:
+            # Report the exception and the line number
+            lineno = getattr(node, 'lineno', 'unknown')
+            print(f"Exception: {e} at line {lineno}")
+            prettify(ast.dump(node))
+            traceback.print_exc()
+            sys.exit(1)
 
     def __init__(self, f_locals, f_globals, scope_manager) -> None:
         super(ToAIR, self).__init__()
@@ -294,7 +304,10 @@ class ToAIR(ast.NodeVisitor):
         if isinstance(node.op, ast.Mult):
             if isinstance(left, int) and isinstance(right, int):
                 return left * right
-            node_a = dsl.clone_exp(left)  # noqa T484
+            if isinstance(left, int):
+                node_a = dsl.intconst(PrimTypeEnum.INT_S32, np.uint64(left), spos)  # noqa T484
+            else:
+                node_a = dsl.clone_exp(left)  # noqa T484
             if isinstance(right, int):
                 offset = dsl.intconst(PrimTypeEnum.INT_S32, np.uint64(right), spos)  # noqa T484
             else:
@@ -306,6 +319,9 @@ class ToAIR(ast.NodeVisitor):
                 node_mul = dsl.mul(node_a, offset, spos)  # noqa T484
 
             return node_mul
+        if isinstance(node.op, ast.Div):
+            if isinstance(left, int) and isinstance(right, int):
+                return int(left / right)
 
         raise ValueError(f"Ln {node.lineno}: {type(node.op)}\
         is currently not supported as a binary operator")
@@ -316,6 +332,16 @@ class ToAIR(ast.NodeVisitor):
         """
         return self._scope_stack.resolve_name(node.id)
 
+    def visit_Attribute(self, node: ast.Attribute) -> Any:  # noqa N802
+        """
+        Handles the Attribute.
+        """
+
+        base = self.visit(node.value)
+        attr_name = node.attr
+        attr_value = getattr(base, attr_name)
+        return attr_value
+
     def visit_Return(self, node: ast.Return) -> Any:  # noqa N802
         """
         Handles the Return.
@@ -323,8 +349,12 @@ class ToAIR(ast.NodeVisitor):
         return_exp = self.visit(node.value)
         spos = self._scope_manager.exprs[0].Spos()
         dsl = self._air
-        st = dsl.st(dsl.clone_exp(return_exp), self._scope_manager.output_var, spos)  # noqa T484
-        return st
+        if self._scope_stack._cur_fname == '__main__' or self._scope_manager._fs is None:
+            st = dsl.st(dsl.clone_exp(return_exp), self._scope_manager.output_var, spos)  # noqa T484
+            return st
+        else:
+            st = dsl.retv(return_exp, spos)  # noqa T484
+            return st
 
     def visit_Index(self, node: ast.Index) -> Any:  # noqa N802
         """
@@ -340,10 +370,23 @@ class ToAIR(ast.NodeVisitor):
         slice_val = self.visit(node.slice)
         spos = self._scope_manager.exprs[0].Spos()
         dsl = self._air
-        if isinstance(slice_val, NodePtr):  # noqa T484
-            ra_const = dsl.new_array(value, dsl.clone_exp(slice_val), spos)  # noqa T484
-            return dsl.new_ild(ra_const, spos)  # noqa T484
-        return value[slice_val]
+        if isinstance(value, NodePtr):  # noqa T484
+            if isinstance(node.value, ast.Name):
+                # value is a symbol
+                if isinstance(slice_val, int):
+                    slice_val = dsl.intconst(PrimTypeEnum.INT_S32, slice_val, spos)  # noqa T484
+                ra = dsl.new_array(dsl.ld_var(value), slice_val, spos)  # noqa T484
+                return dsl.new_ild(ra, spos)  # noqa T484
+        else:
+            if isinstance(slice_val, NodePtr):  # noqa T484
+                if isinstance(value, list):
+                    if all(isinstance(element, int) for element in value):
+                        buf = np.array(value, dtype=np.int32)
+                        value = dsl.new_int_array_const("i32_arr", len(value), dsl.get_prim_type(  # noqa T484
+                            PrimTypeEnum.INT_S32), [len(value)], buf, spos)  # noqa T484
+                ra_const = dsl.new_array(value, dsl.clone_exp(slice_val), spos)  # noqa T484
+                return dsl.new_ild(ra_const, spos)  # noqa T484
+            return value[slice_val]
 
     def visit_Assign(self, node: ast.Assign) -> Any:  # noqa N802
         """
@@ -356,9 +399,23 @@ class ToAIR(ast.NodeVisitor):
         spos = self._scope_manager.exprs[0].Spos()
         dsl = self._air
         annotation_type = dsl.get_rtype(rhs)
-        var_c = dsl.new_var(node.targets[0].id, annotation_type, spos)
-        st = dsl.st(rhs, var_c, spos)
-        self._scope_stack.assign_name(node.targets[0].id, dsl.ld(var_c, spos))
+        target_0 = node.targets[0]
+
+        if isinstance(target_0, ast.Subscript):
+            if isinstance(target_0.slice, ast.Index):  # one dimension array access
+                annotation_type = dsl.get_array_type(target_0.value.id, annotation_type, [1], spos)
+                offset = self.visit(target_0.slice)
+            else:
+                raise ValueError("only one dimension supported!")
+            id = target_0.value.id
+            var_c = dsl.new_var(id, annotation_type, spos)
+            arr = dsl.new_array(var_c, offset, spos)
+            st = dsl.new_ist(arr, rhs, spos)
+        else:
+            id = target_0.id
+            var_c = dsl.new_var(id, annotation_type, spos)
+            st = dsl.st(rhs, var_c, spos)
+        self._scope_stack.assign_name(id, dsl.ld(var_c, spos))
         return st
 
     def emit_air_expr(self, f_sig_ty, index, py_expr, py_expr_name):
@@ -373,6 +430,42 @@ class ToAIR(ast.NodeVisitor):
         dsl.add_parm(py_expr_name, f32_arr_ty, f_sig_ty, spos)
         if index == 0:
             dsl.add_ret(f32_arr_ty, f_sig_ty, spos)
+        dsl.set_sig_complete(f_sig_ty)  # noqa T484
+
+    def get_dsl_ty(self, ty_hint):
+        dsl = self._air
+        if ty_hint is None:
+            raise ValueError("user function need to add type annotations")
+        # a workaround to avoid type inference
+        if ty_hint == "Cipher":
+            # this is a workaround to get cipher type
+            # require register domain type
+            ty = dsl.get_rtype(self._scope_manager.node_operator)
+        elif ty_hint == "int":
+            ty = dsl.get_prim_type(PrimTypeEnum.INT_S32)
+        else:
+            raise ValueError("not supported function types")
+        return ty
+
+    def emit_func_sig(self, f_sig_ty, args, ret):
+        dsl = self._air
+        spos = SPOS(0, 1, 1, 0)
+        for arg in args:
+            name = arg.arg
+            # for user defined function skip no hint args
+            if arg.annotation is None:
+                continue
+            if isinstance(arg.annotation, ast.Name):
+                ty_hint = arg.annotation.id
+                ty = self.get_dsl_ty(ty_hint)
+                dsl.add_parm(name, ty, f_sig_ty, spos)
+            else:
+                raise ValueError("not supported function types")
+        if ret:
+            ty_hint = ret.id
+            ty = self.get_dsl_ty(ty_hint)
+            dsl.add_ret(ty, f_sig_ty, spos)
+        dsl.set_sig_complete(f_sig_ty)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:  # noqa N802
         """
@@ -386,18 +479,11 @@ class ToAIR(ast.NodeVisitor):
         for arg in node.args.args:
             arg_name = arg.arg
             arg_names.append(arg_name)
-
         dsl = self._air
-        if self._scope_manager.fs is None:
+        self._scope_stack.push_func_scope(node)
+        dsl.set_cur_funcScope(self._scope_stack.cur_fs())  # noqa T484
+        if self._scope_manager._fs is None:
             spos = SPOS(0, 1, 1, 0)  # noqa T484
-            f = dsl.new_func(node.name, spos)  # noqa T484
-            f_sig_ty = dsl.new_sig_type()  # noqa T484
-            for i, name in enumerate(arg_names):
-                inp_expr = self._scope_manager.exprs[i]
-                if isinstance(inp_expr, list):
-                    self.emit_air_expr(f_sig_ty, i, inp_expr, name)
-            dsl.set_sig_complete(f_sig_ty)  # noqa T484
-            dsl.new_entry_point(f_sig_ty, f, spos)  # noqa T484
             air_exprs = []
             j = 0
             for i, _ in enumerate(arg_names):
@@ -412,13 +498,21 @@ class ToAIR(ast.NodeVisitor):
             # self._scope_manager.fs = dsl.get_cur_func_scope()  # noqa T484
             self._scope_manager.output_var = dsl.formal(0)  # noqa T484
             self._scope_manager.ctx = dsl.block(spos)  # noqa T484
+        elif node.name != '__main__':
+            spos = SPOS(0, 1, 1, 0)  # noqa T484
+            for i, name in enumerate(arg_names):
+                f_arg = dsl.formal(i)  # noqa T484
+                ld_arg = dsl.ld(f_arg, spos)  # noqa T484
+                self._scope_stack.assign_name(name, ld_arg)
+            dsl.set_blk_ctx(dsl.block(spos))  # noqa T484
+            # TOFIX: find the return var
+            # self._scope_manager.output_var = dsl.formal(len(arg_names))  # noqa T484
+        if self._scope_manager._fs is None or node.name == '__main__':
+            for i, name in enumerate(arg_names):
+                inp_expr = self._scope_manager.exprs[i]
+                self._scope_stack.assign_name(name, inp_expr)
             dsl.set_blk_ctx(self._scope_manager.ctx)  # noqa T484
 
-        self._scope_stack.new_func_scope(node, self._f_locals)
-
-        for i, name in enumerate(arg_names):
-            inp_expr = self._scope_manager.exprs[i]
-            self._scope_stack.assign_name(name, inp_expr)
         for child_node in node.body:
             s = self.visit(child_node)
             if isinstance(s, StmtPtr):  # noqa T484
@@ -427,22 +521,61 @@ class ToAIR(ast.NodeVisitor):
             ret_stmt = dsl.retv(dsl.ld(self._scope_manager.output_var, spos), spos)  # noqa T484
             dsl.append(ret_stmt)  # noqa T484
             dsl.append_block(self._scope_manager.ctx)  # noqa T484
-        # dsl.print_glob()
+        elif node.name != '__main__':
+            dsl.append_block(dsl.get_blk_ctx())  # noqa T484
+        self._scope_stack.pop_func_scope()
         return Any
+
+    def create_funcs(self, root):
+        """
+        Create all functions and setup the scope stack
+        """
+        for node in ast.walk(root):
+            if isinstance(node, ast.FunctionDef):
+                if node.name == 'kernel_impl':
+                    continue
+                dsl = self._air
+                f = self._scope_manager._fs
+                # __main__ is the default main entry of kernel_impl, the
+                # fscope is defined in c++ lower side
+                if f is None or node.name != '__main__':
+                    arg_names = []
+                    for arg in node.args.args:
+                        arg_name = arg.arg
+                        arg_names.append(arg_name)
+                    spos = SPOS(0, 1, 1, 0)  # noqa T484
+                    fptr = dsl.new_func(node.name, spos, False)  # noqa T484
+                    f_sig_ty = dsl.new_sig_type()  # noqa T484
+                    f = dsl.new_func_scope(fptr)
+                    dsl.set_cur_funcScope(f)
+                    if self._scope_manager._fs is None:
+                        for i, name in enumerate(arg_names):
+                            inp_expr = self._scope_manager.exprs[i]
+                            if isinstance(inp_expr, list):
+                                self.emit_air_expr(f_sig_ty, i, inp_expr, name)
+                    else:
+                        # kernel_impl non default functions
+                        self.emit_func_sig(f_sig_ty, node.args.args, node.returns)
+                    dsl.new_entry_point(f_sig_ty, fptr, spos)  # noqa T484
+                self._scope_stack.new_func_scope(node, self._f_locals, f)
 
     def compile_air(self, node):
         """
         Compiles the Python AST into the AIR.
         """
         # create additional properties in AST nodes that we will need during compilation
-        generate_parent(node)
-        generate_next_line(node)
-        self._scope_stack = ScopeStack(self._f_globals)
-        if self._scope_manager.fs is None:
-            self._air = DSL()
-        else:
-            self._air = DSL(self._scope_manager.fs, self._scope_manager.ctx)
-
+        try:
+            generate_parent(node)
+            generate_next_line(node)
+            self._scope_stack = ScopeStack(self._f_globals)
+            if self._scope_manager.fs is None:
+                self._air = DSL()
+            else:
+                self._air = DSL(self._scope_manager.fs, self._scope_manager.ctx)
+            self.create_funcs(node)
+        except Exception as e:
+            traceback.print_exc()
+            sys.exit(1)
         self.visit(node)
 
 
@@ -475,7 +608,6 @@ class CompiledFunction:
         """
         f_ast = ast.parse(inspect.getsource(self._f))
         # prettify(ast.dump(f_ast))
-
         to_air = ToAIR(self._locals, self._globals, self._scope_manager)
         to_air.compile_air(f_ast)
 

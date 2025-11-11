@@ -177,6 +177,13 @@ private:
   void Gen_dup_input_stmt(NODE_PTR input_node, int64_t dup_num, int input_len,
                           ADDR_DATUM_PTR result_var, const SPOS& spos,
                           int outer = 0);
+  ADDR_DATUM_PTR Gen_var(std::string var_name, TYPE_PTR vtype,
+                         const SPOS& spos);
+
+  ADDR_DATUM_PTR Gen_var(std::string var_name, std::string ty_name,
+                         ARRAY_TYPE_PTR              ty_arr,
+                         const std::vector<int64_t>& var_shape,
+                         const SPOS&                 spos);
 
 public:
   ADDR_DATUM_PTR Reduce_add_intra(ADDR_DATUM_PTR input, int rep, int kd, int sf,
@@ -185,6 +192,10 @@ public:
   PREG_PTR Gen_collective_reduce_stmt(ADDR_DATUM_PTR input_var, TYPE_PTR etype,
                                       const SPOS& spos, int num_block,
                                       int width_block_data, int width_block_pad,
+                                      int output_size, bool need_mask);
+
+  PREG_PTR Gen_collective_reduce_stmt(ADDR_DATUM_PTR input_var, TYPE_PTR etype,
+                                      const SPOS& spos, int width_block_data,
                                       int output_size, bool need_mask);
 
   //! @brief this is only used to process roll sum when the
@@ -202,6 +213,9 @@ public:
 
   ADDR_DATUM_PTR Gen_st_0_to_var_stmt(std::string var_name, TYPE_PTR vtype,
                                       const SPOS& spos);
+
+  void Gen_st_0_to_var_stmt(ADDR_DATUM_PTR var, const SPOS& spos);
+
   //! roll input, multiply mask, add to result
   void Gen_loop_combine_stmt(const char* loop_name, int loop_ub,
                              int elem_interval, ADDR_DATUM_PTR input_var,

@@ -324,6 +324,11 @@ public:
   air::base::NODE_PTR New_modswitch(air::base::NODE_PTR    n_opnd,
                                     const air::base::SPOS& spos);
 
+  //! @brief Create RAISE_MOD NODE
+  air::base::NODE_PTR New_raise_mod(air::base::NODE_PTR    n_opnd0,
+                                    air::base::NODE_PTR    n_opnd1,
+                                    const air::base::SPOS& spos);
+
   //! @brief Create MOD_UP Node
   //! @param node Modup Source node
   //! @param v_part_idx Part index variable
@@ -490,6 +495,9 @@ public:
   //! @brief Create node to get the constant of $q_l/2 % q_i$
   air::base::NODE_PTR New_qlhalfmodq(uint32_t               num_q,
                                      const air::base::SPOS& spos);
+
+  //! @brief Create node to get the constant of $q0/2 % q_i$
+  air::base::NODE_PTR New_q0halfmodq(const air::base::SPOS& spos);
 
   //! @brief Create node to get the constant of $q_lhat % p$ at specified
   //! q index and part index

@@ -118,6 +118,10 @@ public:
     Set_mask_attr(mul_mask_node, mask_len);
 
     def_node->Set_child(0, mul_mask_node);
+
+    if (_config.Fusion_count()) {
+      _ctx.Incr_fusion_count();
+    }
   }
 
   air::opt::DFG_NODE_PTR Get_dfg_node(NODE_ID node) {
@@ -227,13 +231,27 @@ public:
       NODE_PTR node = Container()->Node(node_id);
       if (Is_fuse_mask_node(node)) {
         Gen_mult_mask_node(node, mask_node.second);
+      } else if (Is_eliminate_mask_node(node)) {
+        // std::cout << "====strided_slice eliminate masking====" << std::endl;
+        if (_config.Fusion_count()) {
+          _ctx.Incr_fusion_count();
+        }
+      } else if (node->Opcode() == air::core::RET ||
+                 node->Opcode() == air::core::RETV) {
+        if (_config.Fusion_count()) {
+          _ctx.Incr_fusion_count();
+        }
+      } else {
+        AIR_ASSERT(false);
       }
     }
   }
 
   void Mask_fusion() {
     MF_WORKLIST mf_worklist = _ctx.Get_mf_worklist();
+    int         i           = 0;
     for (const NODE_MASK_PAIR mask_node : mf_worklist) {
+      i++;
       std::vector<NODE_ID> candidates = Find_fusion_candidate(mask_node.first);
       // analyze and process candidates.
       Process_mask(candidates, mask_node);
@@ -283,8 +301,19 @@ public:
 
     int64_t output_size = channel_out * input_height * input_width;
 
+    std::vector<int> groups = Get_attr_data<int>(node, core::ATTR::GROUP);
+    int              group  = groups[0];
+    // Only support depthwise convolution for group>1
+    if (group > 1) {
+      AIR_ASSERT_MSG((channel_in == group),
+                     "depthwise convolution: channel_in == group");
+    } else {
+      AIR_ASSERT_MSG(channel_in == channel_in_kernel,
+                     "channel_in == channel_in_kernel");
+    }
+
     // generate worklist which contains all op that generate mask
-    if (ctx.Conv_fast() && (channel_out >= channel_in) &&
+    if ((group == 1) && (channel_out >= channel_in) &&
         (ctx.Get_slot() != output_size)) {
       ctx.Register_node_mask_len(node->Id(), (uint32_t)output_size);
     }
@@ -311,8 +340,7 @@ public:
 
     return RETV();
   }
-
-};  // MASK_FUSION_CORE_HANDLER
+};  // MASK_FUSION_HANDLER
 
 }  // namespace vector
 

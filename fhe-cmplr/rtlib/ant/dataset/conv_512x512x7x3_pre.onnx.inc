@@ -4,14 +4,14 @@
 typedef double float64_t;
 typedef float float32_t;
 
-extern float32_t _cst_0[512][512][3][3];
+extern float32_t _cst_0[2359296];
 extern float32_t _cst_1[512];
 extern int32_t _cst_2[1];
-extern float32_t _cst_3[4608][25088];
+extern float32_t _cst_3[115605504];
 extern float32_t _cst_4[25088];
 extern int32_t _cst_5[9];
-extern float32_t _cst_6[512][25088];
-extern float32_t _cst_7[512][25088];
+extern float32_t _cst_6[12845056];
+extern float32_t _cst_7[12845056];
 CIPHERTEXT Rotate(CIPHERTEXT ciph, int32_t rot_idx);
 
 bool Main_graph() {

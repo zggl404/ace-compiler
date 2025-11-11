@@ -17,6 +17,9 @@ add_library(fheckks_obj OBJECT ${FHECKKS_SRC_FILES})
 add_dependencies(fheckks_obj fhe_depend)
 set_property(TARGET fheckks_obj PROPERTY POSITION_INDEPENDENT_CODE 1)
 
+# support ckks python dsl
+find_nn_extralib(EXTRA_LIBS)
+
 if(BUILD_STATIC)
   add_library(FHEckks STATIC $<TARGET_OBJECTS:fheckks_obj>)
   set_property(TARGET FHEckks PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -30,11 +33,12 @@ gen_option(${PYTHON_EXECUTABLE} ckks_option ${CKKS_OPTION_OUTPUT_DIR} ${CKKS_OPT
 add_dependencies(fhe_depend ckks_option)
 
 # generate domain opcodes for CKKS
+# the target `ckks_od` will be created
 gen_domain_od(
   "$ENV{PACKAGE_BASE_DIR}/irgen/od/odgen.py"
   "${PROJECT_SOURCE_DIR}/ckks/od/opcode_def.yml"
   "${CMAKE_BINARY_DIR}/include/fhe/ckks"
-  ckks_od
+  ckks
 )
 add_dependencies(fhe_depend ckks_od)
 

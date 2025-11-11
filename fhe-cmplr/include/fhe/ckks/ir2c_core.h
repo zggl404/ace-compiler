@@ -85,10 +85,10 @@ public:
   void Handle_retv(VISITOR* visitor, air::base::NODE_PTR node) {
     IR2C_CTX&           ctx = visitor->Context();
     air::base::NODE_PTR val = node->Child(0);
-    AIR_ASSERT(val->Opcode() ==
-               air::base::OPCODE(air::core::CORE, air::core::OPCODE::LD));
-    const char* name = val->Addr_datum()->Base_sym()->Name()->Char_str();
     if (node->Func_scope()->Owning_func()->Entry_point()->Is_program_entry()) {
+      AIR_ASSERT(val->Opcode() ==
+                 air::base::OPCODE(air::core::CORE, air::core::OPCODE::LD));
+      const char* name = val->Addr_datum()->Base_sym()->Name()->Char_str();
       ctx.Set_output_name(name);
       ctx << "Set_output_data(\"" << name << "\", 0, &";
       ctx.Emit_var(val);

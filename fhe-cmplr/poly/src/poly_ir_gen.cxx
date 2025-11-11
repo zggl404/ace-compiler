@@ -588,6 +588,18 @@ NODE_PTR POLY_IR_GEN::New_modswitch(NODE_PTR n_opnd, const SPOS& spos) {
   return n_res;
 }
 
+//! @brief Create RAISE_MOD NODE
+NODE_PTR POLY_IR_GEN::New_raise_mod(NODE_PTR n_opnd0, NODE_PTR n_opnd1,
+                                    const SPOS& spos) {
+  CMPLR_ASSERT(Is_type_of(n_opnd0->Rtype_id(), POLY), "invalid type");
+  CMPLR_ASSERT(n_opnd1->Rtype()->Is_int(), "invalid type");
+
+  NODE_PTR n_res = New_poly_node(RAISE_MOD, n_opnd0->Rtype(), spos);
+  n_res->Set_child(0, n_opnd0);
+  n_res->Set_child(1, n_opnd1);
+  return n_res;
+}
+
 NODE_PTR POLY_IR_GEN::New_get_next_modulus(CONST_VAR   mod_var,
                                            const SPOS& spos) {
   NODE_PTR ld_mod   = New_var_load(mod_var, spos);
@@ -1076,6 +1088,12 @@ NODE_PTR POLY_IR_GEN::New_qlhalfmodq(uint32_t               idx,
   CONSTANT_PTR cst =
       Lower_ctx()->Get_crt_cst().Get_qlhalfmodq(Glob_scope(), idx);
   NODE_PTR ret = Container()->New_ldc(cst, spos);
+  return ret;
+}
+
+NODE_PTR POLY_IR_GEN::New_q0halfmodq(const air::base::SPOS& spos) {
+  CONSTANT_PTR cst = Lower_ctx()->Get_crt_cst().Get_q0halfmodq(Glob_scope());
+  NODE_PTR     ret = Container()->New_ldc(cst, spos);
   return ret;
 }
 

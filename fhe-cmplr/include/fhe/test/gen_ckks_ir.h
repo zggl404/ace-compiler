@@ -24,6 +24,7 @@
 #include "fhe/poly/opcode.h"
 #include "fhe/poly/poly_driver.h"
 #include "fhe/sihe/sihe_gen.h"
+#include "fhe/sihe/sihe_opcode.h"
 #include "fhe/util/util.h"
 
 namespace fhe {
@@ -35,6 +36,8 @@ public:
   CKKS_IR_GEN(fhe::core::LOWER_CTX& lower_ctx) : _lower_ctx(lower_ctx) {
     bool ret = air::core::Register_core();
     CMPLR_ASSERT(ret, "core register failed");
+    ret = fhe::sihe::Register_sihe_domain();
+    CMPLR_ASSERT(ret, "sihe register failed");
     ret = fhe::ckks::Register_ckks_domain();
     CMPLR_ASSERT(ret, "ckks register failed");
     ret = fhe::poly::Register_polynomial();
@@ -71,8 +74,7 @@ public:
     // signature of main function
     air::base::SIGNATURE_TYPE_PTR sig = Glob()->New_sig_type();
     // return type of main function
-    air::base::TYPE_PTR main_rtype =
-        Glob()->Prim_type(air::base::PRIMITIVE_TYPE::INT_S32);
+    air::base::TYPE_PTR main_rtype = Ciph_ty();
     Glob()->New_ret_param(main_rtype, sig);
     // parameter argc of function main
     air::base::TYPE_PTR argc_type =
@@ -429,9 +431,8 @@ public:
     return mul_float_stmt;
   }
 
-  // var_z = encode()
-  air::base::STMT_PTR Gen_encode(air::base::CONTAINER*     cntr,
-                                 air::base::ADDR_DATUM_PTR var_p) {
+  // encode()
+  air::base::NODE_PTR Gen_encode(air::base::CONTAINER* cntr) {
     air::base::STMT_LIST     sl   = cntr->Stmt_list();
     air::base::GLOB_SCOPE*   glob = cntr->Glob_scope();
     air::base::PRIM_TYPE_PTR u32_type =
@@ -454,7 +455,15 @@ public:
     encode_node->Set_child(1, cntr->New_intconst(u32_type, 4, Spos()));
     encode_node->Set_child(2, cntr->New_intconst(u32_type, 0, Spos()));
     encode_node->Set_child(3, cntr->New_intconst(u32_type, 0, Spos()));
-    air::base::STMT_PTR encode_stmt = cntr->New_st(encode_node, var_p, Spos());
+    return encode_node;
+  }
+
+  // var_z = encode()
+  air::base::STMT_PTR Gen_encode(air::base::CONTAINER*     cntr,
+                                 air::base::ADDR_DATUM_PTR var_p) {
+    air::base::STMT_LIST sl          = cntr->Stmt_list();
+    air::base::NODE_PTR  encode_node = Gen_encode(cntr);
+    air::base::STMT_PTR  encode_stmt = cntr->New_st(encode_node, var_p, Spos());
     sl.Append(encode_stmt);
     return encode_stmt;
   }
@@ -472,6 +481,37 @@ public:
     air::base::STMT_PTR bts_stmt = cntr->New_stp(bts_node, tmp, Spos());
     sl.Append(bts_stmt);
     return bts_stmt;
+  }
+
+  air::base::NODE_PTR Gen_bootstrap_node(air::base::CONTAINER*     cntr,
+                                         air::base::ADDR_DATUM_PTR var_x) {
+    air::base::STMT_LIST sl       = cntr->Stmt_list();
+    air::base::NODE_PTR  bts_node = cntr->New_cust_node(
+        air::base::OPCODE(fhe::ckks::CKKS_DOMAIN::ID,
+                           fhe::ckks::CKKS_OPERATOR::BOOTSTRAP),
+        Ciph_ty(), Spos());
+    bts_node->Set_child(0, cntr->New_ld(var_x, Spos()));
+    return bts_node;
+  }
+
+  // var_y = raise_mod(var_x, level)
+  air::base::STMT_PTR Gen_raise_mod(air::base::CONTAINER*     cntr,
+                                    air::base::ADDR_DATUM_PTR var_y,
+                                    air::base::ADDR_DATUM_PTR var_x,
+                                    uint32_t                  level) {
+    air::base::STMT_LIST sl         = cntr->Stmt_list();
+    air::base::NODE_PTR  raise_node = cntr->New_cust_node(
+        air::base::OPCODE(fhe::ckks::CKKS_DOMAIN::ID,
+                           fhe::ckks::CKKS_OPERATOR::RAISE_MOD),
+        Ciph_ty(), Spos());
+    raise_node->Set_child(0, cntr->New_ld(var_x, Spos()));
+    raise_node->Set_child(
+        1, cntr->New_intconst(cntr->Glob_scope()->Prim_type(
+                                  air::base::PRIMITIVE_TYPE::INT_S32),
+                              level, Spos()));
+    air::base::STMT_PTR raise_stmt = cntr->New_st(raise_node, var_y, Spos());
+    sl.Append(raise_stmt);
+    return raise_stmt;
   }
 
   // return var_z

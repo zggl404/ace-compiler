@@ -13,7 +13,7 @@
  */
 
 DEF_OPCODE(INVALID, invalid, 0, 0, 0)
-DEF_OPCODE(ADD, add, 2, 0, PROP_EXPR)
+DEF_OPCODE(ADD, add, 2, 0, PROP_EXPR | PROP_ATTR)
 // Elementwise multiplication of two vectors
 DEF_OPCODE(MUL, mul, 2, 0, PROP_EXPR | PROP_ATTR)
 DEF_OPCODE(ROLL, roll, 2, 0, PROP_EXPR | PROP_ATTR)

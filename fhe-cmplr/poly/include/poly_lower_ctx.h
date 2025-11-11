@@ -112,6 +112,9 @@ public:
 
     if (config.Lower_to_hpoly2()) {
       fhe_ctx->Register_rt_context();
+      // make sure q and p constants are created
+      fhe_ctx->Get_crt_cst().Get_q(Glob_scope());
+      fhe_ctx->Get_crt_cst().Get_p(Glob_scope());
     }
   }
 
@@ -163,6 +166,7 @@ public:
         case fhe::ckks::CKKS_OPERATOR::RESCALE:
         case fhe::ckks::CKKS_OPERATOR::RELIN:
         case fhe::ckks::CKKS_OPERATOR::MODSWITCH:
+        case fhe::ckks::CKKS_OPERATOR::RAISE_MOD:
           return true;
         default:
           return false;
@@ -180,6 +184,7 @@ public:
       case fhe::poly::OPC_DOT_PROD:
       case fhe::poly::OPC_MOD_DOWN:
       case fhe::poly::OPC_RESCALE:
+      case fhe::poly::OPC_RAISE_MOD:
         return true;
       default:
         return false;

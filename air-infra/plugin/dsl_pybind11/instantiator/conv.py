@@ -19,8 +19,8 @@ def kernel_impl():
     '''
     implementation of the kernel
     '''
-    def conv_impl(input_tensor, weight, bias, ra, channel_in, channel_out,
-                  output_height, output_width, kernel_size):
+    def __main__(input_tensor, weight, bias, ra, channel_in, channel_out,  # noqa N807
+                 output_height, output_width, kernel_size):
         '''
         implementation of the conv
         '''

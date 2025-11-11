@@ -23,6 +23,13 @@
 #include <utility>
 
 #include <cstdio>
+#if __cplusplus >= 201103L
+
+#if !defined(sscanf)
+#define sscanf std::sscanf
+#endif
+
+#endif //__cplusplus
 
 #if defined(_MSC_VER)
 #if !defined(_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES)
@@ -46,7 +53,11 @@ static size_t const stackLimit_g =
 
 namespace Json {
 
+#if __cplusplus >= 201103L || (defined(_CPPLIB_VER) && _CPPLIB_VER >= 520)
 using CharReaderPtr = std::unique_ptr<CharReader>;
+#else
+using CharReaderPtr = std::auto_ptr<CharReader>;
+#endif
 
 // Implementation of class Features
 // ////////////////////////////////
@@ -118,7 +129,7 @@ bool Reader::parse(const char* beginDoc, const char* endDoc, Value& root,
 
   bool successful = readValue();
   Token token;
-  readTokenSkippingComments(token);
+  skipCommentTokens(token);
   if (collectComments_ && !commentsBefore_.empty())
     root.setComment(commentsBefore_, commentAfter);
   if (features_.strictRoot_) {
@@ -146,7 +157,7 @@ bool Reader::readValue() {
     throwRuntimeError("Exceeded stackLimit in readValue().");
 
   Token token;
-  readTokenSkippingComments(token);
+  skipCommentTokens(token);
   bool successful = true;
 
   if (collectComments_ && !commentsBefore_.empty()) {
@@ -214,14 +225,14 @@ bool Reader::readValue() {
   return successful;
 }
 
-bool Reader::readTokenSkippingComments(Token& token) {
-  bool success = readToken(token);
+void Reader::skipCommentTokens(Token& token) {
   if (features_.allowComments_) {
-    while (success && token.type_ == tokenComment) {
-      success = readToken(token);
-    }
+    do {
+      readToken(token);
+    } while (token.type_ == tokenComment);
+  } else {
+    readToken(token);
   }
-  return success;
 }
 
 bool Reader::readToken(Token& token) {
@@ -435,7 +446,12 @@ bool Reader::readObject(Token& token) {
   Value init(objectValue);
   currentValue().swapPayload(init);
   currentValue().setOffsetStart(token.start_ - begin_);
-  while (readTokenSkippingComments(tokenName)) {
+  while (readToken(tokenName)) {
+    bool initialTokenOk = true;
+    while (tokenName.type_ == tokenComment && initialTokenOk)
+      initialTokenOk = readToken(tokenName);
+    if (!initialTokenOk)
+      break;
     if (tokenName.type_ == tokenObjectEnd && name.empty()) // empty object
       return true;
     name.clear();
@@ -464,11 +480,15 @@ bool Reader::readObject(Token& token) {
       return recoverFromError(tokenObjectEnd);
 
     Token comma;
-    if (!readTokenSkippingComments(comma) ||
-        (comma.type_ != tokenObjectEnd && comma.type_ != tokenArraySeparator)) {
+    if (!readToken(comma) ||
+        (comma.type_ != tokenObjectEnd && comma.type_ != tokenArraySeparator &&
+         comma.type_ != tokenComment)) {
       return addErrorAndRecover("Missing ',' or '}' in object declaration",
                                 comma, tokenObjectEnd);
     }
+    bool finalizeTokenOk = true;
+    while (comma.type_ == tokenComment && finalizeTokenOk)
+      finalizeTokenOk = readToken(comma);
     if (comma.type_ == tokenObjectEnd)
       return true;
   }
@@ -498,7 +518,10 @@ bool Reader::readArray(Token& token) {
 
     Token currentToken;
     // Accept Comment after last item in the array.
-    ok = readTokenSkippingComments(currentToken);
+    ok = readToken(currentToken);
+    while (currentToken.type_ == tokenComment && ok) {
+      ok = readToken(currentToken);
+    }
     bool badTokenType = (currentToken.type_ != tokenArraySeparator &&
                          currentToken.type_ != tokenArrayEnd);
     if (!ok || badTokenType) {
@@ -576,7 +599,8 @@ bool Reader::decodeDouble(Token& token) {
 
 bool Reader::decodeDouble(Token& token, Value& decoded) {
   double value = 0;
-  IStringStream is(String(token.start_, token.end_));
+  String buffer(token.start_, token.end_);
+  IStringStream is(buffer);
   if (!(is >> value)) {
     if (value == std::numeric_limits<double>::max())
       value = std::numeric_limits<double>::infinity();
@@ -584,7 +608,7 @@ bool Reader::decodeDouble(Token& token, Value& decoded) {
       value = -std::numeric_limits<double>::infinity();
     else if (!std::isinf(value))
       return addError(
-          "'" + String(token.start_, token.end_) + "' is not a number.", token);
+        "'" + String(token.start_, token.end_) + "' is not a number.", token);
   }
   decoded = value;
   return true;
@@ -749,7 +773,7 @@ void Reader::getLocationLineAndColumn(Location location, int& line,
   while (current < location && current != end_) {
     Char c = *current++;
     if (c == '\r') {
-      if (current != end_ && *current == '\n')
+      if (*current == '\n')
         ++current;
       lastLineStart = current;
       ++line;
@@ -866,12 +890,17 @@ class OurReader {
 public:
   using Char = char;
   using Location = const Char*;
+  struct StructuredError {
+    ptrdiff_t offset_start;
+    ptrdiff_t offset_limit;
+    String message;
+  };
 
   explicit OurReader(OurFeatures const& features);
   bool parse(const char* beginDoc, const char* endDoc, Value& root,
              bool collectComments = true);
   String getFormattedErrorMessages() const;
-  std::vector<CharReader::StructuredError> getStructuredErrors() const;
+  std::vector<StructuredError> getStructuredErrors() const;
 
 private:
   OurReader(OurReader const&);      // no impl
@@ -914,7 +943,6 @@ private:
   using Errors = std::deque<ErrorInfo>;
 
   bool readToken(Token& token);
-  bool readTokenSkippingComments(Token& token);
   void skipSpaces();
   void skipBom(bool skipBom);
   bool match(const Char* pattern, int patternLength);
@@ -948,6 +976,7 @@ private:
                                 int& column) const;
   String getLocationLineAndColumn(Location location) const;
   void addComment(Location begin, Location end, CommentPlacement placement);
+  void skipCommentTokens(Token& token);
 
   static String normalizeEOL(Location begin, Location end);
   static bool containsNewLine(Location begin, Location end);
@@ -1001,7 +1030,7 @@ bool OurReader::parse(const char* beginDoc, const char* endDoc, Value& root,
   bool successful = readValue();
   nodes_.pop();
   Token token;
-  readTokenSkippingComments(token);
+  skipCommentTokens(token);
   if (features_.failIfExtra_ && (token.type_ != tokenEndOfStream)) {
     addError("Extra non-whitespace after JSON value.", token);
     return false;
@@ -1029,7 +1058,7 @@ bool OurReader::readValue() {
   if (nodes_.size() > features_.stackLimit_)
     throwRuntimeError("Exceeded stackLimit in readValue().");
   Token token;
-  readTokenSkippingComments(token);
+  skipCommentTokens(token);
   bool successful = true;
 
   if (collectComments_ && !commentsBefore_.empty()) {
@@ -1116,14 +1145,14 @@ bool OurReader::readValue() {
   return successful;
 }
 
-bool OurReader::readTokenSkippingComments(Token& token) {
-  bool success = readToken(token);
+void OurReader::skipCommentTokens(Token& token) {
   if (features_.allowComments_) {
-    while (success && token.type_ == tokenComment) {
-      success = readToken(token);
-    }
+    do {
+      readToken(token);
+    } while (token.type_ == tokenComment);
+  } else {
+    readToken(token);
   }
-  return success;
 }
 
 bool OurReader::readToken(Token& token) {
@@ -1420,7 +1449,12 @@ bool OurReader::readObject(Token& token) {
   Value init(objectValue);
   currentValue().swapPayload(init);
   currentValue().setOffsetStart(token.start_ - begin_);
-  while (readTokenSkippingComments(tokenName)) {
+  while (readToken(tokenName)) {
+    bool initialTokenOk = true;
+    while (tokenName.type_ == tokenComment && initialTokenOk)
+      initialTokenOk = readToken(tokenName);
+    if (!initialTokenOk)
+      break;
     if (tokenName.type_ == tokenObjectEnd &&
         (name.empty() ||
          features_.allowTrailingCommas_)) // empty object or trailing comma
@@ -1457,11 +1491,15 @@ bool OurReader::readObject(Token& token) {
       return recoverFromError(tokenObjectEnd);
 
     Token comma;
-    if (!readTokenSkippingComments(comma) ||
-        (comma.type_ != tokenObjectEnd && comma.type_ != tokenArraySeparator)) {
+    if (!readToken(comma) ||
+        (comma.type_ != tokenObjectEnd && comma.type_ != tokenArraySeparator &&
+         comma.type_ != tokenComment)) {
       return addErrorAndRecover("Missing ',' or '}' in object declaration",
                                 comma, tokenObjectEnd);
     }
+    bool finalizeTokenOk = true;
+    while (comma.type_ == tokenComment && finalizeTokenOk)
+      finalizeTokenOk = readToken(comma);
     if (comma.type_ == tokenObjectEnd)
       return true;
   }
@@ -1495,7 +1533,10 @@ bool OurReader::readArray(Token& token) {
 
     Token currentToken;
     // Accept Comment after last item in the array.
-    ok = readTokenSkippingComments(currentToken);
+    ok = readToken(currentToken);
+    while (currentToken.type_ == tokenComment && ok) {
+      ok = readToken(currentToken);
+    }
     bool badTokenType = (currentToken.type_ != tokenArraySeparator &&
                          currentToken.type_ != tokenArrayEnd);
     if (!ok || badTokenType) {
@@ -1610,7 +1651,8 @@ bool OurReader::decodeDouble(Token& token) {
 
 bool OurReader::decodeDouble(Token& token, Value& decoded) {
   double value = 0;
-  IStringStream is(String(token.start_, token.end_));
+  const String buffer(token.start_, token.end_);
+  IStringStream is(buffer);
   if (!(is >> value)) {
     if (value == std::numeric_limits<double>::max())
       value = std::numeric_limits<double>::infinity();
@@ -1618,7 +1660,7 @@ bool OurReader::decodeDouble(Token& token, Value& decoded) {
       value = -std::numeric_limits<double>::infinity();
     else if (!std::isinf(value))
       return addError(
-          "'" + String(token.start_, token.end_) + "' is not a number.", token);
+        "'" + String(token.start_, token.end_) + "' is not a number.", token);
   }
   decoded = value;
   return true;
@@ -1783,7 +1825,7 @@ void OurReader::getLocationLineAndColumn(Location location, int& line,
   while (current < location && current != end_) {
     Char c = *current++;
     if (c == '\r') {
-      if (current != end_ && *current == '\n')
+      if (*current == '\n')
         ++current;
       lastLineStart = current;
       ++line;
@@ -1818,11 +1860,10 @@ String OurReader::getFormattedErrorMessages() const {
   return formattedMessage;
 }
 
-std::vector<CharReader::StructuredError>
-OurReader::getStructuredErrors() const {
-  std::vector<CharReader::StructuredError> allErrors;
+std::vector<OurReader::StructuredError> OurReader::getStructuredErrors() const {
+  std::vector<OurReader::StructuredError> allErrors;
   for (const auto& error : errors_) {
-    CharReader::StructuredError structured;
+    OurReader::StructuredError structured;
     structured.offset_start = error.token_.start_ - begin_;
     structured.offset_limit = error.token_.end_ - begin_;
     structured.message = error.message_;
@@ -1832,36 +1873,20 @@ OurReader::getStructuredErrors() const {
 }
 
 class OurCharReader : public CharReader {
+  bool const collectComments_;
+  OurReader reader_;
 
 public:
   OurCharReader(bool collectComments, OurFeatures const& features)
-      : CharReader(
-            std::unique_ptr<OurImpl>(new OurImpl(collectComments, features))) {}
-
-protected:
-  class OurImpl : public Impl {
-  public:
-    OurImpl(bool collectComments, OurFeatures const& features)
-        : collectComments_(collectComments), reader_(features) {}
-
-    bool parse(char const* beginDoc, char const* endDoc, Value* root,
-               String* errs) override {
-      bool ok = reader_.parse(beginDoc, endDoc, *root, collectComments_);
-      if (errs) {
-        *errs = reader_.getFormattedErrorMessages();
-      }
-      return ok;
+      : collectComments_(collectComments), reader_(features) {}
+  bool parse(char const* beginDoc, char const* endDoc, Value* root,
+             String* errs) override {
+    bool ok = reader_.parse(beginDoc, endDoc, *root, collectComments_);
+    if (errs) {
+      *errs = reader_.getFormattedErrorMessages();
     }
-
-    std::vector<CharReader::StructuredError>
-    getStructuredErrors() const override {
-      return reader_.getStructuredErrors();
-    }
-
-  private:
-    bool const collectComments_;
-    OurReader reader_;
-  };
+    return ok;
+  }
 };
 
 CharReaderBuilder::CharReaderBuilder() { setDefaults(&settings_); }
@@ -1950,32 +1975,6 @@ void CharReaderBuilder::setDefaults(Json::Value* settings) {
   (*settings)["skipBom"] = true;
   //! [CharReaderBuilderDefaults]
 }
-// static
-void CharReaderBuilder::ecma404Mode(Json::Value* settings) {
-  //! [CharReaderBuilderECMA404Mode]
-  (*settings)["allowComments"] = false;
-  (*settings)["allowTrailingCommas"] = false;
-  (*settings)["strictRoot"] = false;
-  (*settings)["allowDroppedNullPlaceholders"] = false;
-  (*settings)["allowNumericKeys"] = false;
-  (*settings)["allowSingleQuotes"] = false;
-  (*settings)["stackLimit"] = 1000;
-  (*settings)["failIfExtra"] = true;
-  (*settings)["rejectDupKeys"] = false;
-  (*settings)["allowSpecialFloats"] = false;
-  (*settings)["skipBom"] = false;
-  //! [CharReaderBuilderECMA404Mode]
-}
-
-std::vector<CharReader::StructuredError>
-CharReader::getStructuredErrors() const {
-  return _impl->getStructuredErrors();
-}
-
-bool CharReader::parse(char const* beginDoc, char const* endDoc, Value* root,
-                       String* errs) {
-  return _impl->parse(beginDoc, endDoc, root, errs);
-}
 
 //////////////////////////////////
 // global functions
@@ -1984,7 +1983,7 @@ bool parseFromStream(CharReader::Factory const& fact, IStream& sin, Value* root,
                      String* errs) {
   OStringStream ssin;
   ssin << sin.rdbuf();
-  String doc = std::move(ssin).str();
+  String doc = ssin.str();
   char const* begin = doc.data();
   char const* end = begin + doc.size();
   // Note that we do not actually need a null-terminator.

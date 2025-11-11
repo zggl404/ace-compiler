@@ -48,6 +48,15 @@ TEST_P(TEST_HP1TOHP2, Handle_rescale) {
   Lower();
 }
 
+TEST_P(TEST_HP1TOHP2, Handle_raise_mod) {
+  const_cast<TEST_CONFIG&>(this->GetParam()).Set_input_level(1);
+  STMT_PTR stmt = Ckks_ir_gen().Gen_raise_mod(
+      Container(), Ckks_ir_gen().Output_var(), Ckks_ir_gen().Input_var(), 0);
+  Set_level_attr(stmt->Node()->Child(0)->Child(0), 1);
+  Set_sf_degree(stmt->Node()->Child(0)->Child(0), 1);
+  Lower();
+}
+
 // testing same tests with different config
 INSTANTIATE_TEST_SUITE_P(HP1TOHP2_TEST, TEST_HP1TOHP2,
                          ::testing::Values(TEST_CONFIG(".hpoly2.t", HPOLY_P2)));

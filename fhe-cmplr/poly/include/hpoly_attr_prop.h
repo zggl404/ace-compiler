@@ -37,13 +37,14 @@ using ATTR_VISITOR =
 
 class ATTR_INFO {
 public:
-  static constexpr uint32_t NOT_SET   = (uint32_t)-1;
-  static constexpr uint32_t DEF_NUM_P = 0;
-  static constexpr uint32_t DEF_SBASE = 0;
+  static constexpr uint32_t NOT_SET    = (uint32_t)-1;
+  static constexpr uint32_t DEF_NUM_P  = 0;
+  static constexpr uint32_t DEF_SBASE  = 0;
+  static constexpr uint32_t DEF_SF_DEG = 1;
   ATTR_INFO() {}
   ATTR_INFO(uint32_t num_q, uint32_t num_p = DEF_NUM_P,
-            uint32_t sbase = DEF_SBASE)
-      : _num_q(num_q), _num_p(num_p), _sbase(sbase) {}
+            uint32_t sbase = DEF_SBASE, uint32_t sf_deg = DEF_SF_DEG)
+      : _num_q(num_q), _num_p(num_p), _sbase(sbase), _sf_deg(sf_deg) {}
 
   ~ATTR_INFO() {}
 
@@ -52,28 +53,33 @@ public:
   //! @brief default rules of merging attribute
   void Join(const ATTR_INFO& other) {
     if (!Is_valid()) {
-      _num_q = other._num_q;
-      _num_p = other._num_p;
-      _sbase = other._sbase;
+      _num_q  = other._num_q;
+      _num_p  = other._num_p;
+      _sbase  = other._sbase;
+      _sf_deg = other._sf_deg;
       return;
     }
     AIR_ASSERT_MSG(_num_q == other._num_q, "need user to defined prop rule");
     AIR_ASSERT_MSG(_num_p == other._num_p, "need user to defined prop rule");
     AIR_ASSERT_MSG(_sbase == other._sbase, "need user to defined prop rule");
+    AIR_ASSERT_MSG(_sf_deg == other._sf_deg, "need user to defined prop rule");
   }
 
   void Set_num_q(uint32_t num_q) { _num_q = num_q; }
   void Set_num_p(uint32_t num_p) { _num_p = num_p; }
   void Set_sbase(uint32_t sbase) { _sbase = sbase; }
+  void Set_sf_deg(uint32_t sf) { _sf_deg = sf; }
 
   uint32_t Num_q(void) const { return _num_q; }
   uint32_t Num_p(void) const { return _num_p; }
   uint32_t Sbase(void) const { return _sbase; }
+  uint32_t Sf_deg(void) const { return _sf_deg; }
 
 private:
-  uint32_t _num_q = NOT_SET;  // number of q primes
-  uint32_t _num_p = 0;        // number of p primes
-  uint32_t _sbase = 0;        // start RNS basis
+  uint32_t _num_q  = NOT_SET;     // number of q primes
+  uint32_t _num_p  = DEF_NUM_P;   // number of p primes
+  uint32_t _sbase  = DEF_SBASE;   // start RNS basis
+  uint32_t _sf_deg = DEF_SF_DEG;  // scaling factor degree
 };
 
 class ATTR_PROP_CTX : public air::base::ANALYZE_CTX {
@@ -152,6 +158,9 @@ public:
     }
     if (attr_info.Sbase() > 0) {
       _irgen.Set_sbase(node, attr_info.Sbase());
+    }
+    if (attr_info.Sf_deg() >= 1) {
+      _irgen.Set_sf_deg(node, attr_info.Sf_deg());
     }
   }
 
@@ -485,7 +494,7 @@ public:
     air::opt::SSA_VER_PTR    ver_ptr  = ssa_cntr->Node_ver(formal->Id());
     // set ssa attribute from formal node's attribute
     ATTR_INFO info(irgen.Get_num_q(formal), irgen.Get_num_p(formal),
-                   irgen.Get_sbase(formal));
+                   irgen.Get_sbase(formal), irgen.Get_sf_deg(formal));
     ctx.Set_attr_info(ver_ptr->Id(), info);
 
     air::base::NODE_PTR parent = visitor->Parent(1);

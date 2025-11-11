@@ -16,6 +16,7 @@
 
 #include "ckks/ciphertext.h"
 #include "ckks/plain.h"
+#include "lpoly/poly.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -185,6 +186,26 @@ static inline void Zero_ciph(CIPHER ciph) {
   }
   memset(ciph, 0, sizeof(*ciph));
 }
+
+// APIs for lpoly2c
+//! @brief Get lpoly from CIPHERTEXT at given idx
+//! need free data by Free_lpoly_data().
+L_POLY Lpoly_from_ciph(CIPHER ciph, size_t idx);
+
+//! @brief Get lpoly from CIPHERTEXT3 at given idx
+//! need free data by Free_lpoly_data().
+L_POLY Lpoly_from_ciph3(CIPHER3 ciph, size_t idx);
+
+//! @brief Set poly data in CIPHERTEXT with given lpoly & idx
+void Set_ciph_data(CIPHER ciph, L_POLY poly, size_t idx);
+
+//! @brief Set poly data in CIPHERTEXT3 with given lpoly & idx
+void Set_ciph3_data(CIPHER3 ciph, L_POLY poly, size_t idx);
+
+// TODO: This is a workaround for lpoly2c to reset output ciphertext with given
+// level
+//! @brief Reset ciphertext data layout & level
+void Reset_ciph(CIPHER ciph, size_t level);
 
 #ifdef __cplusplus
 }

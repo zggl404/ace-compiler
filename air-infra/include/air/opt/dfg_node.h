@@ -129,6 +129,7 @@ public:
   DFG_EDGE_ITER End_succ(void) const {
     return DFG_EDGE_ITER(Cntr(), air::base::Null_id);
   }
+  uint32_t     Succ_count(void) const;
   DFG_NODE_ID* Begin_opnd(void) const { return Data()->Begin_opnd(); }
   DFG_NODE_ID* End_opnd(void) const { return Data()->End_opnd(); }
   DFG_EDGE_ID  Succ_id() const { return Data()->Succ(); }

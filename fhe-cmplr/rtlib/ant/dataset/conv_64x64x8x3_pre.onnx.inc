@@ -4,10 +4,10 @@
 typedef double float64_t;
 typedef float float32_t;
 
-extern float32_t _cst_0[64][64][3][3];
+extern float32_t _cst_0[36864];
 extern float32_t _cst_1[64];
 extern int32_t _cst_2[1];
-extern float32_t _cst_3[144][20480];
+extern float32_t _cst_3[2949120];
 extern float32_t _cst_4[4096];
 extern int32_t _cst_5[9];
 extern float32_t _cst_6[4096];

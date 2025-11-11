@@ -10,6 +10,7 @@
 #define NN_VECTOR_TENSOR_INSTR_H
 
 #include "air/base/instrument_ctx.h"
+#include "air/base/timing_util.h"
 #include "air/core/null_handler.h"
 #include "nn/vector/config.h"
 

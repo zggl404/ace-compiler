@@ -8,6 +8,7 @@
 // clang-format off
 #include "nn/vector/tensor2vector_handler.h"
 // clang-format on
+#include "fhe/ckks/ckks_ops.h"
 
 namespace py = pybind11;
 using namespace air::dsl;
@@ -91,7 +92,11 @@ PYBIND11_MODULE(air_dsl, m) {
       .def("new_var", &PY_AIRGEN::New_var, py::return_value_policy::reference)
       .def("new_float_array_const", &PY_AIRGEN::New_float_array_const,
            py::return_value_policy::reference)
+      .def("new_int_array_const", &PY_AIRGEN::New_int_array_const,
+           py::return_value_policy::reference)
       .def("formal", &PY_AIRGEN::Formal, py::return_value_policy::reference)
+      .def("ld_var", &PY_AIRGEN::Ld_var, py::return_value_policy::reference)
+      .def("call", &PY_AIRGEN::New_call, py::return_value_policy::reference)
       .def("zero", &PY_AIRGEN::New_zero, py::return_value_policy::reference)
       .def("intconst", &PY_AIRGEN::New_intconst,
            py::return_value_policy::reference)
@@ -126,10 +131,17 @@ PYBIND11_MODULE(air_dsl, m) {
            py::return_value_policy::reference)
       .def("clone_exp", &PY_AIRGEN::Clone_exp,
            py::return_value_policy::reference)
-      .def("new_array", &PY_AIRGEN::New_array,
+      .def("new_array",
+           py::overload_cast<CONSTANT_PTR, NODE_PTR&, const SPOS&>(
+               &PY_AIRGEN::New_array),
+           py::return_value_policy::reference)
+      .def("new_array",
+           py::overload_cast<ADDR_DATUM_PTR, NODE_PTR&, const SPOS&>(
+               &PY_AIRGEN::New_array),
            py::return_value_policy::reference)
       .def("append_block", &PY_AIRGEN::Append_block)
-      .def("new_ild", &PY_AIRGEN::New_ild, py::return_value_policy::reference);
+      .def("new_ild", &PY_AIRGEN::New_ild, py::return_value_policy::reference)
+      .def("new_ist", &PY_AIRGEN::New_ist, py::return_value_policy::reference);
 
   py::class_<PYCONTEXT>(m, "PyContext")
       .def(py::init<NODE_PTR>())
@@ -156,27 +168,11 @@ PYBIND11_MODULE(air_dsl, m) {
       .def("reshape", &VECTOR_API::Reshape, py::return_value_policy::reference)
       .def("slice", &VECTOR_API::Slice, py::return_value_policy::reference);
 
-  py::class_<NN_API>(m, "NNAPI")
-      .def(py::init<PY_AIRGEN&>())
-      .def("add", &NN_API::Add, py::return_value_policy::reference)
-      .def("mul", &NN_API::Mul, py::return_value_policy::reference)
-      .def("rmsnorm", &NN_API::Rmsnorm, py::return_value_policy::reference)
-      .def("matmul", &NN_API::Matmul, py::return_value_policy::reference)
-      .def("rope_rotary", &NN_API::Rope_rotary,
-           py::return_value_policy::reference)
-      .def("update_kcache", &NN_API::Update_kcache,
-           py::return_value_policy::reference)
-      .def("update_vcache", &NN_API::Update_vcache,
-           py::return_value_policy::reference)
-      .def("bmm", &NN_API::Bmm, py::return_value_policy::reference)
-      .def("softmax", &NN_API::Softmax, py::return_value_policy::reference)
-      .def("swiglu", &NN_API::Swiglu, py::return_value_policy::reference)
-      .def("rope", &NN_API::Rope, py::return_value_policy::reference)
-      .def("upd_kv", &NN_API::Upd_kv, py::return_value_policy::reference)
-      .def("comp_mha", &NN_API::Comp_mha, py::return_value_policy::reference)
-      .def("upd_mha", &NN_API::Upd_mha, py::return_value_policy::reference)
-      .def("accum", &NN_API::Accum, py::return_value_policy::reference)
-      .def("silu", &NN_API::Silu, py::return_value_policy::reference);
+// import CKKS dsl binding
+#include "fhe/ckks/ckks_binding.h"
+
+// import NN dsl binding
+#include "nn/core/nn_binding.h"
 
   py::class_<NODE>(m, "Node").def("spos", &NODE::Spos,
                                   py::return_value_policy::copy);

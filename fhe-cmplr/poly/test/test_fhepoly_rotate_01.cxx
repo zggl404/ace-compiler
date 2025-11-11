@@ -46,7 +46,8 @@ int main(int argc, char** argv) {
   std::ofstream            of("test_rotate_01.inc");
   fhe::poly::POLY2C_CONFIG p2c_config;
   fhe::poly::POLY2C_DRIVER poly2c(of, fhe_ctx, p2c_config);
-  poly2c.Run(glob);
+  POLY2C_VISITOR           visitor(poly2c.Ctx());
+  poly2c.Run(glob, visitor);
 
   Gen_expected(of);
   std::cout << "Output: test_rotate_01.inc" << std::endl;

@@ -98,13 +98,18 @@ public:
         _os << ", 0, sizeof(";
         Emit_preg_id((*it)->Id());
         _os << "));" << std::endl;
+      } else if (Is_poly_type(type)) {
+        _os << "  Alloc_lpoly_data(&";
+        Emit_preg_id((*it)->Id());
+        _os << ", degree);" << std::endl;
       }
     }
   }
 
   void Emit_need_bts() {
-    if (this->Provider() == core::PROVIDER::SEAL) {
-      _os << "bool need_bts() {"
+    if (this->Provider() == core::PROVIDER::SEAL ||
+        this->Provider() == core::PROVIDER::PHANTOM) {
+      _os << "bool Need_bts() {"
           << "\n";
       if (this->_need_bts) {
         _os << "  return true;\n";

@@ -865,7 +865,11 @@ CONTAINER::New_retv(CONST_NODE_PTR retv, const SPOS& spos) {
 STMT_PTR
 CONTAINER::New_call(CONST_ENTRY_PTR entry, CONST_PREG_PTR retv,
                     uint32_t num_args, const SPOS& spos) {
-  AIR_ASSERT((entry != Null_ptr) && (retv != Null_ptr));
+  AIR_ASSERT(entry != Null_ptr);
+  AIR_ASSERT(
+      retv == Null_ptr ||
+      retv->Type()->Is_compatible_type(
+          entry->Type()->Base_type()->Cast_to_sig()->Ret_param()->Type()));
   STMT_PTR stmt = New_stmt(core::OPC_CALL, spos, num_args);
   NODE_PTR node = stmt->Node();
   node->Set_entry(entry);

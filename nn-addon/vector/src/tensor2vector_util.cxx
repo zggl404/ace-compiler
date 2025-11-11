@@ -25,8 +25,26 @@ void Compute_pad_gemm(int64_t& n, int64_t& k, int64_t num_slots) {
   int64_t orig_n = n;
   int64_t orig_k = k;
 
+  // make sure n is less than k
   if (n > k) {
     std::swap(n, k);
+  }
+
+  if (Is_power_of_two(k) && !Is_power_of_two(n)) {
+    int limit = Next_power_of_two(n);
+    int padn;
+    for (padn = n; padn <= limit; padn++) {
+      if (k % padn == 0) break;
+    }
+    n = padn;
+  }
+
+  if (k == num_slots || k == num_slots / 2) {
+    int padn;
+    for (padn = n; padn <= n * k; padn++) {
+      if (k % padn == 0) break;
+    }
+    n = padn;
   }
 
   int64_t incre_n = (k - n % k) % k;
@@ -89,18 +107,6 @@ int Get_costmodel_fusion(int channel_in, int channel_out, int kernel_size,
   return bank;
 }
 
-// Trace the analysis params.
-void TENSOR2VECTOR_UTIL::Trace_conv_params(int num_grid, int num_block,
-                                           int width_block_data,
-                                           int width_block_pad, int cap_block,
-                                           int num_dup_input, std::string msg) {
-  _ctx.Trace(TF_LOWER, "Trace_conv_params: ", msg, "\nslots=", _ctx.Get_slot(),
-             "\nnum_grid=", num_grid, "\nnum_block=", num_block,
-             "\nwidth_block_data=", width_block_data,
-             "\nwidth_block_pad=", width_block_pad, "\ncap_block=", cap_block,
-             "\nnum_dup_input=", num_dup_input, "\n========\n");
-}
-
 // Reduce_add_intra: input is vector with rep blocks each size kd.
 // [kd;sf; || kd;sf; || ...]
 // Add rep blocks, and return ADDR_DATUM_PTR result.
@@ -117,28 +123,36 @@ ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Reduce_add_intra(ADDR_DATUM_PTR input,
   STMT_PTR init = _cntr->New_st(_cntr->New_ld(input, spos), var_reduce, spos);
   _ctx.Prepend(init);
 
-  // Reduce add by loop(1...rep): add rotate(input, i*(bsize+sf))
-  STMT_PTR  loop_reduce = New_loop("ri", 1, rep, spos);
-  STMT_LIST reduce_sl   = Get_loop_sl(loop_reduce);
+  if (Is_power_of_two(rep)) {
+    // Reduce add by log based loop(0...log2(rep)): add rotate(input,
+    // 2^i*(bsize+sf))
+    // This method uses less rotations.
+    Gen_loop_roll_add_stmt("ri", log2(rep), (kd + sf),
+                           _cntr->New_ld(var_reduce, spos), spos);
+  } else {
+    // Reduce add by loop(1...rep): add rotate(input, i*(bsize+sf))
+    STMT_PTR  loop_reduce = New_loop("ri", 1, rep, spos);
+    STMT_LIST reduce_sl   = Get_loop_sl(loop_reduce);
 
-  std::vector<int> roll_num;
-  for (int i = 1; i < rep; i++) {
-    roll_num.push_back(i * (kd + sf));
+    std::vector<int> roll_num;
+    for (int i = 1; i < rep; i++) {
+      roll_num.push_back(i * (kd + sf));
+    }
+
+    NODE_PTR shift = _cntr->New_bin_arith(
+        air::core::OPCODE::MUL, s32t, Get_loop_iv(loop_reduce),
+        _cntr->New_intconst(s32t, kd + sf, spos), spos);
+
+    NODE_PTR input_roll_left =
+        New_roll(_cntr->New_ld(input, spos), shift, roll_num, spos);
+
+    NODE_PTR add_roll =
+        New_add(_cntr->New_ld(var_reduce, spos), input_roll_left, spos);
+
+    STMT_PTR store_reduce = _cntr->New_st(add_roll, var_reduce, spos);
+    reduce_sl.Append(store_reduce);
+    _ctx.Prepend(loop_reduce);
   }
-
-  NODE_PTR shift = _cntr->New_bin_arith(
-      air::core::OPCODE::MUL, s32t, Get_loop_iv(loop_reduce),
-      _cntr->New_intconst(s32t, kd + sf, spos), spos);
-
-  NODE_PTR input_roll_left =
-      New_roll(_cntr->New_ld(input, spos), shift, roll_num, spos);
-
-  NODE_PTR add_roll =
-      New_add(_cntr->New_ld(var_reduce, spos), input_roll_left, spos);
-
-  STMT_PTR store_reduce = _cntr->New_st(add_roll, var_reduce, spos);
-  reduce_sl.Append(store_reduce);
-  _ctx.Prepend(loop_reduce);
   return var_reduce;
 }
 
@@ -344,6 +358,74 @@ PREG_PTR TENSOR2VECTOR_UTIL::Gen_collective_reduce_stmt(
   return epi_preg;
 }
 
+PREG_PTR TENSOR2VECTOR_UTIL::Gen_collective_reduce_stmt(
+    ADDR_DATUM_PTR result_var, TYPE_PTR etype, const SPOS& spos,
+    int width_block_data, int output_size, bool need_mask) {
+  FUNC_SCOPE* fscope = _cntr->Parent_func_scope();
+  GLOB_SCOPE* gscope = _cntr->Glob_scope();
+
+  // corner case
+  if (output_size == _ctx.Get_slot()) {
+    _ctx.Trace(TF_LOWER,
+               "Gen_collective_reduce_stmt: output_size == _ctx.Get_slot() ",
+               output_size, "\n");
+    if (need_mask) {
+      FPVEC                mask(width_block_data, 1.0);
+      std::vector<int64_t> mask_shape{width_block_data};
+      CONSTANT_PTR         mask_const =
+          New_array_const(gscope, "mask", width_block_data, etype, mask_shape,
+                          (void*)mask.data(), spos);
+      NODE_PTR init_m1 = New_mul(_cntr->New_ld(result_var, spos),
+                                 _cntr->New_ldc(mask_const, spos), spos);
+
+      PREG_PTR epi_preg   = fscope->New_preg(result_var->Type());
+      STMT_PTR init_store = _cntr->New_stp(init_m1, epi_preg, spos);
+      _ctx.Prepend(init_store);
+      return epi_preg;
+    } else {
+      PREG_PTR epi_preg = fscope->New_preg(result_var->Type());
+      STMT_PTR init_store =
+          _cntr->New_stp(_cntr->New_ld(result_var, spos), epi_preg, spos);
+      _ctx.Prepend(init_store);
+      return epi_preg;
+    }
+  }
+
+  CONST_TYPE_PTR s32_type =
+      _cntr->Glob_scope()->Prim_type(PRIMITIVE_TYPE::INT_S32);
+
+  std::vector<int> roll_num_tail(1, -width_block_data);
+  NODE_PTR         roll_result =
+      New_roll(_cntr->New_ld(result_var, spos),
+               _cntr->New_intconst(s32_type, -width_block_data, spos),
+               roll_num_tail, spos);
+
+  NODE_PTR fini_add =
+      New_add(_cntr->New_ld(result_var, spos), roll_result, spos);
+
+  NODE_PTR init_m1;
+  if (need_mask) {
+    FPVEC mask(width_block_data, 1.0);
+    std::cout << "width_block_data=" << width_block_data << std::endl;
+
+    std::vector<int64_t> mask_shape{width_block_data};
+    CONSTANT_PTR         mask_const =
+        New_array_const(gscope, "mask", width_block_data, etype, mask_shape,
+                        (void*)mask.data(), spos);
+
+    init_m1 = New_mul(fini_add, _cntr->New_ldc(mask_const, spos), spos);
+  } else {
+    init_m1 = fini_add;
+  }
+
+  PREG_PTR epi_preg   = fscope->New_preg(init_m1->Rtype());
+  STMT_PTR init_store = _cntr->New_stp(init_m1, epi_preg, spos);
+
+  _ctx.Prepend(init_store);
+
+  return epi_preg;
+}
+
 NODE_PTR TENSOR2VECTOR_UTIL::Gen_mask_node(int64_t valid_len, TYPE_PTR etype,
                                            float val, const SPOS& spos) {
   GLOB_SCOPE* gscope = _cntr->Glob_scope();
@@ -392,19 +474,39 @@ void TENSOR2VECTOR_UTIL::Gen_clear_data_stmt(NODE_PTR    input_node,
   _ctx.Prepend(cz_result_stmt);
 }
 
-ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(std::string var_name,
-                                                        TYPE_PTR    vtype,
-                                                        const SPOS& spos) {
+ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_var(std::string var_name, TYPE_PTR vtype,
+                                           const SPOS& spos) {
   FUNC_SCOPE* fscope = _cntr->Parent_func_scope();
 
   std::string    var_str    = var_name + std::to_string(_ctx.Get_num_vloop());
   ADDR_DATUM_PTR result_var = fscope->New_var(vtype, var_str.c_str(), spos);
+  return result_var;
+}
 
-  NODE_PTR zero_node = _cntr->New_zero(vtype, spos);
-  STMT_PTR st_stmt   = _cntr->New_st(zero_node, result_var, spos);
+ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(std::string var_name,
+                                                        TYPE_PTR    vtype,
+                                                        const SPOS& spos) {
+  NODE_PTR       zero_node  = _cntr->New_zero(vtype, spos);
+  ADDR_DATUM_PTR result_var = Gen_var(var_name, vtype, spos);
+  STMT_PTR       st_stmt    = _cntr->New_st(zero_node, result_var, spos);
   _ctx.Prepend(st_stmt);
 
   return result_var;
+}
+
+void TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(ADDR_DATUM_PTR var,
+                                              const SPOS&    spos) {
+  NODE_PTR zero_node = _cntr->New_zero(var->Type(), spos);
+  STMT_PTR st_stmt   = _cntr->New_st(zero_node, var, spos);
+  _ctx.Prepend(st_stmt);
+}
+
+ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_var(
+    std::string var_name, std::string ty_name, ARRAY_TYPE_PTR ty_arr,
+    const std::vector<int64_t>& var_shape, const SPOS& spos) {
+  TYPE_PTR arr_type = New_array_type(_cntr->Glob_scope(), ty_name,
+                                     ty_arr->Elem_type(), var_shape, spos);
+  return Gen_var(var_name, arr_type, spos);
 }
 
 ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Gen_st_0_to_var_stmt(
@@ -492,6 +594,7 @@ void TENSOR2VECTOR_UTIL::Gen_loop_combine_stmt(
     ADDR_DATUM_PTR result_var, const SPOS& spos) {
   CONST_TYPE_PTR s32_type =
       _cntr->Glob_scope()->Prim_type(PRIMITIVE_TYPE::INT_S32);
+  Gen_st_0_to_var_stmt(result_var, spos);
 
   STMT_PTR  loop_stmt = New_loop(loop_name, 0, loop_ub, spos);
   STMT_LIST body_sl =
@@ -672,7 +775,8 @@ NODE_PTR TENSOR2VECTOR_UTIL::New_conv_metakernel(
   Gen_dup_input_stmt(input, dup_num, channel_in * output_height * output_width,
                      input_dup_var, spos);
 
-  // Generate two-level LoopNest: level1 for channel_in, level2 for kernel_size
+  // Generate two-level LoopNest: level1 for channel_in, level2 for
+  // kernel_size
   STMT_PTR  loop1_stmt = New_loop("index_cin", 0, channel_in, spos);
   STMT_LIST body1_sl =
       STMT_LIST::Enclosing_list(loop1_stmt->Node()->Child(3)->End_stmt());
@@ -990,27 +1094,23 @@ NODE_PTR TENSOR2VECTOR_UTIL::New_conv_metakernel_fast(
   _ctx.Prepend(grid_loop);
 
   STMT_PTR vadd_bias_stmt;
-  if (num_block > 1) {
-    _ctx.Trace(TF_LOWER, "Reduce_add_intra: Ps=", num_block, "\n");
-    result_var     = Reduce_add_intra(result_var, num_block, width_block_data,
-                                      width_block_pad, spos);
-    vadd_bias_stmt = _cntr->New_st(
-        New_add(_cntr->New_ld(result_var, spos), bias, spos), result_var, spos);
-    _ctx.Prepend(vadd_bias_stmt);
-
-    NODE_PTR ld_result = _cntr->New_ld(result_var, spos);
-    return ld_result;
-  }
-
   if (((channel_in > 1) && (group != channel_in) && !is_cyclic) ||
       (num_slots == output_size)) {
     // Here we get results of all blocks in a vecotr. Reduce it.
     // num_block == 1: 2xslots for rotate-left. so width_block_pad:
-    if (num_block == 1)
-      width_block_pad = (channel_in - 1) * output_height * output_width;
-    PREG_PTR epi_preg = Gen_collective_reduce_stmt(
-        result_var, type2d_elem->Elem_type(), spos, num_block, width_block_data,
-        width_block_pad, output_size, need_mask);
+    PREG_PTR epi_preg;
+    if ((!_ctx.Conv_parallel()) && (!_ctx.Sharding()) && (num_block == 1)) {
+      epi_preg =
+          Gen_collective_reduce_stmt(result_var, type2d_elem->Elem_type(), spos,
+                                     width_block_data, output_size, need_mask);
+    } else {
+      if (num_block == 1) {
+        width_block_pad = (channel_in - 1) * output_height * output_width;
+      }
+      epi_preg = Gen_collective_reduce_stmt(
+          result_var, type2d_elem->Elem_type(), spos, num_block,
+          width_block_data, width_block_pad, output_size, need_mask);
+    }
     vadd_bias_stmt = _cntr->New_st(
         New_add(_cntr->New_ldp(epi_preg, spos), bias, spos), result_var, spos);
   } else {
@@ -1450,15 +1550,15 @@ ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Comb_in_row(
     // 1. combine in row
     // 1.1 prepare combine row result variaable, make it = 0
     std::vector<int64_t> ret_shape{channel * ih * iw};
-    ADDR_DATUM_PTR       ret_var = Gen_st_0_to_var_stmt(
-        "comb_row_result", "comb_row_float", ty_arr, ret_shape, spos);
+    ADDR_DATUM_PTR       ret_var =
+        Gen_var("comb_row_result", "comb_row_float", ty_arr, ret_shape, spos);
 
     if (enb_row_fast) {
       if (_ctx.Stride_slice_exp()) {
         Gen_comb_large_row(input_var, ret_var, ty_arr, stride, spos);
       } else {
-        // TODO: when mask fuse optimization is enabled, fast implement may need
-        // to do masking first.
+        // TODO: when mask fuse optimization is enabled, fast implement may
+        // need to do masking first.
         Gen_comb_row_fast(input_var, ret_var, ty_arr, stride, spos);
       }
     } else {
@@ -1748,8 +1848,8 @@ ADDR_DATUM_PTR TENSOR2VECTOR_UTIL::Comb_cross_row_col(
   // 2. combine by rows and columns
   // 2.1 prepare combine row and column result, VECTOR result = 0
   std::vector<int64_t> ret_shape{channel * ih * iw};
-  ADDR_DATUM_PTR       ret_var = Gen_st_0_to_var_stmt(
-      "comb_rc_result", "comb_rc_float", ty_arr, ret_shape, spos);
+  ADDR_DATUM_PTR       ret_var =
+      Gen_var("comb_rc_result", "comb_rc_float", ty_arr, ret_shape, spos);
 
   if (enable_rc_fast) {
     Gen_comb_rc_fast(input_var, ret_var, ty_arr, stride, interval, spos);
@@ -1780,7 +1880,7 @@ NODE_PTR TENSOR2VECTOR_UTIL::Comb_cross_channel(
 
   NODE_PTR load_ret_node;
   if (need_comb_cc) {
-    ADDR_DATUM_PTR ret_var = Gen_st_0_to_var_stmt("ss_result", ret_type, spos);
+    ADDR_DATUM_PTR ret_var = Gen_var("ss_result", ret_type, spos);
 
     if (Enable_log_cc_comb(channel, ih, iw, oh, ow)) {
       Gen_log_based_comb_cc(input_var, ret_var, ty_arr, stride, spos);
@@ -1854,6 +1954,12 @@ NODE_PTR TENSOR2VECTOR_UTIL::New_extract_valid_data(
   int64_t        oh        = ss_h / stride;
   int64_t        ow        = ss_w / stride;
 
+  // when sss option is enabled, ss_h != ih
+  std::vector<int64_t> new_input_shape{1, channel, ss_h, ss_w};
+  TYPE_PTR             new_input_type = _cntr->Glob_scope()->New_arr_type(
+      ty_arr->Elem_type(), new_input_shape, spos);
+  ARRAY_TYPE_PTR new_ty_arr = new_input_type->Cast_to_arr();
+
   if (stride == ss_h) {
     // global average pool, only need combine cross channel since only 1 valid
     // element in 1 channel
@@ -1864,7 +1970,8 @@ NODE_PTR TENSOR2VECTOR_UTIL::New_extract_valid_data(
       // compact. move it to gap implementation?
       Gen_clear_data_stmt(input, spos);
     }
-    return Comb_cross_channel(input_var, ty_arr, oh, ow, stride, spos, true);
+    return Comb_cross_channel(input_var, new_ty_arr, oh, ow, stride, spos,
+                              true);
   }
 
   bool enb_row_fast = false;
@@ -1891,20 +1998,20 @@ NODE_PTR TENSOR2VECTOR_UTIL::New_extract_valid_data(
   if ((stride > 1) &&
       (_ctx.Two_level_ss() || Enable_1level_channel_comb(ih, iw))) {
     // consume 1 level to combine valid elements in channels
-    comb_rc_ret = Gen_comb_in_channel(input_var, ty_arr, stride, spos);
+    comb_rc_ret = Gen_comb_in_channel(input_var, new_ty_arr, stride, spos);
   } else {
     int64_t interval = 0;
     // consume 1 level to combine valid elements in rows
     ADDR_DATUM_PTR comb_row_ret =
-        Comb_in_row(input_var, ty_arr, ow, stride, padsize, interval,
+        Comb_in_row(input_var, new_ty_arr, ow, stride, padsize, interval,
                     is_start_pos_valid, enb_row_fast, spos);
 
     // consume 1 level to combine valid elements in rows and columns
-    comb_rc_ret = Comb_cross_row_col(comb_row_ret, ty_arr, oh, ow, stride,
+    comb_rc_ret = Comb_cross_row_col(comb_row_ret, new_ty_arr, oh, ow, stride,
                                      interval, spos, enb_rc_fast);
   }
 
-  return Comb_cross_channel(comb_rc_ret, ty_arr, oh, ow, stride, spos,
+  return Comb_cross_channel(comb_rc_ret, new_ty_arr, oh, ow, stride, spos,
                             enb_cc_fast);
 }
 
@@ -2055,6 +2162,18 @@ NODE_PTR Handle_gemm_base(TENSOR2VECTOR_CTX& ctx, air::base::NODE_PTR node,
   NODE_PTR new_node =
       vgen.New_gemm_metakernel(new_ld0, new_weight, new_bias, need_mask, spos);
   return new_node;
+}
+
+// Trace the analysis params.
+void TENSOR2VECTOR_UTIL::Trace_conv_params(int num_grid, int num_block,
+                                           int width_block_data,
+                                           int width_block_pad, int cap_block,
+                                           int num_dup_input, std::string msg) {
+  _ctx.Trace(TF_LOWER, "Trace_conv_params: ", msg, "\nslots=", _ctx.Get_slot(),
+             "\nnum_grid=", num_grid, "\nnum_block=", num_block,
+             "\nwidth_block_data=", width_block_data,
+             "\nwidth_block_pad=", width_block_pad, "\ncap_block=", cap_block,
+             "\nnum_dup_input=", num_dup_input, "\n========\n");
 }
 
 }  // namespace vector

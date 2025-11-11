@@ -92,6 +92,15 @@ size_t Fetch_q_primes(uint64_t* primes) {
   return LIST_LEN(q_primes);
 }
 
+size_t Fetch_p_primes(uint64_t* primes) {
+  VL_CRTPRIME* p_primes = Get_p_primes(Get_crt_context());
+  FOR_ALL_ELEM(p_primes, idx) {
+    CRT_PRIME* prime = Get_vlprime_at(p_primes, idx);
+    primes[idx]      = (uint64_t)Get_modulus_val(prime);
+  }
+  return LIST_LEN(p_primes);
+}
+
 void Fetch_qlhinvmodq_at(const uint64_t** vals, size_t* cnt, uint32_t part_idx,
                          uint32_t part_size_idx) {
   VL_VL_VL_I64* qlhinvmodq = Get_qlhatinvmodq(Get_qpart(Get_crt_context()));

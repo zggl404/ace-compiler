@@ -8,8 +8,15 @@
 # Build external gperftools project dependent function
 function(build_external_gperf)
 
-  set(REPO_GPERF_URL      "https://github.com/gperftools/gperftools.git")
-  message(STATUS "Cloning External Repository   : ${REPO_GPERF_URL}")
+  set(GPERF_URL      "https://code.alipay.com/opencc/gperftools.git")
+  set(GPERF_URL_SSH  "git@code.alipay.com:opencc/gperftools.git")
+  if(EXTERNAL_URL_SSH)
+    set(REPO_GPERF_URL ${GPERF_URL_SSH})
+  else()
+    set(REPO_GPERF_URL ${GPERF_URL})
+  endif()
+
+  message(STATUS "Cloning External Repository    : ${REPO_GPERF_URL}")
 
   include(ExternalProject)
   ExternalProject_Add(

@@ -313,6 +313,13 @@ ADDR_DATUM_PTR IR_GEN::New_polys_var(const SPOS& spos) {
   return var;
 }
 
+CONST_VAR IR_GEN::New_ciph_preg() {
+  FUNC_SCOPE* fs   = Container()->Parent_func_scope();
+  PREG_PTR    preg = fs->New_preg(Get_type(CIPH));
+  Tmp_var().emplace_back(fs, preg);
+  return Tmp_var().back();
+}
+
 ADDR_DATUM_PTR IR_GEN::New_swk_var(const air::base::SPOS& spos) {
   FUNC_SCOPE*    fs = Container()->Parent_func_scope();
   ADDR_DATUM_PTR var =
@@ -599,6 +606,17 @@ uint32_t IR_GEN::Get_sbase(NODE_PTR node) {
   return s_base;
 }
 
+uint32_t IR_GEN::Get_sf_deg(NODE_PTR node) {
+  // get the scaling factor degree from node attribute
+  uint32_t        sf_deg = 1;
+  const uint32_t* sf_deg_attr =
+      node->Attr<uint32_t>(fhe::core::FHE_ATTR_KIND::SCALE);
+  if (sf_deg_attr != NULL) {
+    sf_deg = *sf_deg_attr;
+  }
+  return sf_deg;
+}
+
 bool IR_GEN::Is_coeff_mode(air::base::NODE_PTR node) {
   bool            is_coeff = false;
   const uint32_t* coeff_attr =
@@ -636,6 +654,13 @@ void IR_GEN::Set_sbase(air::base::NODE_PTR node, uint32_t idx) {
   AIR_ASSERT_MSG(Is_fhe_type(tid), "node is not a fhe type");
 
   node->Set_attr(fhe::core::FHE_ATTR_KIND::S_BASE, &idx, 1);
+}
+
+void IR_GEN::Set_sf_deg(air::base::NODE_PTR node, uint32_t sf) {
+  TYPE_ID tid = Node_ty_id(node);
+  AIR_ASSERT_MSG(Is_fhe_type(tid), "node is not a fhe type");
+
+  node->Set_attr(fhe::core::FHE_ATTR_KIND::SCALE, &sf, 1);
 }
 
 void IR_GEN::Set_coeff_mode(air::base::NODE_PTR node, uint32_t value) {

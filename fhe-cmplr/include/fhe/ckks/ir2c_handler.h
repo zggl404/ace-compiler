@@ -37,7 +37,7 @@ public:
       ctx << "Add_ciph(&";
     } else {
       AIR_ASSERT(node->Child(1)->Rtype()->Is_prim());
-      ctx << "Add_const(&";
+      ctx << "Add_scalar(&";
     }
     ctx.Emit_st_var(parent);
     ctx << ", ";
@@ -61,7 +61,7 @@ public:
       ctx << "Mul_ciph(&";
     } else {
       AIR_ASSERT(node->Child(1)->Rtype()->Is_prim());
-      ctx << "Mul_ciph(&";
+      ctx << "Mul_scalar(&";
     }
 
     ctx.Emit_st_var(parent);
@@ -139,11 +139,37 @@ public:
     visitor->template Visit<RETV>(node->Child(0));
     const uint32_t* mul_lev =
         node->Attr<uint32_t>(fhe::core::FHE_ATTR_KIND::LEVEL);
-    ctx << ", " << (mul_lev == nullptr ? 0 : *mul_lev) << ")";
-    ctx << ")";
+    ctx << ", " << (mul_lev == nullptr ? 0 : *mul_lev);
+
+    const uint32_t* slot = node->Attr<uint32_t>(nn::core::ATTR::SLOT);
+    ctx << ", " << (slot == nullptr ? 0 : *slot) << ")";
     if (!ctx._need_bts) {
       ctx._need_bts = true;
     }
+  }
+
+  template <typename RETV, typename VISITOR>
+  void Handle_free(VISITOR* visitor, air::base::NODE_PTR node) {
+    IR2C_CTX& ctx      = visitor->Context();
+    uint64_t  elem_cnt = 0;
+    if (node->Child(0)->Opcode() == air::core::OPC_LD &&
+        node->Child(0)->Addr_datum()->Type()->Is_array()) {
+      elem_cnt =
+          node->Child(0)->Addr_datum()->Type()->Cast_to_arr()->Elem_count();
+    }
+    if (ctx.Is_cipher_type(node->Child(0)->Rtype_id()) ||
+        ctx.Is_cipher3_type(node->Child(0)->Rtype_id())) {
+      ctx << "Free_ciph(";
+    } else if (ctx.Is_plain_type(node->Child(0)->Rtype_id())) {
+      ctx << "Free_plain(";
+    } else {
+      ctx << "Free_ciph_array(";
+    }
+    visitor->template Visit<RETV>(node->Child(0));
+    if (elem_cnt > 0) {
+      ctx << ", " << elem_cnt;
+    }
+    ctx << ")";
   }
 
   template <typename RETV, typename VISITOR>

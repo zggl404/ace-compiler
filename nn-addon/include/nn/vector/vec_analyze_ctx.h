@@ -67,7 +67,7 @@ public:
                    "Conv only supports kernel_height = kernel_width");
 
     int64_t dup_num = 1;
-    if (ctx.Conv_fast() && channel_out >= channel_in) {
+    if (channel_out >= channel_in) {
       dup_num = channel_out / channel_in;
       if (!Is_power_of_two(channel_out)) {
         // duplicate once more

@@ -70,6 +70,21 @@ def find_all_files(cwd, exclude_dirs):
     return res
 
 
+def print_except_info(info, exc: subprocess.TimeoutExpired):
+    '''
+    Print out exeception information
+    '''
+    print(info)
+    if exc.stdout is not None:
+        print('-------- stdout --------')
+        print(exc.stdout.decode())
+    if exc.stderr is not None:
+        print('-------- stderr --------')
+        print(exc.stderr.decode())
+    print('-------- end of time out info --------')
+    return
+
+
 def find_last_changed_files(cwd, exclude_dirs, time_out):
     '''
     Find latest changed files,
@@ -79,15 +94,23 @@ def find_last_changed_files(cwd, exclude_dirs, time_out):
     res = []
     # look for diff files of current branch first, ignore deleted & unmerged files
     cmds = ['git', 'diff', 'origin/HEAD', '--name-only', '--diff-filter=du']
-    ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         timeout=time_out, check=False)
+    try:
+        ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             timeout=time_out, check=False)
+    except subprocess.TimeoutExpired as exc:
+        print_except_info('Git diff time out: ' + ' '.join(cmds), exc)
+        sys.exit(-1)
     if ret.returncode == 0:
         files = ret.stdout.decode().splitlines()
         res.extend(find_valid_files(cwd, exclude_dirs, files))
     # look for cached diff files, ignore deleted files
     cmds = ['git', 'diff', '--cached', '--name-only', '--diff-filter=d']
-    ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                         timeout=time_out, check=False)
+    try:
+        ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             timeout=time_out, check=False)
+    except subprocess.TimeoutExpired as exc:
+        print_except_info('Git diff cached time out: ' + ' '.join(cmds), exc)
+        sys.exit(-1)
     if ret.returncode == 0:
         files = ret.stdout.decode().splitlines()
         for file in find_valid_files(cwd, exclude_dirs, files):
@@ -96,8 +119,12 @@ def find_last_changed_files(cwd, exclude_dirs, time_out):
     # if no diff file, look for files in last commit/merge, ignore deleted files
     if len(res) == 0:
         cmds = ['git', 'log', '-m', '-1', '--name-only', '--diff-filter=d', '--pretty=']
-        ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             timeout=time_out, check=False)
+        try:
+            ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 timeout=time_out, check=False)
+        except subprocess.TimeoutExpired as exc:
+            print_except_info('Git log time out: ' + ' '.join(cmds), exc)
+            sys.exit(-1)
         if ret.returncode == 0:
             files = ret.stdout.decode().splitlines()
             res.extend(find_valid_files(cwd, exclude_dirs, files))
@@ -136,8 +163,12 @@ def pep8_format(files, dry_run, debug, time_out):
             cmds.append('-i')
         if debug:
             print(' '.join(cmds))
-        ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             timeout=time_out, check=False)
+        try:
+            ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 timeout=time_out, check=False)
+        except subprocess.TimeoutExpired as exc:
+            print_except_info('Pep8 time out: ' + ' '.join(cmds), exc)
+            sys.exit(-1)
         if dry_run:
             if len(ret.stdout.decode().splitlines()) != 0:
                 ret_val = 1
@@ -158,8 +189,12 @@ def flake8_check(config_file, mypy_config, files, dry_run, debug, time_out):
         cmds = ['flake8', '--config', config_file, '--mypy-config', mypy_config, file]
         if debug:
             print(' '.join(cmds))
-        ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             timeout=time_out, check=False)
+        try:
+            ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 timeout=time_out, check=False)
+        except subprocess.TimeoutExpired as exc:
+            print_except_info('Flake8 time out: ' + ' '.join(cmds), exc)
+            sys.exit(-1)
         if ret.returncode != 0:
             ret_val = 1
             if dry_run:
@@ -179,8 +214,12 @@ def check_naming(config_file, files, build, dry_run, debug, time_out):
         cmds = ['clang-tidy', '-p', build, '--config-file=' + config_file, file]
         if debug:
             print(' '.join(cmds))
-        ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             timeout=time_out, check=False)
+        try:
+            ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 timeout=time_out, check=False)
+        except subprocess.TimeoutExpired as exc:
+            print_except_info('Clang-tidy time out: ' + ' '.join(cmds), exc)
+            sys.exit(-1)
         errors = ret.stdout.decode().splitlines()
         has_issue = False
         for item in errors:
@@ -210,8 +249,12 @@ def force_format(config_file, files, dry_run, debug, time_out):
             cmds.append('-i')
         if debug:
             print(' '.join(cmds))
-        ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                             timeout=time_out, check=False)
+        try:
+            ret = subprocess.run(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 timeout=time_out, check=False)
+        except subprocess.TimeoutExpired as exc:
+            print_except_info('Clang-format time out: ' + ' '.join(cmds), exc)
+            sys.exit(-1)
         if ret.returncode != 0:
             ret_val = 1
             if dry_run:

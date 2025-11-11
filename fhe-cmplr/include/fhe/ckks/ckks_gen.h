@@ -78,6 +78,8 @@ public:
 
   void Register_ckks_types();
 
+  CONTAINER* Cntr() { return _cntr; }
+
 private:
   // REQUIRED UNDEFINED UNWANTED methods
   CKKS_GEN(void);

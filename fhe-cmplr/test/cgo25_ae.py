@@ -16,6 +16,11 @@ from run_accuracy import run_accuracy
 def cgo25_ae(cwd, args, log):
     '''
     Main function to run CGO25 AE
+
+    Args:
+        cwd(str): current working directory
+        args(Namespace): arguments needed to run
+        log(file): log file
     '''
     if args.perf:
         exec_files = run_ace_compile(cwd, args.file, args.model, None, args.cmplr, args.src,

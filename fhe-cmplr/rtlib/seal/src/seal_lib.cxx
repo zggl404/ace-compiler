@@ -157,14 +157,32 @@ public:
   }
 
 public:
-  void Add(const Ciphertext* op1, const Ciphertext* op2, Ciphertext* res) {
-    if (res == op1) {
-      _eval->add_inplace(*res, *op2);
-    } else if (res == op2) {
-      _eval->add_inplace(*res, *op1);
-    } else {
-      _eval->add(*op1, *op2, *res);
+  void Adjust_level(Ciphertext& op1, Ciphertext& op2, uint64_t level_1,
+                    uint64_t level_2) {
+    if (level_1 > level_2) {
+      while (level_1 > level_2) {
+        _eval->mod_switch_to_next_inplace(op1);
+        --level_1;
+      }
+    } else if (level_1 < level_2) {
+      while (level_1 < level_2) {
+        _eval->mod_switch_to_next_inplace(op2);
+        --level_2;
+      }
     }
+  }
+
+  void Add(const Ciphertext* op1, const Ciphertext* op2, Ciphertext* res) {
+    Ciphertext final_op1 = *op1;
+    Ciphertext final_op2 = *op2;
+    uint64_t   level_1 = _ctx->get_context_data(op1->parms_id())->chain_index();
+    uint64_t   level_2 = _ctx->get_context_data(op2->parms_id())->chain_index();
+    if (level_1 != level_2) {
+      Adjust_level(final_op1, final_op2, level_1, level_2);
+    }
+
+    final_op2.scale() = final_op1.scale();
+    _eval->add(final_op1, final_op2, *res);
   }
 
   void Add(const Ciphertext* op1, const Plaintext* op2, Ciphertext* res) {
@@ -175,14 +193,26 @@ public:
     }
   }
 
-  void Mul(const Ciphertext* op1, const Ciphertext* op2, Ciphertext* res) {
+  void Add(const Ciphertext* op1, const double op2, Ciphertext* res) {
+    Plaintext plain;
+    _encoder->encode(op2, op1->parms_id(), op1->scale(), plain);
     if (res == op1) {
-      _eval->multiply_inplace(*res, *op2);
-    } else if (res == op2) {
-      _eval->multiply_inplace(*res, *op1);
+      _eval->add_plain_inplace(*res, plain);
     } else {
-      _eval->multiply(*op1, *op2, *res);
+      _eval->add_plain(*op1, plain, *res);
     }
+  }
+
+  void Mul(const Ciphertext* op1, const Ciphertext* op2, Ciphertext* res) {
+    Ciphertext final_op1 = *op1;
+    Ciphertext final_op2 = *op2;
+    uint64_t   level_1 = _ctx->get_context_data(op1->parms_id())->chain_index();
+    uint64_t   level_2 = _ctx->get_context_data(op2->parms_id())->chain_index();
+    if (level_1 != level_2) {
+      Adjust_level(final_op1, final_op2, level_1, level_2);
+    }
+
+    _eval->multiply(final_op1, final_op2, *res);
   }
 
   void Mul(const Ciphertext* op1, const Plaintext* op2, Ciphertext* res) {
@@ -190,6 +220,16 @@ public:
       _eval->multiply_plain_inplace(*res, *op2);
     } else {
       _eval->multiply_plain(*op1, *op2, *res);
+    }
+  }
+
+  void Mul(const Ciphertext* op1, const double op2, Ciphertext* res) {
+    Plaintext plain;
+    _encoder->encode(op2, op1->parms_id(), op1->scale(), plain);
+    if (res == op1) {
+      _eval->multiply_plain_inplace(*res, plain);
+    } else {
+      _eval->multiply_plain(*op1, plain, *res);
     }
   }
 
@@ -350,12 +390,12 @@ SEAL_CONTEXT::SEAL_CONTEXT() {
       bits.push_back(prog_param->_first_mod_size);
     }
   } else {
-    for (uint32_t i = 1; i < prog_param->_mul_depth; ++i) {
+    for (uint32_t i = 0; i < prog_param->_mul_depth; ++i) {
       bits.push_back(prog_param->_scaling_mod_size);
     }
   }
 #else
-  for (uint32_t i = 1; i < prog_param->_mul_depth; ++i) {
+  for (uint32_t i = 0; i < prog_param->_mul_depth; ++i) {
     bits.push_back(prog_param->_scaling_mod_size);
   }
 #endif
@@ -525,11 +565,19 @@ void Seal_add_plain(CIPHER res, CIPHER op1, PLAIN op2) {
   SEAL_CONTEXT::Context()->Add(op1, op2, res);
 }
 
+void Seal_add_scalar(CIPHER res, CIPHER op1, double op2) {
+  SEAL_CONTEXT::Context()->Add(op1, op2, res);
+}
+
 void Seal_mul_ciph(CIPHER res, CIPHER op1, CIPHER op2) {
   SEAL_CONTEXT::Context()->Mul(op1, op2, res);
 }
 
 void Seal_mul_plain(CIPHER res, CIPHER op1, PLAIN op2) {
+  SEAL_CONTEXT::Context()->Mul(op1, op2, res);
+}
+
+void Seal_mul_scalar(CIPHER res, CIPHER op1, double op2) {
   SEAL_CONTEXT::Context()->Mul(op1, op2, res);
 }
 
