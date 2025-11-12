@@ -10,7 +10,7 @@ fi
 build_type=$1
 build_dir=`echo $1 | tr 'A-Z' 'a-z'`
 
-cd $working_dir/ant_compiler
+cd $working_dir/ace_compiler
 
 # check directory
 check_source_directory() {
@@ -24,7 +24,18 @@ check_source_directory nn-addon
 check_source_directory fhe-cmplr
 
 # configure compiler with cmake
-cmake -S fhe-cmplr -B $working_dir/$build_dir -DFHE_WITH_SRC="air-infra;nn-addon" -DBUILD_UNITTEST=OFF -DAIR_BUILD_EXAMPLE=OFF -DBUILD_BENCH=OFF -DCMAKE_BUILD_TYPE=$build_type -DAIR_CODE_CHECK=OFF -DNN_CODE_CHECK=OFF -DFHE_CODE_CHECK=OFF
+cmake -S fhe-cmplr -B $working_dir/$build_dir \
+  -DFHE_WITH_SRC="air-infra;nn-addon" \
+  -DBUILD_UNITTEST=OFF \
+  -DAIR_BUILD_EXAMPLE=OFF \
+  -DBUILD_BENCH=OFF \
+  -DCMAKE_BUILD_TYPE=$build_type \
+  -DAIR_CODE_CHECK=OFF \
+  -DNN_CODE_CHECK=OFF \
+  -DFHE_CODE_CHECK=OFF \
+  -DFHE_ENABLE_SEAL=OFF \
+  -DFHE_ENABLE_OPENFHE=OFF
+
 if [ $? -ne 0 ]; then
   echo "Error: configure project with CMake failed."
   exit 1
