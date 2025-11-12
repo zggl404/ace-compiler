@@ -10,7 +10,7 @@ fi
 build_type=$1
 build_dir=`echo $1 | tr 'A-Z' 'a-z'`
 
-cd $working_dir/ace_compiler
+cd $working_dir/ace-compiler
 
 # check directory
 check_source_directory() {

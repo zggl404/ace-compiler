@@ -31,6 +31,8 @@ RUN python3 -m venv .pyenv && \
 
 ENV PATH="/root/.pyenv/bin:${PATH}"
 
+WORKDIR /app
+
 # Copy ace-compiler, scripts and set permissions
 COPY README.md .
 COPY air-infra ace-compiler/air-infra/
@@ -50,5 +52,3 @@ RUN chmod +x /app/scripts/build_cmplr.sh \
         /app/scripts/run_ncf.sh \
         /app/scripts/run_sss.sh \
         /app/scripts/run_sss_cf_mf.sh
-
-WORKDIR /app

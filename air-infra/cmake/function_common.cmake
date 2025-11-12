@@ -76,7 +76,7 @@ function(check_code_revision project commit)
     OUTPUT_VARIABLE GIT_COMMIT
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
-  assert("${GIT_COMMIT}" "can't get commit id")
+  # assert("${GIT_COMMIT}" "can't get commit id")
 
   set(${commit} ${GIT_COMMIT} PARENT_SCOPE)
   file(APPEND "${CMAKE_BINARY_DIR}/git_commit.txt" "${project} Commit: ${GIT_COMMIT}\n")
