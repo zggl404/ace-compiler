@@ -47,7 +47,7 @@ rm ./${exe_file}
 #OLDDIR=$PWD
 #CURDIR=`dirname $0`
 #cd $CURDIR
-time cc -DRTLIB_SUPPORT_LINUX $main_file ${graph_file} -I/app/ace_compiler/air-infra/include -I/app/ace_compiler/nn-addon/include -I/app/ace_compiler/fhe-cmplr/include -I/app/ace_compiler/fhe-cmplr/rtlib/include -I/app/fhefusion_cmplr/rtlib/include/ant -I/app/ace_compiler/fhe-cmplr/rtlib/ant/include /app/fhefusion_cmplr/rtlib/lib/libFHErt_ant.a /app/fhefusion_cmplr/rtlib/lib/libFHErt_common.a /usr/lib/x86_64-linux-gnu/libgmp.so /usr/lib/x86_64-linux-gnu/libm.so -o ${exe_file}
+time cc -DRTLIB_SUPPORT_LINUX $main_file ${graph_file} -I/app/fhefusion_cmplr/rtlib/include/ant -I/app/fhefusion_cmplr/rtlib/include -I/app/fhefusion_cmplr/include /app/fhefusion_cmplr/rtlib/lib/libFHErt_ant.a /app/fhefusion_cmplr/rtlib/lib/libFHErt_common.a /usr/lib/x86_64-linux-gnu/libgmp.so /usr/lib/x86_64-linux-gnu/libm.so -o ${exe_file}
 
 time ./${exe_file}
 ret=$?
