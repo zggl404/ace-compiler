@@ -20,22 +20,22 @@ OPTIMIZATION_OPTIONS = ['sss.cf.mf', 'base', 'cf', 'mf', 'ncf', 'sss']
 
 # Descriptions for each table, to be placed above them.
 FIGURE_DESCRIPTIONS = {
-    "Table3": """FUSION COUNTS OF NGRAPH, AND FHEFUSION ACROSS 13 MODEL
-VARIANTS. FOR FHEFUSION, FOUR FUSION VARIANTS ARE CONSIDERED:
+    "Table3": """FUSION COUNTS OF nGraph, AND FHEFusion ACROSS 13 MODEL
+VARIANTS. FOR FHEFusion, FOUR FUSION VARIANTS ARE CONSIDERED:
 CF (CONSTANT FOLDING), MF (MASKING), SF (COMPACTION VIA
 Strided_Slice), AND ALL (COMBINING ALL).""",
-    "Table4": "MULTIPLICATIVE DEPTHS OF ANT-ACE, NGRAPH, AND FHEFUSION.",
+    "Table4": "MULTIPLICATIVE DEPTHS OF ANT-ACE, nGraph, AND FHEFusion.",
     "Table5": "IMPACT OF FUSION ON BOOTSTRAPS REQUIRED.",
-    "Table6": "COMPILE TIMES OF ANT-ACE AND FHEFUSION (SECONDS).",
+    "Table6": "COMPILE TIMES OF ANT-ACE AND FHEFusion (SECONDS).",
 }
 
 CHART_DESCRIPTIONS = {
-    "Fig9": ("Fig. 9. Speedups of ANT-ACE, NGRAPH, and FHEFUSION (normalized to\n"
+    "Fig9": ("Fig. 9. Speedups of ANT-ACE, nGraph, and FHEFusion (normalized to\n"
              "ANT-ACE) for six models with high-degree polynomial RELU."),
-    "Fig10": ("Fig. 10. Speedups of ANT-ACE, NGRAPH, and FHEFUSION (normalized\n"
+    "Fig10": ("Fig. 10. Speedups of ANT-ACE, nGraph, and FHEFusion (normalized\n"
               "to ANT-ACE) for seven models with quadratic RELU approximations."),
-    "Fig11": "Fig. 11. FHEFUSION Ablation (vs. ANT-ACE) on six models in Figure 9.",
-    "Fig12": "Fig. 12. FHEFUSION Ablation (vs. ANT-ACE) on seven models in Figure 10.",
+    "Fig11": "Fig. 11. FHEFusion Ablation (vs. ANT-ACE) on six models in Figure 9.",
+    "Fig12": "Fig. 12. FHEFusion Ablation (vs. ANT-ACE) on seven models in Figure 10.",
 }
 
 
@@ -255,7 +255,7 @@ def process_data_for_charts(df: pd.DataFrame) -> dict:
 # generate_all_charts) remain exactly the same as the last correct version.
 
 BAR_WIDTH = 0.2
-FHEFUSION_GROUP_NAME = "FHEFUSION"
+FHEFUSION_GROUP_NAME = "FHEFusion"
 TABLE3_COL_DEFS = [ColumnDefinition(name="Model",textprops={"ha":"left"},width=0.75), ColumnDefinition(name="nGraph",textprops={"ha":"center"},width=0.75), ColumnDefinition(name="CF",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6), ColumnDefinition(name="MF",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6), ColumnDefinition(name="SF",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6), ColumnDefinition(name="ALL",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6)]
 TABLE4_COL_DEFS = [ColumnDefinition(name="Model",textprops={"ha":"left"},width=1.0), ColumnDefinition(name="ANT-ACE",textprops={"ha":"center"},width=0.8), ColumnDefinition(name="nGraph",textprops={"ha":"center"},width=0.75), ColumnDefinition(name="CF",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6), ColumnDefinition(name="MF",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6), ColumnDefinition(name="SF",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6), ColumnDefinition(name="ALL",group=FHEFUSION_GROUP_NAME,textprops={"ha":"center"},width=0.6)]
 TABLE5_COL_DEFS = [ColumnDefinition(name="Model",textprops={"ha":"left"},width=1.2), ColumnDefinition(name="ANT-ACE",textprops={"ha":"center"},width=0.9), ColumnDefinition(name="nGraph",textprops={"ha":"center"},width=0.9), ColumnDefinition(name="FHEFusion",textprops={"ha":"center"},width=1.0)]

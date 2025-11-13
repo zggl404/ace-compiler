@@ -18,7 +18,14 @@ RUN apt-get update && \
         cmake make ninja-build \
         python3 python3-dev python3-pip python3-venv pylint \
         libprotobuf-dev protobuf-compiler libssl-dev libtool \
-        libgmp3-dev libomp5 libomp-dev libntl-dev pybind11-dev && \
+        libgmp3-dev libomp5 libomp-dev libntl-dev pybind11-dev fontconfig && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Update Font
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
+    apt-get update && \
+    apt-get install -y --reinstall ttf-mscorefonts-installer && \
+    fc-cache -f -v && rm -rf ~/.cache/matplotlib && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # add scipt for clone avhc repos
