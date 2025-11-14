@@ -39,7 +39,7 @@ Encrypted inference is both compute-intensive and memory-intensive. A computer w
 - **air-infra:** Contains the base components of the ACE compiler with FHEFusion support.
 - **fhe-cmplr:** Houses FHE-related components of the ACE compiler with FHEFusion support.
 - **nn-addon:** Includes ONNX-related components for the ACE compiler with FHEFusion support.
-- **fhefusion_onnx:** Stores ONNX models.
+- **model:** Stores ONNX models.
 - **scripts:** Scripts for building and running FHEFusion and tests.
 - **test:** Test related.
 - **README.md:** This [*README*](https://github.com/ant-research/ace-compiler/blob/fhefusion/README.md) file.
