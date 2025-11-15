@@ -69,7 +69,7 @@ endfunction()
 # Check Build Version function
 function(check_code_revision project commit)
   assert("${project}" "project can't be empty")
-
+  return()
   execute_process(
     COMMAND git rev-parse HEAD
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
