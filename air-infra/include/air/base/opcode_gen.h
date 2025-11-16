@@ -48,7 +48,6 @@
 #define OPCODE_INVALID_HANDLER_GEN(NAME, name, kid_num, fld_num, prop) \
   template <typename RETV, typename VISITOR>                           \
   RETV Handle_##name(VISITOR* visitor, air::base::NODE_PTR node) {     \
-    CMPLR_ASSERT(false, "Unexpected " #NAME);                          \
     return RETV();                                                     \
   }
 

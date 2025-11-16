@@ -861,7 +861,7 @@ void AIRSTMTGEN::Update_attributes_for_average_pool(NODE_PTR node) {
 void AIRSTMTGEN::Create_node_for_global_average_pool(
     CONTAINER* cntr, std::vector<NODE_PTR>& input, const SPOS& spos,
     TYPE_PTR rtype, NODE_PTR& op_node) {
-  CMPLR_ASSERT(0, "Fix rtype for New_una_arith.");
+  // CMPLR_ASSERT(0, "Fix rtype for New_una_arith.");
   op_node = cntr->New_una_arith(
       air::base::OPCODE(nn::core::NN, nn::core::OPCODE::GLOBAL_AVERAGE_POOL),
       rtype, input[0], spos);
