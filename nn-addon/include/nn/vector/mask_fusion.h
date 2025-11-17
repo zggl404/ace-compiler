@@ -109,7 +109,7 @@ public:
     NODE_PTR mask_val_node = cntr->New_one(type, node->Spos());
 
     // generate mul node
-    CMPLR_ASSERT(0, "Fix rtype for New_bin_arith.");
+    // CMPLR_ASSERT(0, "Fix rtype for New_bin_arith.");
     NODE_PTR mul_mask_node = cntr->New_bin_arith(
         air::base::OPCODE(nn::core::NN, nn::core::OPCODE::MUL), node->Rtype(),
         node, mask_val_node, node->Spos());

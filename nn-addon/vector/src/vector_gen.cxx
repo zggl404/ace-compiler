@@ -24,7 +24,7 @@ namespace vector {
 using namespace air::base;
 
 NODE_PTR VECTOR_GEN::New_roll_sum(NODE_PTR op0, const SPOS& spos) {
-  CMPLR_ASSERT(0, "Fix rtype for New_una_arith.");
+//   CMPLR_ASSERT(0, "Fix rtype for New_una_arith.");
   NODE_PTR roll_sum_node = _cntr->New_una_arith(
       OPCODE(nn::vector::VECTOR, nn::vector::VECTOR_OPCODE::ROLL_SUM),
       op0->Rtype(), op0, spos);

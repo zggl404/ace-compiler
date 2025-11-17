@@ -60,7 +60,7 @@ A local directory `ae_result` is created and mounted in the docker container to 
 root@xxxxxx:/app#
 ```
 
-*Note: The compressed Docker image is approximately 2 GB and may take **several minutes to over an hour** to download, depending on your network speed.*
+*Note: The compressed Docker image is approximately 3 GB and may take **several minutes to over an hour** to download, depending on your network speed.*
 
 ### 2. Running All Tests
 
