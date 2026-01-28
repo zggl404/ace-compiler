@@ -17,8 +17,8 @@ CONFIG = {
             "/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu_1/Relu=7;/layer3/layer3.0/relu_1/Relu=4;"
             "/layer3/layer3.1/relu_1/Relu=6;/layer3/layer3.2/relu/Relu=4;/layer3/layer3.2/relu_1/Relu=20"
         ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom"
+        "ckks": "-CKKS:q0=60:sf=56:N=65536:bm",
+        "p2c": "-P2C:lib=phantom:df=weight/resnet20_cifar10_pre.bin"
     },
     "resnet32_cifar10": {
         "vec": '-VEC:conv_parl:ssf',
@@ -30,8 +30,8 @@ CONFIG = {
             "/layer2/layer2.0/relu/Relu=3;/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu_1/Relu=6;/layer2/layer2.4/relu_1/Relu=6;"
             "/layer3/layer3.0/relu/Relu=3;/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu_1/Relu=4;/layer3/layer3.2/relu/Relu=3;/layer3/layer3.2/relu_1/Relu=6;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=10;/layer3/layer3.4/relu_1/Relu=11"
         ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom"
+        "ckks": "-CKKS:q0=60:sf=56:N=65536:bm",
+        "p2c": "-P2C:lib=phantom:df=weight/resnet32_cifar10_pre.bin"
     },
     "resnet32_cifar100": {
         "vec": '-VEC:conv_parl:ssf',
@@ -42,8 +42,8 @@ CONFIG = {
             "/layer2/layer2.0/relu/Relu=4;/layer2/layer2.0/relu_1/Relu=6;/layer2/layer2.1/relu_1/Relu=8;/layer2/layer2.2/relu/Relu=4;/layer2/layer2.2/relu_1/Relu=8;/layer2/layer2.3/relu_1/Relu=9;/layer2/layer2.4/relu_1/Relu=11;"
             "/layer3/layer3.0/relu/Relu=4;/layer3/layer3.0/relu_1/Relu=8;/layer3/layer3.1/relu_1/Relu=9;/layer3/layer3.2/relu/Relu=4;/layer3/layer3.2/relu_1/Relu=11;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=26;/layer3/layer3.4/relu/Relu=5;/layer3/layer3.4/relu_1/Relu=46"
         ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom"
+        "ckks": "-CKKS:q0=60:sf=56:N=65536:bm",
+        "p2c": "-P2C:lib=phantom:df=weight/resnet32_cifar100_pre.bin"
     },
     "resnet44_cifar10": {
         "vec": '-VEC:conv_parl:ssf',
@@ -55,8 +55,8 @@ CONFIG = {
             "/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu/Relu=2;/layer2/layer2.3/relu_1/Relu=5;/layer2/layer2.4/relu/Relu=2;/layer2/layer2.4/relu_1/Relu=5;/layer2/layer2.5/relu/Relu=2;/layer2/layer2.5/relu_1/Relu=6;/layer2/layer2.6/relu/Relu=2;/layer2/layer2.6/relu_1/Relu=7;"
             "/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu/Relu=2;/layer3/layer3.1/relu_1/Relu=5;/layer3/layer3.2/relu/Relu=2;/layer3/layer3.2/relu_1/Relu=6;/layer3/layer3.3/relu_1/Relu=7;/layer3/layer3.4/relu_1/Relu=9;/layer3/layer3.5/relu_1/Relu=15;/layer3/layer3.6/relu_1/Relu=16"
         ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom"
+        "ckks": "-CKKS:q0=60:sf=56:N=65536:bm",
+        "p2c": "-P2C:lib=phantom:df=weight/resnet44_cifar10_pre.bin"
     },
     "resnet56_cifar10": {
         "vec": '-VEC:conv_parl:ssf',
@@ -67,8 +67,8 @@ CONFIG = {
             "/layer2/layer2.0/relu_1/Relu=4;/layer2/layer2.1/relu_1/Relu=4;/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu_1/Relu=5;/layer2/layer2.4/relu_1/Relu=6;/layer2/layer2.5/relu_1/Relu=8;/layer2/layer2.6/relu_1/Relu=11;/layer2/layer2.7/relu_1/Relu=11;/layer2/layer2.8/relu_1/Relu=12;"
             "/layer3/layer3.0/relu/Relu=3;/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu_1/Relu=5;/layer3/layer3.2/relu_1/Relu=5;/layer3/layer3.3/relu_1/Relu=5;/layer3/layer3.4/relu_1/Relu=5;/layer3/layer3.5/relu_1/Relu=6;/layer3/layer3.6/relu_1/Relu=8;/layer3/layer3.7/relu/Relu=3;/layer3/layer3.7/relu_1/Relu=10;/layer3/layer3.8/relu_1/Relu=12"
         ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom"
+        "ckks": "-CKKS:q0=60:sf=56:N=65536:bm",
+        "p2c": "-P2C:lib=phantom:df=weight/resnet56_cifar10_pre.bin"
     },
     "resnet110_cifar10": {
         "vec": '-VEC:conv_parl:ssf',
@@ -89,8 +89,8 @@ CONFIG = {
             "/layer3/layer3.16/relu/Relu=4;/layer3/layer3.16/relu_1/Relu=27;/layer3/layer3.17/relu/Relu=9;/layer3/layer3.17/relu_1/Relu=33;/layer3/layer3.2/relu/Relu=3;/layer3/layer3.2/relu_1/Relu=15;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=15;/layer3/layer3.4/relu/Relu=3;/layer3/layer3.4/relu_1/Relu=15;/layer3/layer3.5/relu/Relu=3;"
             "/layer3/layer3.5/relu_1/Relu=16;/layer3/layer3.6/relu/Relu=3;/layer3/layer3.6/relu_1/Relu=16;/layer3/layer3.7/relu/Relu=3;/layer3/layer3.7/relu_1/Relu=16;/layer3/layer3.8/relu/Relu=3;/layer3/layer3.8/relu_1/Relu=17;/layer3/layer3.9/relu/Relu=3;/layer3/layer3.9/relu_1/Relu=18"
         ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom"
+        "ckks": "-CKKS:q0=60:sf=56:N=65536:bm",
+        "p2c": "-P2C:lib=phantom:df=weight/resnet110_cifar10_pre.bin"
     },
 }
 
