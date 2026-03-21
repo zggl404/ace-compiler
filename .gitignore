@@ -4,3 +4,4 @@ scripts/*
 
 release/*
 ace_cmplr/*
+__pycache__/*

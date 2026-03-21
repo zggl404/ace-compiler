@@ -59,29 +59,41 @@ docker run -it --name ace -v "$(pwd)":/app --privileged ace:latest bash
 ```
 
 ## 2. Building the ACE Compiler
-To build the ACE compiler, navigate to the `/app` directory within the container and run:
-```
-/app/scripts/build_cmplr.sh Release
-```
-Upon successful completion, you will see:
-```
-Info: build project succeeded. FHE compiler executable can be found in /app/ace_cmplr/bin/fhe_cmplr
-root@xxxxxx:/app#
-```
-The ACE compiler will be built under `/app/release` and installed in the `/app/ace_cmplr` directory.
+All helper scripts now live under `scripts/`. Run the build script from the repository root:
 
-For debug purpose, run
+```bash
+cd /path/to/ace-compiler
+./scripts/build_cmplr.sh Release
 ```
-/app/scripts/build_cmplr.sh Debug
-```
-The ACE compiler will be built under `/app/debug`.
 
-Optionally, you can pick the FHE backend in build script:
+Inside Docker, the equivalent command is still:
+
+```bash
+cd /app
+./scripts/build_cmplr.sh Release
 ```
-/app/scripts/build_cmplr.sh Release ant         # default
-/app/scripts/build_cmplr.sh Release seal
-/app/scripts/build_cmplr.sh Release openfhe
-/app/scripts/build_cmplr.sh Release phantom-fhe 80
+
+Upon successful completion, you will see output similar to:
+
+```text
+Info: build project succeeded. FHE compiler executable can be found in /path/to/ace-compiler/ace_cmplr/bin/fhe_cmplr
+```
+
+The compiler build directory is `<repo>/release` for `Release` builds and `<repo>/debug` for `Debug` builds. The installed compiler is placed under `<repo>/ace_cmplr/bin/fhe_cmplr`.
+
+For a debug build, run:
+
+```bash
+./scripts/build_cmplr.sh Debug
+```
+
+Optionally, you can pick the FHE backend in the build script:
+
+```bash
+./scripts/build_cmplr.sh Release ant         # default
+./scripts/build_cmplr.sh Release seal
+./scripts/build_cmplr.sh Release openfhe
+./scripts/build_cmplr.sh Release phantom-fhe 80
 ```
 
 Notes:
@@ -95,20 +107,74 @@ Notes:
     - `RTLIB_PHANTOM_SOURCE_DIR` (local phantom-fhe source directory), or
     - `RTLIB_PHANTOM_REPO_URL` (an accessible git URL mirror).
 
-## 3. Building and run ResNet20-CIFAR model
-To build the ResNet20-CIFAR model, navigate to the `/app/release` directory within the container and run:
-```
-cd /app/release
-/app/scripts/build_resnet20_cifar10.sh test
-```
-'test' is just a configuration name and can be replaced by any other string. Upon successful completion, you will see:
-```
-[INFO]: build resnet20_cifar10 succeeded.
-root@xxxxxx:/app/release#
+## 3. Compiling example models with `scripts/ace_compile.py`
+The model compilation entry point is now `scripts/ace_compile.py`. It is designed to work both inside Docker and directly on the host machine, and it auto-detects the repository root from `ACE_ROOT` or the script location.
+
+By default, the script resolves paths relative to its own location, so when run from this repository it uses:
+
+- compiler: `<repo>/ace_cmplr/bin/fhe_cmplr`
+- model directory: `<repo>/model`
+- generated `.onnx.inc` directory: `<repo>/fhe-cmplr/rtlib/phantom/example`
+- target build helper: `<repo>/scripts/build_target_gpu.sh`
+- target build directory: `<repo>/release`
+
+### 3.1 Compile and link one model
+
+```bash
+python3 scripts/ace_compile.py --model resnet20_cifar10
 ```
 
-To run this model with first 10 images in CIFAR-10 dataset, run:
+This command compiles `model/resnet20_cifar10_pre.onnx`, generates `resnet20_cifar10_gpu.onnx.inc`, and then invokes `scripts/build_target_gpu.sh` to build the GPU target. If `model/resnet20_cifar10_gpu.cu` does not exist, `scripts/ace_compile.py` automatically calls `scripts/onnx2c.py` to generate it first.
+
+### 3.2 Compile all configured models
+
+```bash
+python3 scripts/ace_compile.py
 ```
-./dataset/resnet20_cifar10.test test_batch.bin 0 9
+
+### 3.3 Compile only, skip target build
+
+```bash
+python3 scripts/ace_compile.py --model resnet20_cifar10 --skip-link
 ```
-where 'test_batch.bin' is the path to CIFAR-10 data file, 0 and 9 is the index of start and end image. 
+
+Use this when you only want the generated `.onnx.inc` file. If you omit `--skip-link` and the matching `*_gpu.cu` target source is missing, `scripts/ace_compile.py` now auto-generates it through `scripts/onnx2c.py`.
+
+### 3.4 Rebuild target from an existing `.onnx.inc`
+
+```bash
+python3 scripts/ace_compile.py --model resnet20_cifar10 --skip-compile
+```
+
+Use this when the generated include file already exists and you only want to rerun the target build step. If `model/resnet20_cifar10_gpu.cu` is missing, this command also auto-generates it via `scripts/onnx2c.py` before building.
+
+### 3.5 Override default paths
+
+```bash
+python3 scripts/ace_compile.py \
+  --root /path/to/ace-compiler \
+  --compiler /path/to/fhe_cmplr \
+  --model-dir /path/to/model \
+  --link-dir /path/to/output \
+  --build-dir /path/to/release \
+  --model resnet20_cifar10
+```
+
+Supported options:
+
+- `--root`: ACE repository root. Defaults to `ACE_ROOT` or the directory of `scripts/ace_compile.py`.
+- `--compiler`: path to `fhe_cmplr`.
+- `--model-dir`: directory containing `*_pre.onnx` and `*_gpu.cu`.
+- `--link-dir`: output directory for generated `*.onnx.inc` files.
+- `--build-script`: path to `scripts/build_target_gpu.sh`.
+- `--build-dir`: build directory passed to `scripts/build_target_gpu.sh` through `ACE_BUILD_DIR`.
+- `--model`: compile only the specified model; pass multiple times to build multiple models.
+- `--keep`: keep compiler-generated intermediate `.t` and `.json` files.
+- `--skip-link`: skip the target build step.
+- `--skip-compile`: skip ONNX compilation and only build the target.
+
+You can always inspect the latest CLI help with:
+
+```bash
+python3 scripts/ace_compile.py --help
+```

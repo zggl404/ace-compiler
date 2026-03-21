@@ -260,7 +260,8 @@ public:
         }
         else
         {
-            _evaluator->evaluator.mod_switch_to_inplace(*res, op1->chain_index());
+            *res = *op1;
+            _evaluator->evaluator.mod_switch_to_next_inplace(*res);
         }
     }
 
@@ -278,29 +279,31 @@ public:
     }
     void Bootstrap(Ciphertext *op1, Ciphertext *res, int level, int slot)
     {
-        _evaluator->evaluator.mod_switch_to_inplace(*op1, _num_prime_parts - 1);
-
+        Ciphertext input = *op1;
+ 
         switch (slot)
         {
         case 16384:
-            _bootstrapper_16384->bootstrap_3(*res, *op1);
+            _bootstrapper_16384->slim_bootstrap(*res, input);
             break;
         case 8192:
-            _bootstrapper_8192->bootstrap_3(*res, *op1);
+            _bootstrapper_8192->slim_bootstrap(*res, input);
             break;
         case 4096:
-            _bootstrapper_4096->bootstrap_3(*res, *op1);
+            _bootstrapper_4096->slim_bootstrap(*res, input);
             break;
         default:
-            std::cout<<"Unsupported slot size for bootstrap: (must 16384,8192,4096)" << slot << std::endl;
+            std::cout << "Unsupported slot size for bootstrap: (must 16384,8192,4096) exec 16384" << slot << std::endl;
+            _bootstrapper_16384->slim_bootstrap(*res, input);
+
             break;
         }
 
-        int target_level = _num_prime_parts - level;
-        if (level != 0 && target_level > res->chain_index())
-        {
-            _evaluator->evaluator.mod_switch_to_inplace(*res, target_level);
-        }
+        // int target_level = _num_prime_parts - level;
+        // if (level != 0 && target_level > res->chain_index())
+        // {
+        //     _evaluator->evaluator.mod_switch_to_inplace(*res, target_level);
+        // }
     }
     void Free_ciph(Ciphertext *ct)
     {
@@ -320,23 +323,41 @@ public:
     void Init_context_with_bootstrap()
     {
         IS_TRUE(Instance == nullptr, "_install already created");
-
         CKKS_PARAMS *prog_param = Get_context_params();
         IS_TRUE(prog_param->_provider == LIB_PHANTOM, "provider is not PHANTOM");
+
+        bool enable_relu = false;
+        int boot_level = 3 + 6 + 2;
+        int remaining_level = prog_param->_mul_depth - boot_level;
+        int special_modulus_size = 4;
+
+        std::cout << "the boot level and the remain level is " << boot_level << " " << remaining_level << std::endl;
+
         _slot_count = prog_param->_poly_degree / 2;
         EncryptionParameters parms(scheme_type::ckks);
         uint32_t degree = prog_param->_poly_degree;
         parms.set_poly_modulus_degree(degree);
+
         std::vector<int> bits;
-        bits.push_back(prog_param->_scaling_mod_size);
-        for (uint32_t i = 0; i < prog_param->_mul_depth; ++i)
+        bits.push_back(prog_param->_first_mod_size);
+
+        for (int i = 0; i < remaining_level; i++)
         {
             bits.push_back(prog_param->_scaling_mod_size);
         }
+        for (int i = 0; i < boot_level; i++)
+        {
+            bits.push_back(prog_param->_first_mod_size);
+        }
+        for (int i = 0; i < special_modulus_size; i++)
+        {
+            bits.push_back(prog_param->_first_mod_size);
+        }
 
-        bits.push_back(prog_param->_first_mod_size);
         parms.set_coeff_modulus(phantom::arith::CoeffModulus::Create(degree, bits));
-        parms.set_secret_key_hamming_weight(192);
+        parms.set_secret_key_hamming_weight(prog_param->_hamming_weight);
+        parms.set_special_modulus_size(special_modulus_size);
+
         _num_prime_parts = bits.size();
         phantom::arith::sec_level_type sec = phantom::arith::sec_level_type::tc128;
         switch (prog_param->_sec_level)
@@ -381,13 +402,13 @@ public:
         int log_slot_count = 15;
         _bootstrapper_16384 = std::make_unique<Bootstrapper>(
             loge, 14, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
-            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get());
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(),enable_relu);
         _bootstrapper_8192 = std::make_unique<Bootstrapper>(
             loge, 13, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
-            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get());
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(),enable_relu);
         _bootstrapper_4096 = std::make_unique<Bootstrapper>(
             loge, 12, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
-            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get());
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(),enable_relu);
 
         _bootstrapper_16384->prepare_mod_polynomial();
         _bootstrapper_8192->prepare_mod_polynomial();
@@ -408,7 +429,7 @@ public:
         _evaluator->decryptor.create_galois_keys_from_steps(gal_steps_vector, *(_evaluator.get()->galois_keys));
         std::cout << "gen rot key done " << gal_steps_vector.size() << std::endl;
         // log2(32768) = 15, log2(16384) = 14, log2(8192) = 13, log2(4096) = 12
-         _bootstrapper_16384->slot_vec.push_back(14);
+        _bootstrapper_16384->slot_vec.push_back(14);
         _bootstrapper_8192->slot_vec.push_back(13);
         _bootstrapper_4096->slot_vec.push_back(12);
 
@@ -556,10 +577,20 @@ void Prepare_context()
     Init_rtlib_timing();
     Io_init();
     PHANTOM_CONTEXT::Init_context();
+
+    RT_DATA_INFO *data_info = Get_rt_data_info();
+    if (data_info != NULL)
+    {
+        Pt_mgr_init(data_info->_file_name);
+    }
 }
 
 void Finalize_context()
 {
+    if (Get_rt_data_info() != NULL)
+    {
+        Pt_mgr_fini();
+    }
     PHANTOM_CONTEXT::Fini_context();
     Io_fini();
 }
