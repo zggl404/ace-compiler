@@ -30,6 +30,11 @@
 //! RT_DATA_ASYNC_READ=0|1: use asynchronous read. default: 0
 #define ENV_RT_DATA_ASYNC_READ "RT_DATA_ASYNC_READ"
 
+//! environment variable to control plaintext message preview while reading
+//! PT_MSG_DUMP_COUNT=int: print the first N float values in Pt_from_msg path.
+//! default: 0 (disabled)
+#define ENV_PT_MSG_DUMP_COUNT "PT_MSG_DUMP_COUNT"
+
 //! environment variable to control using even polynomial
 //! in mod_reduce of bootstrapping
 #define ENV_BOOTSTRAP_EVEN_POLY "RTLIB_BTS_EVEN_POLY"

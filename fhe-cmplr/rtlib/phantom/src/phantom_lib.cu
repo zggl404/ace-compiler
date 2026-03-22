@@ -496,9 +496,10 @@ public:
         _rlk = std::make_unique<PhantomRelinKey>(_sk->gen_relinkey(*_ctx));
         _rtk = std::make_unique<PhantomGaloisKey>();
         _encoder = std::make_unique<PhantomCKKSEncoder>(*_ctx);
-        _evaluator = std::make_unique<CKKSEvaluator>(_ctx.get(), _pk.get(), _sk.get(), _encoder.get(), _rlk.get(), _rtk.get(),
-                                                     prog_param->_scaling_mod_size);
         _scaling_mod_size = prog_param->_scaling_mod_size;
+        _evaluator = std::make_unique<CKKSEvaluator>(
+            _ctx.get(), _pk.get(), _sk.get(), _encoder.get(), _rlk.get(),
+            _rtk.get(), std::pow(2.0, _scaling_mod_size));
 
         vector<int> rotation_keys(prog_param->_rot_idxs, prog_param->_rot_idxs + prog_param->_num_rot_idx);
         vector<int> gal_steps_vector;
