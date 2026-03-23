@@ -305,6 +305,33 @@ public:
         //     _evaluator->evaluator.mod_switch_to_inplace(*res, target_level);
         // }
     }
+    void Bootstrap_with_relu(Ciphertext *op1, Ciphertext *res, int level, int slot)
+    {
+        Ciphertext input = *op1;
+
+        switch (slot)
+        {
+        case 16384:
+            _bootstrapper_relu_16384->slim_bootstrap(*res, input);
+            break;
+        case 8192:
+            _bootstrapper_relu_8192->slim_bootstrap(*res, input);
+            break;
+        case 4096:
+            _bootstrapper_relu_4096->slim_bootstrap(*res, input);
+            break;
+        default:
+            std::cout << "Unsupported slot size for bootstrap_with_relu: (must 16384,8192,4096) exec 16384" << slot << std::endl;
+            _bootstrapper_relu_16384->slim_bootstrap(*res, input);
+            break;
+        }
+
+        // int target_level = _num_prime_parts - level;
+        // if (level != 0 && target_level > res->chain_index())
+        // {
+        //     _evaluator->evaluator.mod_switch_to_inplace(*res, target_level);
+        // }
+    }
     void Free_ciph(Ciphertext *ct)
     {
         ct->release();
@@ -402,17 +429,30 @@ public:
         int log_slot_count = 15;
         _bootstrapper_16384 = std::make_unique<Bootstrapper>(
             loge, 14, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
-            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(),enable_relu);
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(), enable_relu);
         _bootstrapper_8192 = std::make_unique<Bootstrapper>(
             loge, 13, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
-            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(),enable_relu);
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(), enable_relu);
         _bootstrapper_4096 = std::make_unique<Bootstrapper>(
             loge, 12, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
-            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(),enable_relu);
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(), enable_relu);
+
+        _bootstrapper_relu_16384 = std::make_unique<Bootstrapper>(
+            loge, 14, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(), true);
+        _bootstrapper_relu_8192 = std::make_unique<Bootstrapper>(
+            loge, 13, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(), true);
+        _bootstrapper_relu_4096 = std::make_unique<Bootstrapper>(
+            loge, 12, log_slot_count, prog_param->_mul_depth, std::pow(2.0, _scaling_mod_size),
+            boundary_K, deg, scale_factor, inverse_deg, _evaluator.get(), true);
 
         _bootstrapper_16384->prepare_mod_polynomial();
         _bootstrapper_8192->prepare_mod_polynomial();
         _bootstrapper_4096->prepare_mod_polynomial();
+        _bootstrapper_relu_16384->prepare_mod_polynomial();
+        _bootstrapper_relu_8192->prepare_mod_polynomial();
+        _bootstrapper_relu_4096->prepare_mod_polynomial();
 
         vector<int> gal_steps_vector;
         gal_steps_vector.push_back(0);
@@ -424,6 +464,9 @@ public:
         _bootstrapper_16384->addLeftRotKeys_Linear_to_vector_3(gal_steps_vector);
         _bootstrapper_8192->addLeftRotKeys_Linear_to_vector_3(gal_steps_vector);
         _bootstrapper_4096->addLeftRotKeys_Linear_to_vector_3(gal_steps_vector);
+        _bootstrapper_relu_16384->addLeftRotKeys_Linear_to_vector_3(gal_steps_vector);
+        _bootstrapper_relu_8192->addLeftRotKeys_Linear_to_vector_3(gal_steps_vector);
+        _bootstrapper_relu_4096->addLeftRotKeys_Linear_to_vector_3(gal_steps_vector);
 
         std::cout << "the size of gal_steps_vector is " << gal_steps_vector.size() << std::endl;
         _evaluator->decryptor.create_galois_keys_from_steps(gal_steps_vector, *(_evaluator.get()->galois_keys));
@@ -432,10 +475,16 @@ public:
         _bootstrapper_16384->slot_vec.push_back(14);
         _bootstrapper_8192->slot_vec.push_back(13);
         _bootstrapper_4096->slot_vec.push_back(12);
+        _bootstrapper_relu_16384->slot_vec.push_back(14);
+        _bootstrapper_relu_8192->slot_vec.push_back(13);
+        _bootstrapper_relu_4096->slot_vec.push_back(12);
 
         _bootstrapper_16384->generate_LT_coefficient_3();
         _bootstrapper_8192->generate_LT_coefficient_3();
         _bootstrapper_4096->generate_LT_coefficient_3();
+        _bootstrapper_relu_16384->generate_LT_coefficient_3();
+        _bootstrapper_relu_8192->generate_LT_coefficient_3();
+        _bootstrapper_relu_4096->generate_LT_coefficient_3();
 
         printf(
             "ckks_param: _provider = %d, _poly_degree = %d, _sec_level = %ld, "
@@ -547,6 +596,9 @@ private:
     std::unique_ptr<Bootstrapper> _bootstrapper_16384;
     std::unique_ptr<Bootstrapper> _bootstrapper_8192;
     std::unique_ptr<Bootstrapper> _bootstrapper_4096;
+    std::unique_ptr<Bootstrapper> _bootstrapper_relu_16384;
+    std::unique_ptr<Bootstrapper> _bootstrapper_relu_8192;
+    std::unique_ptr<Bootstrapper> _bootstrapper_relu_4096;
 
     uint64_t _scaling_mod_size;
     uint64_t _num_prime_parts;
@@ -707,6 +759,10 @@ void Phantom_relin(CIPHER res, CIPHER3 op)
 void Phantom_bootstrap(CIPHER res, CIPHER op, int level, int slot)
 {
     PHANTOM_CONTEXT::Context()->Bootstrap(op, res, level, slot);
+}
+void Phantom_bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot)
+{
+    PHANTOM_CONTEXT::Context()->Bootstrap_with_relu(op, res, level, slot);
 }
 
 void Phantom_free_ciph(CIPHER ct)

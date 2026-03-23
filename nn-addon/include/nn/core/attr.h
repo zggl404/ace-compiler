@@ -43,6 +43,8 @@ public:
   static constexpr const char* MASK = "mask";
   // slot whose value is valid data len
   static constexpr const char* SLOT = "slot";
+  // mark bootstrap node fused from relu lowering
+  static constexpr const char* WITH_RELU = "with_relu";
 
   // sharding
   static constexpr const char* SHARDING   = "sharding";

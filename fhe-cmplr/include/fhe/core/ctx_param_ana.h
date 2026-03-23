@@ -966,11 +966,14 @@ RETV CKKS_ANA_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR bootstrap) {
   // 2. handle redundant bootstrap
   if (!ana_ctx.Rgn_scl_bts_mng() && !ana_ctx.Rgn_bts_mng()) {
     NODE_PTR        child = bootstrap->Child(0);
+    const uint32_t* with_relu =
+        bootstrap->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
     const uint32_t* rescale_lev_attr =
         child->Attr<uint32_t>(FHE_ATTR_KIND::RESCALE_LEVEL);
     AIR_ASSERT(rescale_lev_attr != nullptr);
     uint32_t rescale_lev = *rescale_lev_attr;
-    if (rescale_lev + mul_level <= ana_ctx.Input_level()) {
+    if (with_relu == nullptr &&
+        rescale_lev + mul_level <= ana_ctx.Input_level()) {
       NODE_PTR parent_node = ana_ctx.Parent(1);
       for (uint32_t id = 0; id < parent_node->Num_child(); ++id) {
         if (parent_node->Child(id) != bootstrap) continue;

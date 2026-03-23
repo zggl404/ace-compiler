@@ -170,13 +170,19 @@ RETV TENSOR2SIHE_IMPL::Handle_relu(VISITOR* visitor, NODE_PTR node) {
   GLOB_SCOPE* glob_scope  = &func_scope->Glob_scope();
   TYPE_PTR    cipher_type = lower_ctx.Get_cipher_type(glob_scope);
 
+  bool fused_bootstrap_with_relu = ctx.Bootstrap_with_relu();
+
   // 1. bootstapping before relu: bs_tmp = SIHE.bootstrap(op0)
   PREG_PTR bs_tmp = func_scope->New_preg(cipher_type);
   {
-    NODE_PTR bs_node    = sihe_gen.Gen_bootstrap(op0, slot, spos);
+    NODE_PTR bs_node = sihe_gen.Gen_bootstrap(op0, slot, spos);
+    if (fused_bootstrap_with_relu) {
+      uint32_t with_relu = 1;
+      bs_node->Set_attr(nn::core::ATTR::WITH_RELU, &with_relu, 1);
+    }
     STMT_PTR st_bs_node = cntr->New_stp(bs_node, bs_tmp, spos);
     visitor->Context().Prepend(st_bs_node);
-    if (ctx.Rt_validate()) {
+    if (ctx.Rt_validate() && !fused_bootstrap_with_relu) {
       NODE_PTR bts_val = cntr->Clone_node_tree(op0);
       NODE_PTR bts_msg = cntr->New_cust_node(fhe::sihe::OPC_BOOTSTRAP_MSG,
                                              node->Rtype(), spos);
@@ -188,6 +194,27 @@ RETV TENSOR2SIHE_IMPL::Handle_relu(VISITOR* visitor, NODE_PTR node) {
       visitor->Context().Prepend(cntr->New_validate_stmt(
           cntr->New_ldp(bs_tmp, spos), bts_msg, len, epi, spos));
     }
+  }
+
+  if (fused_bootstrap_with_relu) {
+    NODE_PTR ret = cntr->New_ldp(bs_tmp, spos);
+    ret          = util.Finalize(visitor, ret, -5);
+    if (ctx.Rt_validate()) {
+      NODE_PTR relu_val = cntr->Clone_node_tree(op0);
+      NODE_PTR relu_msg =
+          cntr->New_cust_node(fhe::sihe::OPC_RELU_MSG, node->Rtype(), spos);
+      relu_msg->Set_child(0, relu_val);
+      AIR_ASSERT(node->Rtype()->Is_array());
+      std::vector<int64_t> shape = node->Rtype()->Cast_to_arr()->Shape();
+      relu_msg->Set_attr("x_shape", shape.data(), shape.size());
+      uint64_t elem_count = node->Rtype()->Cast_to_arr()->Elem_count();
+      TYPE_PTR s32        = glob_scope->Prim_type(PRIMITIVE_TYPE::INT_S32);
+      NODE_PTR len        = cntr->New_intconst(s32, elem_count, spos);
+      NODE_PTR epi        = cntr->New_intconst(s32, -3, spos);
+      visitor->Context().Append(cntr->New_validate_stmt(
+          cntr->New_ldp(bs_tmp, spos), relu_msg, len, epi, spos));
+    }
+    return RETV(ret);
   }
 
   // 2. call App_relu: CORE.call App_relu(bs_tmp, bs_tmp/relu_value_range,

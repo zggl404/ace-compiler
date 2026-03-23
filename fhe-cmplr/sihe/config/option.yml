@@ -39,3 +39,6 @@ group:
       kind: int
       value: 0
       value_maker: "="
+    - name: bootstrap_with_relu
+      abbrev_name: bwr
+      description: Fuse relu lowering into bootstrap

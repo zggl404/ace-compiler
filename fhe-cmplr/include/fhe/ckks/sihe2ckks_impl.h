@@ -294,6 +294,12 @@ RETV SIHE2CKKS_IMPL::Handle_encode(VISITOR* visitor, NODE_PTR node) {
 
 template <typename RETV, typename VISITOR>
 RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
+  const char*     slot_key       = nn::core::ATTR::SLOT;
+  uint32_t        slot_count     = 0;
+  const uint32_t* slot_idx       = node->Attr<uint32_t>(slot_key, &slot_count);
+  const uint32_t* with_relu_attr =
+      node->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
+
   // Check if Python has a registered lowering for this op
   if (sihe::Should_skip_lowering("fhe::sihe", "bootstrap")) {
     // Preserve as CKKS.bootstrap (not SIHE) so scale manager can process it
@@ -307,6 +313,12 @@ RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
     NODE_PTR new_bootstrap = cntr->New_una_arith(
         ckks_bootstrap_op, new_child->Rtype(), new_child, node->Spos());
     new_bootstrap->Set_rtype(new_child->Rtype());
+    if (slot_key != nullptr && slot_count > 0) {
+      new_bootstrap->Set_attr(slot_key, slot_idx, slot_count);
+    }
+    if (with_relu_attr != nullptr) {
+      new_bootstrap->Set_attr(nn::core::ATTR::WITH_RELU, with_relu_attr, 1);
+    }
     return RETV(new_bootstrap);
   }
 
@@ -318,6 +330,8 @@ RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
   const SPOS& spos      = node->Spos();
 
   if (ctx.Python_dsl()) {
+    AIR_ASSERT_MSG(with_relu_attr == nullptr,
+                   "bootstrap_with_relu is not supported with python DSL lowering");
     CKKS_PY_IMPL py_gen(ctx);
     FUNC_SCOPE*  bts_func = py_gen.New_py_bts(node, spos);
     // Generate call to bootstrap function
@@ -341,11 +355,11 @@ RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
 
   NODE_PTR ckks_bootstrap = ckks_gen.Gen_bootstrap(new_child, spos);
 
-  const char*     slot_key   = nn::core::ATTR::SLOT;
-  uint32_t        slot_count = 0;
-  const uint32_t* slot_idx   = node->Attr<uint32_t>(slot_key, &slot_count);
   AIR_ASSERT(slot_key != nullptr && slot_count > 0);
   ckks_bootstrap->Set_attr(slot_key, slot_idx, slot_count);
+  if (with_relu_attr != nullptr) {
+    ckks_bootstrap->Set_attr(nn::core::ATTR::WITH_RELU, with_relu_attr, 1);
+  }
 
   return RETV(ckks_bootstrap);
 }

@@ -162,6 +162,13 @@ inline CIPHER Bootstrap(CIPHER res, CIPHER op, int level, int slot) {
   return res;
 }
 
+inline CIPHER Bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot) {
+  START_TIMER
+  Phantom_bootstrap_with_relu(res, op, level, slot);
+  END_TIMER("Bootstrap_with_relu")
+  return res;
+}
+
 inline void Copy_ciph(CIPHER res, CIPHER op) {
   if (res != op) {
     START_TIMER

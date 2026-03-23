@@ -18,6 +18,7 @@
 #include "fhe/core/rt_timing.h"
 #include "fhe/poly/ir2c_ctx.h"
 #include "fhe/poly/opcode.h"
+#include "nn/core/attr.h"
 #include "nn/core/data_scheme.h"
 
 namespace fhe {
@@ -215,14 +216,25 @@ public:
           return;
         }
         case ckks::OPC_BOOTSTRAP: {
-          ctx << "Bootstrap(&";
+          const uint32_t* with_relu =
+              val->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
+          if (with_relu != nullptr) {
+            AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                           "Bootstrap_with_relu is only supported for PHANTOM provider");
+          }
+          ctx << (with_relu != nullptr ? "Bootstrap_with_relu(&" : "Bootstrap(&");
           ctx.Emit_var(node);
           ctx << ", ";
           visitor->template Visit<RETV>(val->Child(0));
 
           const uint32_t* mul_lev =
               val->Attr<uint32_t>(fhe::core::FHE_ATTR_KIND::LEVEL);
-          ctx << ", " << (mul_lev == nullptr ? 0 : *mul_lev) << ")";
+          ctx << ", " << (mul_lev == nullptr ? 0 : *mul_lev);
+          if (with_relu != nullptr) {
+            const uint32_t* slot = val->Attr<uint32_t>(nn::core::ATTR::SLOT);
+            ctx << ", " << (slot == nullptr ? 0 : *slot);
+          }
+          ctx << ")";
           return;
         }
         default:
@@ -245,7 +257,13 @@ public:
     air::base::NODE_PTR val = node->Child(0);
     if (ctx.Is_cipher_type(val->Rtype_id())) {
       if (val->Opcode() == fhe::ckks::OPC_BOOTSTRAP) {
-        ctx << "Bootstrap(&";
+        const uint32_t* with_relu =
+            val->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
+        if (with_relu != nullptr) {
+          AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                         "Bootstrap_with_relu is only supported for PHANTOM provider");
+        }
+        ctx << (with_relu != nullptr ? "Bootstrap_with_relu(&" : "Bootstrap(&");
         ctx.Emit_preg_id(node->Preg_id());
         ctx << ", ";
         visitor->template Visit<RETV>(val->Child(0));
@@ -256,6 +274,10 @@ public:
           ctx << ", " << 0;
         } else {
           ctx << ", " << *mul_lev;
+        }
+        if (with_relu != nullptr) {
+          const uint32_t* slot = val->Attr<uint32_t>(nn::core::ATTR::SLOT);
+          ctx << ", " << (slot == nullptr ? 0 : *slot);
         }
       } else {
         ctx << "Copy_ciph(&";

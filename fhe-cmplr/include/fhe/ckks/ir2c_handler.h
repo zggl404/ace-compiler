@@ -18,6 +18,7 @@
 #include "fhe/ckks/ckks_opcode.h"
 #include "fhe/ckks/invalid_handler.h"
 #include "fhe/ckks/ir2c_ctx.h"
+#include "nn/core/attr.h"
 #include "nn/vector/vector_opcode.h"
 
 namespace fhe {
@@ -185,8 +186,13 @@ public:
     air::base::NODE_PTR parent = ctx.Parent(1);
 
     AIR_ASSERT(parent != air::base::Null_ptr && parent->Is_st());
+    const uint32_t* with_relu = node->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
+    if (with_relu != nullptr) {
+      AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                     "Bootstrap_with_relu is only supported for PHANTOM provider");
+    }
     // TODO Handle bts with target level.
-    ctx << "Bootstrap(&";
+    ctx << (with_relu != nullptr ? "Bootstrap_with_relu(&" : "Bootstrap(&");
     ctx.Emit_st_var(parent);
     ctx << ", ";
     visitor->template Visit<RETV>(node->Child(0));
