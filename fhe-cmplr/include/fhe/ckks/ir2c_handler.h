@@ -99,6 +99,191 @@ public:
   }
 
   template <typename RETV, typename VISITOR>
+  void Handle_mul_plain_rescale(VISITOR* visitor, air::base::NODE_PTR node) {
+    IR2C_CTX&           ctx    = visitor->Context();
+    air::base::NODE_PTR parent = ctx.Parent(1);
+
+    AIR_ASSERT(parent != air::base::Null_ptr && parent->Is_st());
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                   "Mul_plain_rescale is only supported for PHANTOM provider");
+    ctx << "Mul_plain_rescale(&";
+    ctx.Emit_st_var(parent);
+    ctx << ", ";
+    visitor->template Visit<RETV>(node->Child(0));
+    ctx << ", ";
+    visitor->template Visit<RETV>(node->Child(1));
+    ctx << ")";
+  }
+
+  template <typename RETV, typename VISITOR>
+  void Handle_rotate_add_reduce(VISITOR* visitor, air::base::NODE_PTR node) {
+    IR2C_CTX&           ctx    = visitor->Context();
+    air::base::NODE_PTR parent = ctx.Parent(1);
+
+    AIR_ASSERT(parent != air::base::Null_ptr && parent->Is_st());
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                   "Rotate_add_reduce is only supported for PHANTOM provider");
+
+    uint32_t   step_count       = 0;
+    const int* steps            = node->Attr<int>(nn::core::ATTR::RNUM,
+                                       &step_count);
+    const uint32_t* rotate_self = node->Attr<uint32_t>("rotate_self");
+    AIR_ASSERT_MSG(steps != nullptr && step_count > 0,
+                   "Rotate_add_reduce requires non-empty rotation steps");
+
+    ctx << "Rotate_add_reduce(&";
+    ctx.Emit_st_var(parent);
+    ctx << ", ";
+    visitor->template Visit<RETV>(node->Child(0));
+    ctx << ", " << step_count << ", " << (rotate_self != nullptr && *rotate_self);
+    for (uint32_t idx = 0; idx < step_count; ++idx) {
+      ctx << ", " << steps[idx];
+    }
+    ctx << ")";
+  }
+
+  template <typename RETV, typename VISITOR>
+  void Handle_linear_transform(VISITOR* visitor, air::base::NODE_PTR node) {
+    IR2C_CTX&           ctx    = visitor->Context();
+    air::base::NODE_PTR parent = ctx.Parent(1);
+
+    AIR_ASSERT(parent != air::base::Null_ptr && parent->Is_st());
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                   "Linear_transform is only supported for PHANTOM provider");
+
+    uint32_t   step_count = 0;
+    const int* steps =
+        node->Attr<int>(nn::core::ATTR::RNUM, &step_count);
+    const uint32_t* post_rescale = node->Attr<uint32_t>("post_rescale");
+    AIR_ASSERT_MSG(steps != nullptr && step_count > 0,
+                   "Linear_transform requires non-empty rotation steps");
+    if (node->Num_arg() == 1 && node->Child(1) != air::base::Null_ptr &&
+        node->Child(1)->Opcode() == air::core::OPC_LDC) {
+      const uint32_t* plain_len = node->Attr<uint32_t>("plain_len");
+      const uint32_t* plain_scale = node->Attr<uint32_t>("plain_scale");
+      const uint32_t* plain_level = node->Attr<uint32_t>("plain_level");
+      AIR_ASSERT_MSG(plain_len != nullptr && plain_scale != nullptr &&
+                         plain_level != nullptr,
+                     "Linear_transform descriptor form requires plain attrs");
+
+      ctx << "Rotate_mul_sum(&";
+      ctx.Emit_st_var(parent);
+      ctx << ", ";
+      visitor->template Visit<RETV>(node->Child(0));
+      ctx << ", " << step_count << ", "
+          << (post_rescale != nullptr && *post_rescale);
+      if (ctx.Emit_data_file()) {
+        uint64_t base_idx = ctx.Append_plain_table_rows(
+            node->Child(1)->Const(), step_count, *plain_len, *plain_scale,
+            *plain_level);
+        ctx << ", " << base_idx;
+      } else {
+        ctx << ", ";
+        ctx.template Emit_const_buffer_address<RETV, VISITOR>(visitor,
+                                                              node->Child(1));
+      }
+      ctx << ", " << *plain_len << ", " << *plain_scale << ", "
+          << *plain_level;
+      for (uint32_t idx = 0; idx < step_count; ++idx) {
+        ctx << ", " << steps[idx];
+      }
+      ctx << ")";
+      return;
+    }
+
+    AIR_ASSERT_MSG(node->Num_arg() == step_count,
+                   "Linear_transform expects one plaintext child per step");
+
+    ctx << "Rotate_mul_sum(&";
+    ctx.Emit_st_var(parent);
+    ctx << ", ";
+    visitor->template Visit<RETV>(node->Child(0));
+    ctx << ", " << step_count << ", "
+        << (post_rescale != nullptr && *post_rescale);
+    for (uint32_t idx = 0; idx < step_count; ++idx) {
+      ctx << ", " << steps[idx] << ", ";
+      visitor->template Visit<RETV>(node->Child(1 + idx));
+    }
+    ctx << ")";
+  }
+
+  template <typename RETV, typename VISITOR>
+  void Handle_blocking_rotate(VISITOR* visitor, air::base::NODE_PTR node) {
+    IR2C_CTX& ctx = visitor->Context();
+
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                   "Blocking_rotate is only supported for PHANTOM provider");
+
+    uint32_t   step_count = 0;
+    const int* steps =
+        node->Attr<int>(nn::core::ATTR::RNUM, &step_count);
+    AIR_ASSERT_MSG(node->Num_child() == 2,
+                   "Blocking_rotate expects array base and source children");
+    AIR_ASSERT_MSG(steps != nullptr && step_count > 0,
+                   "Blocking_rotate requires non-empty rotation steps");
+
+    ctx << "Blocking_rotate(";
+    visitor->template Visit<RETV>(node->Child(0));
+    ctx << ", ";
+    visitor->template Visit<RETV>(node->Child(1));
+    ctx << ", " << step_count;
+    for (uint32_t idx = 0; idx < step_count; ++idx) {
+      ctx << ", " << steps[idx];
+    }
+    ctx << ")";
+  }
+
+  template <typename RETV, typename VISITOR>
+  void Handle_block_linear_transform(VISITOR* visitor,
+                                     air::base::NODE_PTR node) {
+    IR2C_CTX& ctx = visitor->Context();
+
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
+                   "Block_linear_transform is only supported for PHANTOM provider");
+
+    uint32_t   block_count = 0;
+    const int* bank_steps =
+        node->Attr<int>(nn::core::ATTR::RNUM, &block_count);
+    const uint32_t* grid_count = node->Attr<uint32_t>("grid_count");
+    const int* grid_shift = node->Attr<int>("grid_shift");
+    const uint32_t* post_rescale = node->Attr<uint32_t>("post_rescale");
+    const uint32_t* plain_len = node->Attr<uint32_t>("plain_len");
+    const uint32_t* plain_scale = node->Attr<uint32_t>("plain_scale");
+    const uint32_t* plain_level = node->Attr<uint32_t>("plain_level");
+
+    AIR_ASSERT_MSG(node->Num_child() == 3,
+                   "Block_linear_transform expects output, source, and plain-table children");
+    AIR_ASSERT_MSG(bank_steps != nullptr && block_count > 0,
+                   "Block_linear_transform requires non-empty bank steps");
+    AIR_ASSERT_MSG(grid_count != nullptr && *grid_count > 0 &&
+                       grid_shift != nullptr && plain_len != nullptr &&
+                       plain_scale != nullptr && plain_level != nullptr,
+                   "Block_linear_transform descriptor attrs are incomplete");
+
+    ctx << "Block_rotate_mul_sum(&";
+    visitor->template Visit<RETV>(node->Child(0));
+    ctx << ", ";
+    visitor->template Visit<RETV>(node->Child(1));
+    ctx << ", " << block_count << ", " << *grid_count << ", " << *grid_shift
+        << ", " << (post_rescale != nullptr && *post_rescale);
+    if (ctx.Emit_data_file()) {
+      uint64_t base_idx = ctx.Append_plain_table_rows(
+          node->Child(2)->Const(), block_count * (*grid_count), *plain_len,
+          *plain_scale, *plain_level);
+      ctx << ", " << base_idx;
+    } else {
+      ctx << ", ";
+      ctx.template Emit_const_buffer_address<RETV, VISITOR>(visitor,
+                                                            node->Child(2));
+    }
+    ctx << ", " << *plain_len << ", " << *plain_scale << ", " << *plain_level;
+    for (uint32_t idx = 0; idx < block_count; ++idx) {
+      ctx << ", " << bank_steps[idx];
+    }
+    ctx << ")";
+  }
+
+  template <typename RETV, typename VISITOR>
   void Handle_rotate(VISITOR* visitor, air::base::NODE_PTR node) {
     IR2C_CTX&           ctx    = visitor->Context();
     air::base::NODE_PTR parent = ctx.Parent(1);

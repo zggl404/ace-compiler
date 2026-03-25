@@ -162,6 +162,53 @@ opcodes:
         desc: Input ciphertext
     prop: [STMT, LIB_CALL]
     desc: Frees the ciphertext
+  - name: mul_plain_rescale
+    args:
+      - name: a
+        type: CIPHER
+        desc: Ciphertext operand
+      - name: b
+        type: PLAIN
+        desc: Plaintext operand
+    prop: [EXPR, ATTR, LIB_CALL]
+    desc: Performs ciphertext-plaintext multiplication followed by rescale
+  - name: rotate_add_reduce
+    args:
+      - name: a
+        type: CIPHER
+        desc: Ciphertext source operand
+    prop: [EXPR, ATTR, LIB_CALL]
+    desc: Performs a rotation-add reduction with compile-time known steps
+  - name: linear_transform
+    args:
+      - name: a
+        type: CIPHER
+        desc: Ciphertext source operand
+    prop: [EXPR, ATTR, EX_CHILD, LIB_CALL]
+    desc: Performs a fused rotate-mul_plain-add linear transform with compile-time known steps and plaintext terms
+  - name: blocking_rotate
+    args:
+      - name: out
+        type: CIPHER
+        desc: Ciphertext array output base
+      - name: a
+        type: CIPHER
+        desc: Ciphertext source operand
+    prop: [STMT, ATTR, LIB_CALL]
+    desc: Materializes a compile-time known rotation bank into a ciphertext array
+  - name: block_linear_transform
+    args:
+      - name: out
+        type: CIPHER
+        desc: Ciphertext output operand
+      - name: a
+        type: CIPHER
+        desc: Ciphertext source operand
+      - name: b
+        type: VECTOR
+        desc: Compile-time known plaintext table operand
+    prop: [STMT, ATTR, LIB_CALL]
+    desc: Performs a fused blocking-rotate plus grid-wise rotate-mul-add transform with compile-time known bank steps and plaintext table
 
 
 namespace:

@@ -127,6 +127,55 @@ inline CIPHER Mul_plain(CIPHER res, CIPHER op1, PLAIN op2) {
   return res;
 }
 
+inline CIPHER Mul_plain_rescale(CIPHER res, CIPHER op1, PLAIN op2) {
+  START_TIMER
+  Phantom_mul_plain_rescale(res, op1, op2);
+  END_TIMER("Mul_plain_rescale")
+  return res;
+}
+
+template <typename... Steps>
+inline CIPHER Rotate_add_reduce(CIPHER res, CIPHER op, uint32_t step_count,
+                                uint32_t rotate_self, Steps... steps) {
+  START_TIMER
+  Phantom_rotate_add_reduce(res, op, step_count, rotate_self, steps...);
+  END_TIMER("Rotate_add_reduce")
+  return res;
+}
+
+template <typename... Args>
+inline CIPHER Rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                             uint32_t post_rescale, Args... args) {
+  START_TIMER
+  Phantom_rotate_mul_sum(res, op, term_count, post_rescale, args...);
+  END_TIMER("Rotate_mul_sum")
+  return res;
+}
+
+template <typename... Args>
+inline CIPHER Linear_transform(CIPHER res, CIPHER op, uint32_t term_count,
+                               uint32_t post_rescale, Args... args) {
+  return Rotate_mul_sum(res, op, term_count, post_rescale, args...);
+}
+
+template <typename... Steps>
+inline void Blocking_rotate(CIPHER res, CIPHER op, uint32_t step_count,
+                            Steps... steps) {
+  START_TIMER
+  Phantom_blocking_rotate(res, op, step_count, steps...);
+  END_TIMER("Blocking_rotate")
+}
+
+template <typename... Steps>
+inline void Block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
+                                 uint32_t grid_count, int grid_shift,
+                                 uint32_t post_rescale, Steps... steps) {
+  START_TIMER
+  Phantom_block_rotate_mul_sum(res, op, block_count, grid_count, grid_shift,
+                               post_rescale, steps...);
+  END_TIMER("Block_rotate_mul_sum")
+}
+
 inline CIPHER Rotate_ciph(CIPHER res, CIPHER op, int step) {
   START_TIMER
   Phantom_rotate(res, op, step);

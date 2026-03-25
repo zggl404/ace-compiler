@@ -16,5 +16,10 @@ CKKS = [
   raise_mod,
   mul_mono,
   conjugate,
-  free
+  free,
+  mul_plain_rescale,
+  rotate_add_reduce,
+  linear_transform,
+  blocking_rotate,
+  block_linear_transform
 ]

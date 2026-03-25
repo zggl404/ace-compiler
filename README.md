@@ -112,7 +112,7 @@ The model compilation entry point is now `scripts/ace_compile.py`. It is designe
 
 By default, the script resolves paths relative to its own location, so when run from this repository it uses:
 
-- compiler: `<repo>/ace_cmplr/bin/fhe_cmplr`
+- compiler: prefer `<repo>/release/driver/fhe_cmplr`, fallback to `<repo>/ace_cmplr/bin/fhe_cmplr`
 - model directory: `<repo>/model`
 - generated `.onnx.inc` directory: `<repo>/fhe-cmplr/rtlib/phantom/example`
 - target build helper: `<repo>/scripts/build_target_gpu.sh`
@@ -139,6 +139,14 @@ python3 scripts/ace_compile.py --model resnet20_cifar10 --skip-link
 ```
 
 Use this when you only want the generated `.onnx.inc` file. If you omit `--skip-link` and the matching `*_gpu.cu` target source is missing, `scripts/ace_compile.py` now auto-generates it through `scripts/onnx2c.py`.
+
+### 3.3.1 Compile with CKKS fusion enabled
+
+```bash
+python3 scripts/ace_compile.py --model resnet20_cifar10 --fusion --skip-link
+```
+
+This appends `-CKKS:fus` to the compiler invocation. The compiler still only enables `CKKS_FUSION_PASS` when the backend is `phantom`.
 
 ### 3.4 Rebuild target from an existing `.onnx.inc`
 
@@ -170,6 +178,7 @@ Supported options:
 - `--build-dir`: build directory passed to `scripts/build_target_gpu.sh` through `ACE_BUILD_DIR`.
 - `--model`: compile only the specified model; pass multiple times to build multiple models.
 - `--keep`: keep compiler-generated intermediate `.t` and `.json` files.
+- `--fusion`: enable `-CKKS:fus` during compilation. Effective only when the target backend is `phantom`.
 - `--skip-link`: skip the target build step.
 - `--skip-compile`: skip ONNX compilation and only build the target.
 

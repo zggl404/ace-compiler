@@ -9,6 +9,8 @@
 #ifndef FHE_CKKS_IR2C_CTX_H
 #define FHE_CKKS_IR2C_CTX_H
 
+#include <cstdint>
+
 #include "air/base/container_decl.h"
 #include "air/base/st_decl.h"
 #include "air/util/debug.h"
@@ -306,6 +308,61 @@ public:
     } else {
       visitor->template Visit<RETV>(node);
     }
+  }
+
+  template <typename RETV, typename VISITOR>
+  void Emit_const_buffer_address(VISITOR* visitor, air::base::NODE_PTR node) {
+    AIR_ASSERT(node != air::base::Null_ptr);
+    if (node->Opcode() == air::core::LDC && node->Rtype()->Is_array()) {
+      air::base::CONSTANT_PTR cst = node->Const();
+      AIR_ASSERT(cst->Kind() == air::base::CONSTANT_KIND::ARRAY);
+      AIR_ASSERT(cst->Type()->Is_array());
+      air::base::CONST_ARRAY_TYPE_PTR arr_ty = cst->Type()->Cast_to_arr();
+      AIR_ASSERT(arr_ty->Elem_type()->Is_prim());
+      uint32_t dims = arr_ty->Dim();
+      if (dims == 1) {
+        visitor->template Visit<RETV>(node);
+      } else {
+        _ir2c_util << "&";
+        visitor->template Visit<RETV>(node);
+        for (uint32_t i = 0; i < dims; ++i) {
+          _ir2c_util << "[0]";
+        }
+      }
+      return;
+    }
+    visitor->template Visit<RETV>(node);
+  }
+
+  uint64_t Append_plain_table_rows(air::base::CONSTANT_PTR cst,
+                                   uint32_t row_count, uint32_t row_len,
+                                   uint32_t scale, uint32_t level) {
+    AIR_ASSERT(_rt_data_writer != nullptr);
+    AIR_ASSERT(cst != air::base::Null_ptr);
+    AIR_ASSERT(cst->Kind() == air::base::CONSTANT_KIND::ARRAY);
+    AIR_ASSERT(cst->Type()->Is_array());
+    AIR_ASSERT(cst->Type()->Cast_to_arr()->Elem_type()->Is_prim());
+    AIR_ASSERT(
+        cst->Type()->Cast_to_arr()->Elem_type()->Cast_to_prim()->Encoding() ==
+        air::base::PRIMITIVE_TYPE::FLOAT_32);
+
+    const float* data        = reinterpret_cast<const float*>(cst->Array_buffer());
+    uint64_t     total_count = cst->Array_byte_len() / sizeof(float);
+    AIR_ASSERT(total_count >= static_cast<uint64_t>(row_count) * row_len);
+
+    uint64_t base_idx = UINT64_MAX;
+    for (uint32_t row = 0; row < row_count; ++row) {
+      char name[32];
+      snprintf(name, sizeof(name), "cst_%d_%u", cst->Id().Value(), row);
+      uint64_t idx =
+          _rt_data_writer->Append(name, data + static_cast<uint64_t>(row) * row_len,
+                                  row_len, scale, level);
+      if (base_idx == UINT64_MAX) {
+        base_idx = idx;
+      }
+    }
+    AIR_ASSERT(base_idx != UINT64_MAX);
+    return base_idx;
   }
 
   const char* Data_file_uuid() const { return _data_file_uuid.c_str(); }

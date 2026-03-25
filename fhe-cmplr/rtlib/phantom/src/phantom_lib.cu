@@ -1,9 +1,12 @@
 
 #include "rt_phantom/phantom_api.h"
 #include "rt_phantom/rt_phantom.h"
+#include <cstdarg>
+#include <vector>
 #include "common/common.h"
 #include "common/error.h"
 #include "common/io_api.h"
+#include "common/pt_mgr.h"
 #include "common/rt_api.h"
 #include "common/rtlib_timing.h"
 #include "boot/Bootstrapper.cuh"
@@ -11,6 +14,313 @@
 using namespace phantom;
 using namespace phantom::arith;
 using namespace phantom::util;
+
+namespace
+{
+
+void Phantom_rotate_mul_sum_legacy_impl(CIPHER res, CIPHER op,
+                                        uint32_t term_count,
+                                        uint32_t post_rescale, va_list args)
+{
+    CIPHERTEXT accum;
+    bool first_term = true;
+    for (uint32_t idx = 0; idx < term_count; ++idx)
+    {
+        int step = va_arg(args, int);
+        PLAIN plain = va_arg(args, PLAIN);
+
+        CIPHERTEXT rotated;
+        if (step == 0)
+        {
+            rotated = *op;
+        }
+        else
+        {
+            Phantom_rotate(&rotated, op, step);
+        }
+
+        CIPHERTEXT term;
+        Phantom_mul_plain(&term, &rotated, plain);
+        if (first_term)
+        {
+            accum = term;
+            first_term = false;
+        }
+        else
+        {
+            Phantom_add_ciph(&accum, &accum, &term);
+        }
+    }
+
+    if (first_term)
+    {
+        Phantom_zero(res);
+        return;
+    }
+    if (post_rescale != 0)
+    {
+        Phantom_rescale(res, &accum);
+    }
+    else
+    {
+        *res = accum;
+    }
+}
+
+void Rotate_mul_sum_from_raw(CIPHER res, CIPHER op, uint32_t term_count,
+                             uint32_t post_rescale, const float *plain_data,
+                             size_t plain_len, SCALE_T scale, LEVEL_T level,
+                             va_list args)
+{
+    CIPHERTEXT accum;
+    bool first_term = true;
+    PLAINTEXT plain;
+    bool plain_loaded = false;
+
+    for (uint32_t idx = 0; idx < term_count; ++idx)
+    {
+        int step = va_arg(args, int);
+        Phantom_encode_float(&plain,
+                             const_cast<float *>(plain_data + idx * plain_len),
+                             plain_len, scale, level);
+        plain_loaded = true;
+
+        CIPHERTEXT rotated;
+        if (step == 0)
+        {
+            rotated = *op;
+        }
+        else
+        {
+            Phantom_rotate(&rotated, op, step);
+        }
+
+        CIPHERTEXT term;
+        Phantom_mul_plain(&term, &rotated, &plain);
+        if (first_term)
+        {
+            accum = term;
+            first_term = false;
+        }
+        else
+        {
+            Phantom_add_ciph(&accum, &accum, &term);
+        }
+    }
+
+    if (plain_loaded)
+    {
+        Phantom_free_plain(&plain);
+    }
+    if (first_term)
+    {
+        Phantom_zero(res);
+        return;
+    }
+    if (post_rescale != 0)
+    {
+        Phantom_rescale(res, &accum);
+    }
+    else
+    {
+        *res = accum;
+    }
+}
+
+void Rotate_mul_sum_from_msg(CIPHER res, CIPHER op, uint32_t term_count,
+                             uint32_t post_rescale, uint64_t plain_base,
+                             size_t plain_len, SCALE_T scale, LEVEL_T level,
+                             va_list args)
+{
+    CIPHERTEXT accum;
+    bool first_term = true;
+    PLAINTEXT plain;
+    bool plain_loaded = false;
+
+    for (uint32_t idx = 0; idx < term_count; ++idx)
+    {
+        int step = va_arg(args, int);
+        plain = *(PLAIN)Pt_from_msg(&plain,
+                                    static_cast<uint32_t>(plain_base + idx),
+                                    plain_len, scale, level);
+        plain_loaded = true;
+
+        CIPHERTEXT rotated;
+        if (step == 0)
+        {
+            rotated = *op;
+        }
+        else
+        {
+            Phantom_rotate(&rotated, op, step);
+        }
+
+        CIPHERTEXT term;
+        Phantom_mul_plain(&term, &rotated, &plain);
+        if (first_term)
+        {
+            accum = term;
+            first_term = false;
+        }
+        else
+        {
+            Phantom_add_ciph(&accum, &accum, &term);
+        }
+    }
+
+    if (plain_loaded)
+    {
+        Phantom_free_plain(&plain);
+    }
+    if (first_term)
+    {
+        Phantom_zero(res);
+        return;
+    }
+    if (post_rescale != 0)
+    {
+        Phantom_rescale(res, &accum);
+    }
+    else
+    {
+        *res = accum;
+    }
+}
+
+void Build_rotated_bank(std::vector<CIPHERTEXT> &bank, CIPHER op,
+                        const std::vector<int> &steps)
+{
+    for (size_t idx = 0; idx < steps.size(); ++idx)
+    {
+        if (steps[idx] == 0)
+        {
+            bank[idx] = *op;
+        }
+        else
+        {
+            Phantom_rotate(&bank[idx], op, steps[idx]);
+        }
+    }
+}
+
+void Block_rotate_mul_sum_from_raw(CIPHER res, CIPHER op, uint32_t block_count,
+                                   uint32_t grid_count, int grid_shift,
+                                   uint32_t post_rescale,
+                                   const float *plain_data, size_t plain_len,
+                                   SCALE_T scale, LEVEL_T level, va_list args)
+{
+    std::vector<int> steps(block_count);
+    for (uint32_t idx = 0; idx < block_count; ++idx)
+    {
+        steps[idx] = va_arg(args, int);
+    }
+
+    std::vector<CIPHERTEXT> bank(block_count);
+    Build_rotated_bank(bank, op, steps);
+
+    PLAINTEXT plain;
+    bool plain_loaded = false;
+    CIPHERTEXT grid_acc;
+    CIPHERTEXT product;
+    CIPHERTEXT rotated_grid;
+    Phantom_zero(res);
+
+    for (uint32_t grid = 0; grid < grid_count; ++grid)
+    {
+        Phantom_zero(&grid_acc);
+        for (uint32_t block = 0; block < block_count; ++block)
+        {
+            uint64_t row = static_cast<uint64_t>(grid) * block_count + block;
+            Phantom_encode_float(&plain,
+                                 const_cast<float *>(plain_data + row * plain_len),
+                                 plain_len, scale, level);
+            plain_loaded = true;
+            Phantom_mul_plain(&product, &bank[block], &plain);
+            Phantom_add_ciph(&grid_acc, &grid_acc, &product);
+        }
+
+        int step = static_cast<int>(grid) * grid_shift;
+        if (step == 0)
+        {
+            rotated_grid = grid_acc;
+        }
+        else
+        {
+            Phantom_rotate(&rotated_grid, &grid_acc, step);
+        }
+        Phantom_add_ciph(res, res, &rotated_grid);
+    }
+
+    if (plain_loaded)
+    {
+        Phantom_free_plain(&plain);
+    }
+    if (post_rescale != 0)
+    {
+        Phantom_rescale(res, res);
+    }
+}
+
+void Block_rotate_mul_sum_from_msg(CIPHER res, CIPHER op, uint32_t block_count,
+                                   uint32_t grid_count, int grid_shift,
+                                   uint32_t post_rescale, uint64_t plain_base,
+                                   size_t plain_len, SCALE_T scale,
+                                   LEVEL_T level, va_list args)
+{
+    std::vector<int> steps(block_count);
+    for (uint32_t idx = 0; idx < block_count; ++idx)
+    {
+        steps[idx] = va_arg(args, int);
+    }
+
+    std::vector<CIPHERTEXT> bank(block_count);
+    Build_rotated_bank(bank, op, steps);
+
+    PLAINTEXT plain;
+    bool plain_loaded = false;
+    CIPHERTEXT grid_acc;
+    CIPHERTEXT product;
+    CIPHERTEXT rotated_grid;
+    Phantom_zero(res);
+
+    for (uint32_t grid = 0; grid < grid_count; ++grid)
+    {
+        Phantom_zero(&grid_acc);
+        for (uint32_t block = 0; block < block_count; ++block)
+        {
+            uint64_t row = plain_base +
+                           static_cast<uint64_t>(grid) * block_count + block;
+            plain =
+                *(PLAIN)Pt_from_msg(&plain, static_cast<uint32_t>(row), plain_len,
+                                    scale, level);
+            plain_loaded = true;
+            Phantom_mul_plain(&product, &bank[block], &plain);
+            Phantom_add_ciph(&grid_acc, &grid_acc, &product);
+        }
+
+        int step = static_cast<int>(grid) * grid_shift;
+        if (step == 0)
+        {
+            rotated_grid = grid_acc;
+        }
+        else
+        {
+            Phantom_rotate(&rotated_grid, &grid_acc, step);
+        }
+        Phantom_add_ciph(res, res, &rotated_grid);
+    }
+
+    if (plain_loaded)
+    {
+        Phantom_free_plain(&plain);
+    }
+    if (post_rescale != 0)
+    {
+        Phantom_rescale(res, res);
+    }
+}
+
+} // namespace
 
 #ifdef ENABLE_PERFORMANCE_STATS
 #include <unordered_map>
@@ -735,6 +1045,115 @@ void Phantom_mul_ciph_const(CIPHER res, CIPHER op1, double op2)
 void Phantom_mul_plain(CIPHER res, CIPHER op1, PLAIN op2)
 {
     PHANTOM_CONTEXT::Context()->Mul(op1, op2, res);
+}
+
+void Phantom_mul_plain_rescale(CIPHER res, CIPHER op1, PLAIN op2)
+{
+    PHANTOM_CONTEXT::Context()->Mul(op1, op2, res);
+    PHANTOM_CONTEXT::Context()->Rescale(res, res);
+}
+
+void Phantom_rotate_add_reduce(CIPHER res, CIPHER op, uint32_t step_count,
+                               uint32_t rotate_self, ...)
+{
+    Phantom_copy(res, op);
+    va_list args;
+    va_start(args, rotate_self);
+    CIPHERTEXT tmp;
+    for (uint32_t idx = 0; idx < step_count; ++idx)
+    {
+        int step = va_arg(args, int);
+        PHANTOM_CONTEXT::Context()->Rotate(rotate_self ? res : op, step, &tmp);
+        PHANTOM_CONTEXT::Context()->Add(res, &tmp, res);
+    }
+    va_end(args);
+}
+
+void Phantom_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                            uint32_t post_rescale, ...)
+{
+    va_list args;
+    va_start(args, post_rescale);
+    Phantom_rotate_mul_sum_legacy_impl(res, op, term_count, post_rescale, args);
+    va_end(args);
+}
+
+void Phantom_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                            uint32_t post_rescale, const float *plain_data,
+                            size_t plain_len, SCALE_T scale, LEVEL_T level, ...)
+{
+    va_list args;
+    va_start(args, level);
+    Rotate_mul_sum_from_raw(res, op, term_count, post_rescale, plain_data,
+                            plain_len, scale, level, args);
+    va_end(args);
+}
+
+void Phantom_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                            uint32_t post_rescale, uint64_t plain_base,
+                            size_t plain_len, SCALE_T scale, LEVEL_T level, ...)
+{
+    va_list args;
+    va_start(args, level);
+    Rotate_mul_sum_from_msg(res, op, term_count, post_rescale, plain_base,
+                            plain_len, scale, level, args);
+    va_end(args);
+}
+
+void Phantom_linear_transform(CIPHER res, CIPHER op, uint32_t term_count,
+                              uint32_t post_rescale, ...)
+{
+    va_list args;
+    va_start(args, post_rescale);
+    Phantom_rotate_mul_sum_legacy_impl(res, op, term_count, post_rescale, args);
+    va_end(args);
+}
+
+void Phantom_blocking_rotate(CIPHER res, CIPHER op, uint32_t step_count, ...)
+{
+    va_list args;
+    va_start(args, step_count);
+    for (uint32_t idx = 0; idx < step_count; ++idx)
+    {
+        int step = va_arg(args, int);
+        if (step == 0)
+        {
+            *(res + idx) = *op;
+        }
+        else
+        {
+            PHANTOM_CONTEXT::Context()->Rotate(op, step, res + idx);
+        }
+    }
+    va_end(args);
+}
+
+void Phantom_block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
+                                  uint32_t grid_count, int grid_shift,
+                                  uint32_t post_rescale,
+                                  const float *plain_data, size_t plain_len,
+                                  SCALE_T scale, LEVEL_T level, ...)
+{
+    va_list args;
+    va_start(args, level);
+    Block_rotate_mul_sum_from_raw(res, op, block_count, grid_count, grid_shift,
+                                  post_rescale, plain_data, plain_len, scale,
+                                  level, args);
+    va_end(args);
+}
+
+void Phantom_block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
+                                  uint32_t grid_count, int grid_shift,
+                                  uint32_t post_rescale, uint64_t plain_base,
+                                  size_t plain_len, SCALE_T scale,
+                                  LEVEL_T level, ...)
+{
+    va_list args;
+    va_start(args, level);
+    Block_rotate_mul_sum_from_msg(res, op, block_count, grid_count, grid_shift,
+                                  post_rescale, plain_base, plain_len, scale,
+                                  level, args);
+    va_end(args);
 }
 
 void Phantom_rotate(CIPHER res, CIPHER op, int step)

@@ -5,3 +5,6 @@ scripts/*
 release/*
 ace_cmplr/*
 __pycache__/*
+
+doc/*
+build-fusion-ut/*

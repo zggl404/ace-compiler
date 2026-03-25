@@ -35,6 +35,32 @@ void Phantom_add_plain(CIPHER res, CIPHER op1, PLAIN op2);
 void Phantom_mul_ciph(CIPHER res, CIPHER op1, CIPHER op2);
 void Phantom_mul_ciph_const(CIPHER res, CIPHER op1, double op2);
 void Phantom_mul_plain(CIPHER res, CIPHER op1, PLAIN op2);
+void Phantom_mul_plain_rescale(CIPHER res, CIPHER op1, PLAIN op2);
+void Phantom_rotate_add_reduce(CIPHER res, CIPHER op, uint32_t step_count,
+                               uint32_t rotate_self, ...);
+void Phantom_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                            uint32_t post_rescale, ...);
+void Phantom_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                            uint32_t post_rescale, const float* plain_data,
+                            size_t plain_len, SCALE_T scale, LEVEL_T level,
+                            ...);
+void Phantom_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                            uint32_t post_rescale, uint64_t plain_base,
+                            size_t plain_len, SCALE_T scale, LEVEL_T level,
+                            ...);
+void Phantom_linear_transform(CIPHER res, CIPHER op, uint32_t term_count,
+                              uint32_t post_rescale, ...);
+void Phantom_blocking_rotate(CIPHER res, CIPHER op, uint32_t step_count, ...);
+void Phantom_block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
+                                  uint32_t grid_count, int grid_shift,
+                                  uint32_t post_rescale,
+                                  const float* plain_data, size_t plain_len,
+                                  SCALE_T scale, LEVEL_T level, ...);
+void Phantom_block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
+                                  uint32_t grid_count, int grid_shift,
+                                  uint32_t post_rescale, uint64_t plain_base,
+                                  size_t plain_len, SCALE_T scale,
+                                  LEVEL_T level, ...);
 void Phantom_rotate(CIPHER res, CIPHER op, int step);
 void Phantom_rescale(CIPHER res, CIPHER op);
 void Phantom_mod_switch(CIPHER res, CIPHER op);

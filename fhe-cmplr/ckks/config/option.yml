@@ -128,6 +128,9 @@ group:
     - name: rt_val_scl_lvl
       abbrev_name: vsl
       description: Validate ciphertext scale and level at runtime.
+    - name: fusion
+      abbrev_name: fus
+      description: Enable CKKS fusion pass for Phantom backend only.
     - name: python_dsl
       abbrev_name: pdsl
       description: Use python DSL to lower operators
