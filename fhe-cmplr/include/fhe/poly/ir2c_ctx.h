@@ -108,6 +108,7 @@ public:
 
   void Emit_need_bts() {
     if (this->Provider() == core::PROVIDER::SEAL ||
+        this->Provider() == core::PROVIDER::HEONGPU ||
         this->Provider() == core::PROVIDER::PHANTOM) {
       _ir2c_util << "bool Need_bts() {"
                  << "\n";

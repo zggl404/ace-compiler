@@ -35,6 +35,8 @@ function(build_rtlib)
               -DRTLIB_ENABLE_SEAL=${FHE_ENABLE_SEAL}
               -DRTLIB_ENABLE_SEAL_BTS=${FHE_ENABLE_SEAL_BTS}
               -DRTLIB_ENABLE_OPENFHE=${FHE_ENABLE_OPENFHE}
+              -DRTLIB_ENABLE_PHANTOM=${FHE_ENABLE_PHANTOM}
+              -DRTLIB_ENABLE_HEONGPU=${FHE_ENABLE_HEONGPU}
               -DRTLIB_ENABLE_CUDA=${FHE_ENABLE_CUDA}
               -DRTLIB_SUPPORT_HPU=${FHE_SUPPORT_HPU}
               -DRTLIB_SEED_MODE=${FHE_SEED_MODE}
@@ -55,6 +57,7 @@ function(build_rtlib)
                       <BINARY_DIR>/seal/libFHErt_seal.a
                       <BINARY_DIR>/openfhe/libFHErt_openfhe.a
                       <BINARY_DIR>/phantom/libFHErt_phantom.a
+                      <BINARY_DIR>/heongpu/libFHErt_heongpu.a
   )
   ExternalProject_Get_Property(fhe_rtlib SOURCE_DIR BINARY_DIR)
 
@@ -92,6 +95,13 @@ function(build_rtlib)
       IMPORTED_LOCATION "${BINARY_DIR}/phantom/libFHErt_phantom.a"
     )
     install(FILES ${BINARY_DIR}/phantom/libFHErt_phantom.a DESTINATION rtlib/lib)
+  endif()
+  if(FHE_ENABLE_HEONGPU)
+    add_library(FHErt_heongpu STATIC IMPORTED GLOBAL)
+    set_target_properties(FHErt_heongpu PROPERTIES
+      IMPORTED_LOCATION "${BINARY_DIR}/heongpu/libFHErt_heongpu.a"
+    )
+    install(FILES ${BINARY_DIR}/heongpu/libFHErt_heongpu.a DESTINATION rtlib/lib)
   endif()
 
   add_test(NAME test_fhe_rtlib COMMAND ${CMAKE_COMMAND} --build ${BINARY_DIR} --target test)

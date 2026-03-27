@@ -19,6 +19,7 @@ namespace core {
   DEFINE_PROVIDER(ANT, "ant", "LIB_ANT")             \
   DEFINE_PROVIDER(SEAL, "seal", "LIB_SEAL")          \
   DEFINE_PROVIDER(OPENFHE, "openfhe", "LIB_OPENFHE") \
+  DEFINE_PROVIDER(HEONGPU, "heongpu", "LIB_HEONGPU") \
   DEFINE_PROVIDER(PHANTOM, "phantom", "LIB_PHANTOM") \
   DEFINE_PROVIDER(HYPERFHE, "hyperfhe", "LIB_HYPERFHE")
 

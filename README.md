@@ -94,6 +94,7 @@ Optionally, you can pick the FHE backend in the build script:
 ./scripts/build_cmplr.sh Release seal
 ./scripts/build_cmplr.sh Release openfhe
 ./scripts/build_cmplr.sh Release phantom-fhe 80
+./scripts/build_cmplr.sh Release heongpu 80
 ```
 
 Notes:
@@ -106,15 +107,24 @@ Notes:
   - If your environment cannot access `code.alipay.com`, set one of:
     - `RTLIB_PHANTOM_SOURCE_DIR` (local phantom-fhe source directory), or
     - `RTLIB_PHANTOM_REPO_URL` (an accessible git URL mirror).
+- `heongpu` enables the CUDA/HEonGPU build path and also requires CUDA arch setting.
+  - Pass CUDA arch as the 3rd argument (for example: `80`, `86`, `89`, `90`), or set `CMAKE_CUDA_ARCHITECTURES`.
+  - The script auto-detects `nvcc`; you can also set `CUDACXX=/path/to/nvcc` manually.
+  - By default the runtime looks for a local checkout in `<repo>/backend/HEonGPU`.
+  - You can override that with:
+    - `RTLIB_HEONGPU_SOURCE_DIR` (local HEonGPU source tree), or
+    - `RTLIB_HEONGPU_PATH` (installed HEonGPU CMake package prefix).
 
 ## 3. Compiling example models with `scripts/ace_compile.py`
 The model compilation entry point is now `scripts/ace_compile.py`. It is designed to work both inside Docker and directly on the host machine, and it auto-detects the repository root from `ACE_ROOT` or the script location.
 
-By default, the script resolves paths relative to its own location, so when run from this repository it uses:
+By default, the script resolves paths relative to its own location. The generated `.onnx.inc` directory depends on `--backend`:
 
 - compiler: prefer `<repo>/release/driver/fhe_cmplr`, fallback to `<repo>/ace_cmplr/bin/fhe_cmplr`
 - model directory: `<repo>/model`
-- generated `.onnx.inc` directory: `<repo>/fhe-cmplr/rtlib/phantom/example`
+- generated `.onnx.inc` directory:
+  - `phantom`: `<repo>/fhe-cmplr/rtlib/phantom/example`
+  - `heongpu`: `<repo>/fhe-cmplr/rtlib/heongpu/example`
 - target build helper: `<repo>/scripts/build_target_gpu.sh`
 - target build directory: `<repo>/release`
 
@@ -125,6 +135,14 @@ python3 scripts/ace_compile.py --model resnet20_cifar10
 ```
 
 This command compiles `model/resnet20_cifar10_pre.onnx`, generates `resnet20_cifar10_gpu.onnx.inc`, and then invokes `scripts/build_target_gpu.sh` to build the GPU target. If `model/resnet20_cifar10_gpu.cu` does not exist, `scripts/ace_compile.py` automatically calls `scripts/onnx2c.py` to generate it first.
+
+To generate HEonGPU-flavored code instead, pass `--backend heongpu`:
+
+```bash
+python3 scripts/ace_compile.py --backend heongpu --model conv_16x16x32x3 --skip-link
+```
+
+This switches the compiler flag to `-P2C:lib=heongpu` and emits the generated include under `fhe-cmplr/rtlib/heongpu/example`.
 
 ### 3.2 Compile all configured models
 
@@ -172,6 +190,7 @@ Supported options:
 
 - `--root`: ACE repository root. Defaults to `ACE_ROOT` or the directory of `scripts/ace_compile.py`.
 - `--compiler`: path to `fhe_cmplr`.
+- `--backend`: CUDA backend used for `-P2C:lib=...`. Supported values: `phantom`, `heongpu`.
 - `--model-dir`: directory containing `*_pre.onnx` and `*_gpu.cu`.
 - `--link-dir`: output directory for generated `*.onnx.inc` files.
 - `--build-script`: path to `scripts/build_target_gpu.sh`.
@@ -181,6 +200,12 @@ Supported options:
 - `--fusion`: enable `-CKKS:fus` during compilation. Effective only when the target backend is `phantom`.
 - `--skip-link`: skip the target build step.
 - `--skip-compile`: skip ONNX compilation and only build the target.
+
+Current HEonGPU notes:
+
+- `scripts/ace_compile.py --backend heongpu` automatically removes the default `:df=...` option from model presets because the current HEonGPU runtime path uses inline constants only.
+- The current HEonGPU runtime supports the generic CKKS path used by standard add/sub/mul/rotate/rescale/mod-switch/relin codegen.
+- Bootstrap runtime support is not enabled yet for HEonGPU; programs that emit bootstrap calls will compile, but the runtime will stop with a clear error if that path is executed.
 
 You can always inspect the latest CLI help with:
 
