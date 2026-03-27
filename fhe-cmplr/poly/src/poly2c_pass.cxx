@@ -77,7 +77,7 @@ bool POLY2C_PASS::Check_provider_supported(core::PROVIDER provider) {
     std::stringbuf buf;
     std::ostream   os(&buf);
     os << "-P2C:lib=" << _config.Prov_str()
-       << ". Only support -P2C:lib=ant|openfhe|seal|heongpu|phantom.";
+       << ". Only support -P2C:lib=ant|openfhe|seal|heongpu|cheddar|phantom.";
     CMPLR_USR_MSG(U_CODE::Incorrect_Option, buf.str().c_str());
     return false;
   }

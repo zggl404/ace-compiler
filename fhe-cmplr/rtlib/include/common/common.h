@@ -34,6 +34,7 @@ typedef enum {
   LIB_SEAL,      //!< Using SEAL library
   LIB_OPENFHE,   //!< Using OpenFHE library
   LIB_HEONGPU,   //!< Using HEonGPU library
+  LIB_CHEDDAR,   //!< Using CHEDDAR library
   LIB_PHANTOM,   //!< Using Phantom library
   LIB_HYPERFHE,  //!< Using HyperFHE library
 } LIB_PROV;

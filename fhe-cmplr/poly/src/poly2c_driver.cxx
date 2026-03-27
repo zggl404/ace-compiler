@@ -8,7 +8,9 @@
 
 #include "fhe/poly/poly2c_driver.h"
 
+#include <array>
 #include <iostream>
+#include <limits>
 
 #include "air/base/flatten_ctx.h"
 #include "air/base/st.h"
@@ -21,6 +23,25 @@ using namespace air::base;
 namespace fhe {
 
 namespace poly {
+
+namespace {
+
+uint32_t Normalize_cheddar_scale_bits(uint32_t requested_bits) {
+  static constexpr std::array<uint32_t, 3> kSupportedScaleBits = {30, 35, 40};
+  uint32_t best = kSupportedScaleBits.front();
+  uint32_t best_score = std::numeric_limits<uint32_t>::max();
+  for (uint32_t candidate : kSupportedScaleBits) {
+    uint32_t score = (candidate > requested_bits) ? candidate - requested_bits
+                                                  : requested_bits - candidate;
+    if (score < best_score || (score == best_score && candidate > best)) {
+      best = candidate;
+      best_score = score;
+    }
+  }
+  return best;
+}
+
+}  // namespace
 
 GLOB_SCOPE* POLY2C_DRIVER::Flatten(GLOB_SCOPE* glob) {
   GLOB_SCOPE* new_glob = new GLOB_SCOPE(glob->Id(), true);
@@ -57,12 +78,20 @@ GLOB_SCOPE* POLY2C_DRIVER::Flatten(GLOB_SCOPE* glob) {
 void POLY2C_DRIVER::Emit_get_context_params() {
   const core::CTX_PARAM&   param    = _ctx.Lower_ctx().Get_ctx_param();
   const std::set<int32_t>& rot_keys = param.Get_rotate_index();
+  uint32_t poly_degree              = param.Get_poly_degree();
+  uint32_t scale_bits              = param.Get_scaling_factor_bit_num();
+  if (_ctx.Provider() == core::PROVIDER::CHEDDAR) {
+    // Cheddar currently only ships the 65536-degree profiles in the ACE
+    // runtime, and its supported default scales are discrete profile choices.
+    poly_degree = 65536;
+    scale_bits  = Normalize_cheddar_scale_bits(scale_bits);
+  }
   // CKKS_PARAMS Get_context_params()
   _ctx << "CKKS_PARAMS* Get_context_params() {\n";
   _ctx << "  static CKKS_PARAMS parm = {\n";
   _ctx << "    ";
   _ctx << fhe::core::Provider_name(_ctx.Provider());
-  _ctx << ", " << param.Get_poly_degree() << ", ";
+  _ctx << ", " << poly_degree << ", ";
   _ctx << param.Get_security_level() << ", ";
   // mul_depth is 1 less than mul_level.
   uint32_t mul_level = param.Get_mul_level();
@@ -71,7 +100,7 @@ void POLY2C_DRIVER::Emit_get_context_params() {
   _ctx << mul_depth << ", ";
   _ctx << param.Get_input_level() << ", ";
   _ctx << param.Get_first_prime_bit_num() << ", ";
-  _ctx << param.Get_scaling_factor_bit_num() << ", ";
+  _ctx << scale_bits << ", ";
   _ctx << param.Get_q_part_num() << ", ";
   _ctx << param.Get_hamming_weight() << ", ";
   _ctx << rot_keys.size() << ", \n";

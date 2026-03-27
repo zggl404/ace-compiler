@@ -37,6 +37,7 @@ function(build_rtlib)
               -DRTLIB_ENABLE_OPENFHE=${FHE_ENABLE_OPENFHE}
               -DRTLIB_ENABLE_PHANTOM=${FHE_ENABLE_PHANTOM}
               -DRTLIB_ENABLE_HEONGPU=${FHE_ENABLE_HEONGPU}
+              -DRTLIB_ENABLE_CHEDDAR=${FHE_ENABLE_CHEDDAR}
               -DRTLIB_ENABLE_CUDA=${FHE_ENABLE_CUDA}
               -DRTLIB_SUPPORT_HPU=${FHE_SUPPORT_HPU}
               -DRTLIB_SEED_MODE=${FHE_SEED_MODE}
@@ -58,6 +59,7 @@ function(build_rtlib)
                       <BINARY_DIR>/openfhe/libFHErt_openfhe.a
                       <BINARY_DIR>/phantom/libFHErt_phantom.a
                       <BINARY_DIR>/heongpu/libFHErt_heongpu.a
+                      <BINARY_DIR>/cheddar/libFHErt_cheddar.a
   )
   ExternalProject_Get_Property(fhe_rtlib SOURCE_DIR BINARY_DIR)
 
@@ -102,6 +104,13 @@ function(build_rtlib)
       IMPORTED_LOCATION "${BINARY_DIR}/heongpu/libFHErt_heongpu.a"
     )
     install(FILES ${BINARY_DIR}/heongpu/libFHErt_heongpu.a DESTINATION rtlib/lib)
+  endif()
+  if(FHE_ENABLE_CHEDDAR)
+    add_library(FHErt_cheddar STATIC IMPORTED GLOBAL)
+    set_target_properties(FHErt_cheddar PROPERTIES
+      IMPORTED_LOCATION "${BINARY_DIR}/cheddar/libFHErt_cheddar.a"
+    )
+    install(FILES ${BINARY_DIR}/cheddar/libFHErt_cheddar.a DESTINATION rtlib/lib)
   endif()
 
   add_test(NAME test_fhe_rtlib COMMAND ${CMAKE_COMMAND} --build ${BINARY_DIR} --target test)

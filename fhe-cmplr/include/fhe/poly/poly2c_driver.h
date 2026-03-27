@@ -97,6 +97,7 @@ void POLY2C_DRIVER::Run(air::base::GLOB_SCOPE* glob, VISITOR& visitor) {
       fhe::poly::MFREE_PASS mfree(_ctx.Lower_ctx());
       mfree.Perform(body);
     } else if (_ctx.Provider() == core::PROVIDER::SEAL ||
+               _ctx.Provider() == core::PROVIDER::CHEDDAR ||
                _ctx.Provider() == core::PROVIDER::PHANTOM) {
       // insert free before emit C code
       fhe::ckks::MFREE_PASS mfree(_ctx.Lower_ctx());
