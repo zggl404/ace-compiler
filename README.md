@@ -95,6 +95,7 @@ Optionally, you can pick the FHE backend in the build script:
 ./scripts/build_cmplr.sh Release openfhe
 ./scripts/build_cmplr.sh Release phantom-fhe 80
 ./scripts/build_cmplr.sh Release heongpu 80
+./scripts/build_cmplr.sh Release cheddar 89
 ```
 
 Notes:
@@ -114,6 +115,13 @@ Notes:
   - You can override that with:
     - `RTLIB_HEONGPU_SOURCE_DIR` (local HEonGPU source tree), or
     - `RTLIB_HEONGPU_PATH` (installed HEonGPU CMake package prefix).
+- `cheddar` enables the CUDA/CHEDDAR build path and also requires CUDA arch setting.
+  - Pass CUDA arch as the 3rd argument (for example: `80`, `86`, `89`, `90`), or set `CMAKE_CUDA_ARCHITECTURES`.
+  - The script auto-detects `nvcc`; you can also set `CUDACXX=/path/to/nvcc` manually.
+  - By default the runtime looks for a local checkout in `<repo>/backend/cheddar-fhe`.
+  - You can override that with:
+    - `RTLIB_CHEDDAR_SOURCE_DIR` (local CHEDDAR source tree).
+- `build_cmplr.sh` prefers `/usr/bin/python3` when available; override with `PYTHON_EXECUTABLE` or `Python3_EXECUTABLE` if you need a different interpreter.
 
 ## 3. Compiling example models with `scripts/ace_compile.py`
 The model compilation entry point is now `scripts/ace_compile.py`. It is designed to work both inside Docker and directly on the host machine, and it auto-detects the repository root from `ACE_ROOT` or the script location.
