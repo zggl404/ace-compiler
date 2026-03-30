@@ -109,6 +109,8 @@ void Pt_mgr_fini() {
   Block_io_fini(Pt_mgr._sync_read);
 }
 
+bool Pt_pre_encode() { return true; }
+
 static inline uint32_t Get_slot(uint32_t pt_idx) {
   // so far, using direct mapping
   return pt_idx % Pt_mgr._ent_count;

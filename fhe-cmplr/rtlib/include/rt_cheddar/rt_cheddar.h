@@ -9,9 +9,98 @@
 #ifndef RTLIB_RT_CHEDDAR_RT_CHEDDAR_H
 #define RTLIB_RT_CHEDDAR_RT_CHEDDAR_H
 
+#include <cstddef>
+#include <cstdint>
+
+#include "UserInterface.h"
 #include "common/pt_mgr.h"
 #include "common/rt_api.h"
+#include "core/DeviceVector.h"
 #include "cheddar_api.h"
+
+namespace fhe {
+namespace rt {
+namespace cheddar {
+
+using Word = uint32_t;
+using CipherInner = ::cheddar::Ciphertext<Word>;
+using PlainInner = ::cheddar::Plaintext<Word>;
+
+inline void Copy_cipher_inner(CipherInner& dst, const CipherInner& src) {
+  dst.RemoveRx();
+  dst.ModifyNP(src.GetNP());
+  if (src.HasRx()) {
+    dst.PrepareRx();
+  }
+  dst.SetNumSlots(src.GetNumSlots());
+  dst.SetScale(src.GetScale());
+  ::cheddar::CopyDeviceToDevice(dst.bx_, src.bx_);
+  ::cheddar::CopyDeviceToDevice(dst.ax_, src.ax_);
+  if (src.HasRx()) {
+    ::cheddar::CopyDeviceToDevice(dst.rx_, src.rx_);
+  }
+}
+
+inline void Copy_plain_inner(PlainInner& dst, const PlainInner& src) {
+  dst.ModifyNP(src.GetNP());
+  dst.SetNumSlots(src.GetNumSlots());
+  dst.SetScale(src.GetScale());
+  ::cheddar::CopyDeviceToDevice(dst.mx_, src.mx_);
+}
+
+struct CheddarCiphertext {
+  CipherInner inner;
+  bool        is_zero    = false;
+  int         zero_level = 0;
+  double      zero_scale = 1.0;
+  int         zero_slots = 0;
+
+  CheddarCiphertext() = default;
+
+  CheddarCiphertext(const CheddarCiphertext& other) { *this = other; }
+
+  CheddarCiphertext& operator=(const CheddarCiphertext& other) {
+    if (this == &other) {
+      return *this;
+    }
+    is_zero = other.is_zero;
+    zero_level = other.zero_level;
+    zero_scale = other.zero_scale;
+    zero_slots = other.zero_slots;
+    Copy_cipher_inner(inner, other.inner);
+    return *this;
+  }
+
+  CheddarCiphertext(CheddarCiphertext&&) noexcept = default;
+  CheddarCiphertext& operator=(CheddarCiphertext&&) noexcept = default;
+};
+
+inline size_t Cipher_size(const CheddarCiphertext& ct) {
+  return ct.inner.bx_.size() + ct.inner.ax_.size() + ct.inner.rx_.size();
+}
+
+struct CheddarPlaintext {
+  PlainInner inner;
+
+  CheddarPlaintext() = default;
+
+  CheddarPlaintext(const CheddarPlaintext& other) { *this = other; }
+
+  CheddarPlaintext& operator=(const CheddarPlaintext& other) {
+    if (this == &other) {
+      return *this;
+    }
+    Copy_plain_inner(inner, other.inner);
+    return *this;
+  }
+
+  CheddarPlaintext(CheddarPlaintext&&) noexcept = default;
+  CheddarPlaintext& operator=(CheddarPlaintext&&) noexcept = default;
+};
+
+}  // namespace cheddar
+}  // namespace rt
+}  // namespace fhe
 
 inline uint32_t Degree() { return Get_context_params()->_poly_degree; }
 
@@ -128,6 +217,11 @@ inline CIPHER Mod_switch(CIPHER res, CIPHER op) {
   return res;
 }
 
+inline CIPHER Level_down_ciph(CIPHER res, CIPHER op, int level) {
+  Cheddar_level_down(res, op, level);
+  return res;
+}
+
 inline CIPHER Relin(CIPHER res, CIPHER3 ciph) {
   Cheddar_relin(res, ciph);
   return res;
@@ -159,6 +253,20 @@ inline void Free_ciph_array(CIPHER3 res, size_t size) {
 inline SCALE_T Sc_degree(CIPHER ct) { return Cheddar_scale(ct); }
 
 inline LEVEL_T Level(CIPHER ct) { return Cheddar_level(ct); }
+
+inline double Exact_scale(CIPHER ct) {
+  return ct->is_zero ? ct->zero_scale : ct->inner.GetScale();
+}
+
+inline uint32_t Exact_slots(CIPHER ct) {
+  int slots = ct->is_zero ? ct->zero_slots : ct->inner.GetNumSlots();
+  return slots > 0 ? static_cast<uint32_t>(slots) : Degree() / 2;
+}
+
+inline uint32_t Exact_level(CIPHER ct) {
+  return ct->is_zero ? static_cast<uint32_t>(ct->zero_level)
+                       : static_cast<uint32_t>(Level(ct));
+}
 
 void Dump_ciph(CIPHER ct, size_t start, size_t len);
 

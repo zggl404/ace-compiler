@@ -40,7 +40,7 @@ function(build_external_cheddar)
 
   set(BUILD_UNITTEST OFF)
   set(BUILD_TESTS OFF)
-  set(ENABLE_EXTENSION OFF)
+  set(ENABLE_EXTENSION ON)
   set(USE_GMP ON)
   add_subdirectory("${CHEDDAR_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/external/cheddar")
 

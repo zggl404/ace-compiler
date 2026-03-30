@@ -35,6 +35,17 @@
 //! default: 0 (disabled)
 #define ENV_PT_MSG_DUMP_COUNT "PT_MSG_DUMP_COUNT"
 
+//! environment variable to cap CHEDDAR pre-encoded plaintext entry count
+//! PT_PRE_ENCODE_COUNT=int: enable CHEDDAR pre-encode and pre-encode at most N
+//! entries before Main_graph. Unset disables pre-encode; set 0 for no explicit
+//! cap (best effort until resource limit).
+#define ENV_PT_PRE_ENCODE_COUNT "PT_PRE_ENCODE_COUNT"
+
+//! environment variable to reserve device memory for graph execution
+//! PT_PRE_ENCODE_RESERVE_MB=int: stop pre-encode when free GPU memory is below
+//! this threshold. default: 4096 MB.
+#define ENV_PT_PRE_ENCODE_RESERVE_MB "PT_PRE_ENCODE_RESERVE_MB"
+
 //! environment variable to control using even polynomial
 //! in mod_reduce of bootstrapping
 #define ENV_BOOTSTRAP_EVEN_POLY "RTLIB_BTS_EVEN_POLY"
@@ -47,4 +58,8 @@
 
 //! environment variable to control keyswitch dot product optimization
 #define ENV_FAST_DOT_PROD "FAST_DOT_PROD"
+
+//! environment variable to control CHEDDAR rotation key mode
+//! CHEDDAR_ROT_KEY_MODE=full|pow2. default: full
+#define ENV_CHEDDAR_ROT_KEY_MODE "CHEDDAR_ROT_KEY_MODE"
 #endif  // RTLIB_COMMON_RT_ENV_H

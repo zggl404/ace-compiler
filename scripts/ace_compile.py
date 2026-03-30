@@ -12,111 +12,29 @@ import sys
 import tempfile
 from pathlib import Path
 
-CONFIG = {
-    "conv_16x16x32x3": {
-        "input": "conv_16x16x32x3.onnx",
-        "vec": "-VEC:conv_parl",
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom:df=/tmp/conv_16x16x32x3.bin",
-    },
-    "lenet": {
-        "input": "lenet.onnx",
-        "vec": "-VEC:conv_parl",
-        "sihe": "bwr",
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom:df=/tmp/lenet.bin",
-    },
-    "resnet20_cifar10": {
-        "vec": "-VEC:conv_parl:ssf",
-        "sihe": "bwr",
-        "relu_vr_def": 3,
-        "relu_vr": (
-            "/relu/Relu=4;"
-            "/layer1/layer1.0/relu_1/Relu=4;/layer1/layer1.1/relu/Relu=4;/layer1/layer1.1/relu_1/Relu=5;/layer1/layer1.2/relu_1/Relu=5;"
-            "/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu_1/Relu=7;/layer3/layer3.0/relu_1/Relu=4;"
-            "/layer3/layer3.1/relu_1/Relu=6;/layer3/layer3.2/relu/Relu=4;/layer3/layer3.2/relu_1/Relu=20"
-        ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom:df=/tmp/resnet20_cifar10.bin",
-    },
-    "resnet32_cifar10": {
-        "vec": "-VEC:conv_parl:ssf",
-        "relu_vr_def": 2,
-        "relu_vr": (
-            "/relu/Relu=4;"
-            "/layer1/layer1.0/relu/Relu=3;/layer1/layer1.0/relu_1/Relu=5;/layer1/layer1.1/relu/Relu=3;/layer1/layer1.1/relu_1/Relu=5;"
-            "/layer1/layer1.2/relu/Relu=3;/layer1/layer1.2/relu_1/Relu=5;/layer1/layer1.3/relu/Relu=3;/layer1/layer1.3/relu_1/Relu=5;/layer1/layer1.4/relu/Relu=3;/layer1/layer1.4/relu_1/Relu=5;"
-            "/layer2/layer2.0/relu/Relu=3;/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu_1/Relu=6;/layer2/layer2.4/relu_1/Relu=6;"
-            "/layer3/layer3.0/relu/Relu=3;/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu_1/Relu=4;/layer3/layer3.2/relu/Relu=3;/layer3/layer3.2/relu_1/Relu=6;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=10;/layer3/layer3.4/relu_1/Relu=11"
-        ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom",
-    },
-    "resnet32_cifar100": {
-        "vec": "-VEC:conv_parl:ssf",
-        "relu_vr_def": 3,
-        "relu_vr": (
-            "/relu/Relu=5;"
-            "/layer1/layer1.0/relu_1/Relu=6;/layer1/layer1.1/relu_1/Relu=7;/layer1/layer1.2/relu_1/Relu=8;/layer1/layer1.3/relu_1/Relu=10;/layer1/layer1.4/relu/Relu=4;/layer1/layer1.4/relu_1/Relu=7;"
-            "/layer2/layer2.0/relu/Relu=4;/layer2/layer2.0/relu_1/Relu=6;/layer2/layer2.1/relu_1/Relu=8;/layer2/layer2.2/relu/Relu=4;/layer2/layer2.2/relu_1/Relu=8;/layer2/layer2.3/relu_1/Relu=9;/layer2/layer2.4/relu_1/Relu=11;"
-            "/layer3/layer3.0/relu/Relu=4;/layer3/layer3.0/relu_1/Relu=8;/layer3/layer3.1/relu_1/Relu=9;/layer3/layer3.2/relu/Relu=4;/layer3/layer3.2/relu_1/Relu=11;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=26;/layer3/layer3.4/relu/Relu=5;/layer3/layer3.4/relu_1/Relu=46"
-        ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom",
-    },
-    "resnet44_cifar10": {
-        "vec": "-VEC:conv_parl:ssf",
-        "relu_vr_def": 2,
-        "relu_vr": (
-            "/relu/Relu=4;"
-            "/layer1/layer1.0/relu_1/Relu=5;/layer1/layer1.1/relu_1/Relu=5;/layer1/layer1.2/relu_1/Relu=5;/layer1/layer1.3/relu_1/Relu=6;/layer1/layer1.4/relu_1/Relu=6;/layer1/layer1.5/relu/Relu=2;/layer1/layer1.5/relu_1/Relu=7;/layer1/layer1.6/relu_1/Relu=6;"
-            "/layer2/layer2.0/relu/Relu=2;/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu/Relu=2;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu/Relu=2;"
-            "/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu/Relu=2;/layer2/layer2.3/relu_1/Relu=5;/layer2/layer2.4/relu/Relu=2;/layer2/layer2.4/relu_1/Relu=5;/layer2/layer2.5/relu/Relu=2;/layer2/layer2.5/relu_1/Relu=6;/layer2/layer2.6/relu/Relu=2;/layer2/layer2.6/relu_1/Relu=7;"
-            "/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu/Relu=2;/layer3/layer3.1/relu_1/Relu=5;/layer3/layer3.2/relu/Relu=2;/layer3/layer3.2/relu_1/Relu=6;/layer3/layer3.3/relu_1/Relu=7;/layer3/layer3.4/relu_1/Relu=9;/layer3/layer3.5/relu_1/Relu=15;/layer3/layer3.6/relu_1/Relu=16"
-        ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom",
-    },
-    "resnet56_cifar10": {
-        "vec": "-VEC:conv_parl:ssf",
-        "relu_vr_def": 2,
-        "relu_vr": (
-            "/relu/Relu=4;"
-            "/layer1/layer1.0/relu_1/Relu=6;/layer1/layer1.1/relu_1/Relu=5;/layer1/layer1.2/relu/Relu=3;/layer1/layer1.2/relu_1/Relu=6;/layer1/layer1.3/relu/Relu=3;/layer1/layer1.3/relu_1/Relu=7;/layer1/layer1.4/relu_1/Relu=6;/layer1/layer1.5/relu_1/Relu=6;/layer1/layer1.6/relu_1/Relu=6;/layer1/layer1.7/relu_1/Relu=6;/layer1/layer1.8/relu_1/Relu=5;"
-            "/layer2/layer2.0/relu_1/Relu=4;/layer2/layer2.1/relu_1/Relu=4;/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu_1/Relu=5;/layer2/layer2.4/relu_1/Relu=6;/layer2/layer2.5/relu_1/Relu=8;/layer2/layer2.6/relu_1/Relu=11;/layer2/layer2.7/relu_1/Relu=11;/layer2/layer2.8/relu_1/Relu=12;"
-            "/layer3/layer3.0/relu/Relu=3;/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu_1/Relu=5;/layer3/layer3.2/relu_1/Relu=5;/layer3/layer3.3/relu_1/Relu=5;/layer3/layer3.4/relu_1/Relu=5;/layer3/layer3.5/relu_1/Relu=6;/layer3/layer3.6/relu_1/Relu=8;/layer3/layer3.7/relu/Relu=3;/layer3/layer3.7/relu_1/Relu=10;/layer3/layer3.8/relu_1/Relu=12"
-        ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom",
-    },
-    "resnet110_cifar10": {
-        "vec": "-VEC:conv_parl:ssf",
-        "relu_vr_def": 3,
-        "relu_vr": (
-            "/relu/Relu=14;"
-            "/layer1/layer1.0/relu/Relu=4;/layer1/layer1.0/relu_1/Relu=14;/layer1/layer1.1/relu/Relu=4;/layer1/layer1.1/relu_1/Relu=15;/layer1/layer1.10/relu/Relu=5;/layer1/layer1.10/relu_1/Relu=18;/layer1/layer1.11/relu/Relu=5;/layer1/layer1.11/relu_1/Relu=17;"
-            "/layer1/layer1.12/relu/Relu=4;/layer1/layer1.12/relu_1/Relu=21;/layer1/layer1.13/relu/Relu=7;/layer1/layer1.13/relu_1/Relu=22;/layer1/layer1.14/relu/Relu=7;/layer1/layer1.14/relu_1/Relu=23;/layer1/layer1.15/relu/Relu=7;/layer1/layer1.15/relu_1/Relu=25;"
-            "/layer1/layer1.16/relu/Relu=6;/layer1/layer1.16/relu_1/Relu=22;/layer1/layer1.17/relu/Relu=6;/layer1/layer1.17/relu_1/Relu=22;/layer1/layer1.2/relu/Relu=3;/layer1/layer1.2/relu_1/Relu=15;/layer1/layer1.3/relu/Relu=6;/layer1/layer1.3/relu_1/Relu=20;"
-            "/layer1/layer1.4/relu/Relu=5;/layer1/layer1.4/relu_1/Relu=17;/layer1/layer1.5/relu/Relu=5;"
-            "/layer1/layer1.5/relu_1/Relu=17;/layer1/layer1.6/relu/Relu=5;/layer1/layer1.6/relu_1/Relu=17;/layer1/layer1.7/relu/Relu=4;/layer1/layer1.7/relu_1/Relu=17;/layer1/layer1.8/relu/Relu=4;/layer1/layer1.8/relu_1/Relu=17;/layer1/layer1.9/relu/Relu=5;/layer1/layer1.9/relu_1/Relu=18;"
-            "/layer2/layer2.0/relu/Relu=6;/layer2/layer2.0/relu_1/Relu=14;/layer2/layer2.1/relu/Relu=4;/layer2/layer2.1/relu_1/Relu=14;/layer2/layer2.10/relu/Relu=3;/layer2/layer2.10/relu_1/Relu=19;/layer2/layer2.11/relu/Relu=3;/layer2/layer2.11/relu_1/Relu=19;/layer2/layer2.12/relu/Relu=3;"
-            "/layer2/layer2.12/relu_1/Relu=22;/layer2/layer2.13/relu/Relu=3;/layer2/layer2.13/relu_1/Relu=21;/layer2/layer2.14/relu/Relu=3;/layer2/layer2.14/relu_1/Relu=23;/layer2/layer2.15/relu/Relu=3;/layer2/layer2.15/relu_1/Relu=22;/layer2/layer2.16/relu/Relu=4;/layer2/layer2.16/relu_1/Relu=23;"
-            "/layer2/layer2.17/relu/Relu=3;/layer2/layer2.17/relu_1/Relu=22;/layer2/layer2.2/relu/Relu=3;/layer2/layer2.2/relu_1/Relu=15;/layer2/layer2.3/relu/Relu=4;/layer2/layer2.3/relu_1/Relu=16;/layer2/layer2.4/relu/Relu=4;/layer2/layer2.4/relu_1/Relu=16;/layer2/layer2.5/relu/Relu=3;"
-            "/layer2/layer2.5/relu_1/Relu=17;/layer2/layer2.6/relu/Relu=5;/layer2/layer2.6/relu_1/Relu=17;/layer2/layer2.7/relu/Relu=3;/layer2/layer2.7/relu_1/Relu=17;/layer2/layer2.8/relu/Relu=3;/layer2/layer2.8/relu_1/Relu=18;/layer2/layer2.9/relu/Relu=4;/layer2/layer2.9/relu_1/Relu=19;"
-            "/layer3/layer3.0/relu/Relu=5;/layer3/layer3.0/relu_1/Relu=14;/layer3/layer3.1/relu/Relu=4;/layer3/layer3.1/relu_1/Relu=15;/layer3/layer3.10/relu/Relu=3;/layer3/layer3.10/relu_1/Relu=20;/layer3/layer3.11/relu/Relu=4;/layer3/layer3.11/relu_1/Relu=20;"
-            "/layer3/layer3.12/relu/Relu=4;/layer3/layer3.12/relu_1/Relu=20;/layer3/layer3.13/relu/Relu=4;/layer3/layer3.13/relu_1/Relu=24;/layer3/layer3.14/relu/Relu=4;/layer3/layer3.14/relu_1/Relu=27;/layer3/layer3.15/relu/Relu=4;/layer3/layer3.15/relu_1/Relu=30;"
-            "/layer3/layer3.16/relu/Relu=4;/layer3/layer3.16/relu_1/Relu=27;/layer3/layer3.17/relu/Relu=9;/layer3/layer3.17/relu_1/Relu=33;/layer3/layer3.2/relu/Relu=3;/layer3/layer3.2/relu_1/Relu=15;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=15;/layer3/layer3.4/relu/Relu=3;/layer3/layer3.4/relu_1/Relu=15;/layer3/layer3.5/relu/Relu=3;"
-            "/layer3/layer3.5/relu_1/Relu=16;/layer3/layer3.6/relu/Relu=3;/layer3/layer3.6/relu_1/Relu=16;/layer3/layer3.7/relu/Relu=3;/layer3/layer3.7/relu_1/Relu=16;/layer3/layer3.8/relu/Relu=3;/layer3/layer3.8/relu_1/Relu=17;/layer3/layer3.9/relu/Relu=3;/layer3/layer3.9/relu_1/Relu=18"
-        ),
-        "ckks": "-CKKS:q0=60:sf=56:N=65536",
-        "p2c": "-P2C:lib=phantom",
-    },
-}
-
+MODEL_CONFIG = {'conv_16x16x32x3': {'input': 'conv_16x16x32x3.onnx'},
+ 'lenet': {'input': 'lenet.onnx'},
+ 'resnet20_cifar10': {'relu_sihe': ['relu_vr_def=3',
+                                    'relu_vr=/relu/Relu=4;/layer1/layer1.0/relu_1/Relu=4;/layer1/layer1.1/relu/Relu=4;/layer1/layer1.1/relu_1/Relu=5;/layer1/layer1.2/relu_1/Relu=5;/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu_1/Relu=7;/layer3/layer3.0/relu_1/Relu=4;/layer3/layer3.1/relu_1/Relu=6;/layer3/layer3.2/relu/Relu=4;/layer3/layer3.2/relu_1/Relu=20']},
+ 'resnet32_cifar10': {'relu_sihe': ['relu_vr_def=2',
+                                    'relu_vr=/relu/Relu=4;/layer1/layer1.0/relu/Relu=3;/layer1/layer1.0/relu_1/Relu=5;/layer1/layer1.1/relu/Relu=3;/layer1/layer1.1/relu_1/Relu=5;/layer1/layer1.2/relu/Relu=3;/layer1/layer1.2/relu_1/Relu=5;/layer1/layer1.3/relu/Relu=3;/layer1/layer1.3/relu_1/Relu=5;/layer1/layer1.4/relu/Relu=3;/layer1/layer1.4/relu_1/Relu=5;/layer2/layer2.0/relu/Relu=3;/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu_1/Relu=6;/layer2/layer2.4/relu_1/Relu=6;/layer3/layer3.0/relu/Relu=3;/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu_1/Relu=4;/layer3/layer3.2/relu/Relu=3;/layer3/layer3.2/relu_1/Relu=6;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=10;/layer3/layer3.4/relu_1/Relu=11']},
+ 'resnet32_cifar100': {'relu_sihe': ['relu_vr_def=3',
+                                     'relu_vr=/relu/Relu=5;/layer1/layer1.0/relu_1/Relu=6;/layer1/layer1.1/relu_1/Relu=7;/layer1/layer1.2/relu_1/Relu=8;/layer1/layer1.3/relu_1/Relu=10;/layer1/layer1.4/relu/Relu=4;/layer1/layer1.4/relu_1/Relu=7;/layer2/layer2.0/relu/Relu=4;/layer2/layer2.0/relu_1/Relu=6;/layer2/layer2.1/relu_1/Relu=8;/layer2/layer2.2/relu/Relu=4;/layer2/layer2.2/relu_1/Relu=8;/layer2/layer2.3/relu_1/Relu=9;/layer2/layer2.4/relu_1/Relu=11;/layer3/layer3.0/relu/Relu=4;/layer3/layer3.0/relu_1/Relu=8;/layer3/layer3.1/relu_1/Relu=9;/layer3/layer3.2/relu/Relu=4;/layer3/layer3.2/relu_1/Relu=11;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=26;/layer3/layer3.4/relu/Relu=5;/layer3/layer3.4/relu_1/Relu=46']},
+ 'resnet44_cifar10': {'relu_sihe': ['relu_vr_def=2',
+                                    'relu_vr=/relu/Relu=4;/layer1/layer1.0/relu_1/Relu=5;/layer1/layer1.1/relu_1/Relu=5;/layer1/layer1.2/relu_1/Relu=5;/layer1/layer1.3/relu_1/Relu=6;/layer1/layer1.4/relu_1/Relu=6;/layer1/layer1.5/relu/Relu=2;/layer1/layer1.5/relu_1/Relu=7;/layer1/layer1.6/relu_1/Relu=6;/layer2/layer2.0/relu/Relu=2;/layer2/layer2.0/relu_1/Relu=5;/layer2/layer2.1/relu/Relu=2;/layer2/layer2.1/relu_1/Relu=5;/layer2/layer2.2/relu/Relu=2;/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu/Relu=2;/layer2/layer2.3/relu_1/Relu=5;/layer2/layer2.4/relu/Relu=2;/layer2/layer2.4/relu_1/Relu=5;/layer2/layer2.5/relu/Relu=2;/layer2/layer2.5/relu_1/Relu=6;/layer2/layer2.6/relu/Relu=2;/layer2/layer2.6/relu_1/Relu=7;/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu/Relu=2;/layer3/layer3.1/relu_1/Relu=5;/layer3/layer3.2/relu/Relu=2;/layer3/layer3.2/relu_1/Relu=6;/layer3/layer3.3/relu_1/Relu=7;/layer3/layer3.4/relu_1/Relu=9;/layer3/layer3.5/relu_1/Relu=15;/layer3/layer3.6/relu_1/Relu=16']},
+ 'resnet56_cifar10': {'relu_sihe': ['relu_vr_def=2',
+                                    'relu_vr=/relu/Relu=4;/layer1/layer1.0/relu_1/Relu=6;/layer1/layer1.1/relu_1/Relu=5;/layer1/layer1.2/relu/Relu=3;/layer1/layer1.2/relu_1/Relu=6;/layer1/layer1.3/relu/Relu=3;/layer1/layer1.3/relu_1/Relu=7;/layer1/layer1.4/relu_1/Relu=6;/layer1/layer1.5/relu_1/Relu=6;/layer1/layer1.6/relu_1/Relu=6;/layer1/layer1.7/relu_1/Relu=6;/layer1/layer1.8/relu_1/Relu=5;/layer2/layer2.0/relu_1/Relu=4;/layer2/layer2.1/relu_1/Relu=4;/layer2/layer2.2/relu_1/Relu=5;/layer2/layer2.3/relu_1/Relu=5;/layer2/layer2.4/relu_1/Relu=6;/layer2/layer2.5/relu_1/Relu=8;/layer2/layer2.6/relu_1/Relu=11;/layer2/layer2.7/relu_1/Relu=11;/layer2/layer2.8/relu_1/Relu=12;/layer3/layer3.0/relu/Relu=3;/layer3/layer3.0/relu_1/Relu=5;/layer3/layer3.1/relu_1/Relu=5;/layer3/layer3.2/relu_1/Relu=5;/layer3/layer3.3/relu_1/Relu=5;/layer3/layer3.4/relu_1/Relu=5;/layer3/layer3.5/relu_1/Relu=6;/layer3/layer3.6/relu_1/Relu=8;/layer3/layer3.7/relu/Relu=3;/layer3/layer3.7/relu_1/Relu=10;/layer3/layer3.8/relu_1/Relu=12']},
+ 'resnet110_cifar10': {'relu_sihe': ['relu_vr_def=3',
+                                     'relu_vr=/relu/Relu=14;/layer1/layer1.0/relu/Relu=4;/layer1/layer1.0/relu_1/Relu=14;/layer1/layer1.1/relu/Relu=4;/layer1/layer1.1/relu_1/Relu=15;/layer1/layer1.10/relu/Relu=5;/layer1/layer1.10/relu_1/Relu=18;/layer1/layer1.11/relu/Relu=5;/layer1/layer1.11/relu_1/Relu=17;/layer1/layer1.12/relu/Relu=4;/layer1/layer1.12/relu_1/Relu=21;/layer1/layer1.13/relu/Relu=7;/layer1/layer1.13/relu_1/Relu=22;/layer1/layer1.14/relu/Relu=7;/layer1/layer1.14/relu_1/Relu=23;/layer1/layer1.15/relu/Relu=7;/layer1/layer1.15/relu_1/Relu=25;/layer1/layer1.16/relu/Relu=6;/layer1/layer1.16/relu_1/Relu=22;/layer1/layer1.17/relu/Relu=6;/layer1/layer1.17/relu_1/Relu=22;/layer1/layer1.2/relu/Relu=3;/layer1/layer1.2/relu_1/Relu=15;/layer1/layer1.3/relu/Relu=6;/layer1/layer1.3/relu_1/Relu=20;/layer1/layer1.4/relu/Relu=5;/layer1/layer1.4/relu_1/Relu=17;/layer1/layer1.5/relu/Relu=5;/layer1/layer1.5/relu_1/Relu=17;/layer1/layer1.6/relu/Relu=5;/layer1/layer1.6/relu_1/Relu=17;/layer1/layer1.7/relu/Relu=4;/layer1/layer1.7/relu_1/Relu=17;/layer1/layer1.8/relu/Relu=4;/layer1/layer1.8/relu_1/Relu=17;/layer1/layer1.9/relu/Relu=5;/layer1/layer1.9/relu_1/Relu=18;/layer2/layer2.0/relu/Relu=6;/layer2/layer2.0/relu_1/Relu=14;/layer2/layer2.1/relu/Relu=4;/layer2/layer2.1/relu_1/Relu=14;/layer2/layer2.10/relu/Relu=3;/layer2/layer2.10/relu_1/Relu=19;/layer2/layer2.11/relu/Relu=3;/layer2/layer2.11/relu_1/Relu=19;/layer2/layer2.12/relu/Relu=3;/layer2/layer2.12/relu_1/Relu=22;/layer2/layer2.13/relu/Relu=3;/layer2/layer2.13/relu_1/Relu=21;/layer2/layer2.14/relu/Relu=3;/layer2/layer2.14/relu_1/Relu=23;/layer2/layer2.15/relu/Relu=3;/layer2/layer2.15/relu_1/Relu=22;/layer2/layer2.16/relu/Relu=4;/layer2/layer2.16/relu_1/Relu=23;/layer2/layer2.17/relu/Relu=3;/layer2/layer2.17/relu_1/Relu=22;/layer2/layer2.2/relu/Relu=3;/layer2/layer2.2/relu_1/Relu=15;/layer2/layer2.3/relu/Relu=4;/layer2/layer2.3/relu_1/Relu=16;/layer2/layer2.4/relu/Relu=4;/layer2/layer2.4/relu_1/Relu=16;/layer2/layer2.5/relu/Relu=3;/layer2/layer2.5/relu_1/Relu=17;/layer2/layer2.6/relu/Relu=5;/layer2/layer2.6/relu_1/Relu=17;/layer2/layer2.7/relu/Relu=3;/layer2/layer2.7/relu_1/Relu=17;/layer2/layer2.8/relu/Relu=3;/layer2/layer2.8/relu_1/Relu=18;/layer2/layer2.9/relu/Relu=4;/layer2/layer2.9/relu_1/Relu=19;/layer3/layer3.0/relu/Relu=5;/layer3/layer3.0/relu_1/Relu=14;/layer3/layer3.1/relu/Relu=4;/layer3/layer3.1/relu_1/Relu=15;/layer3/layer3.10/relu/Relu=3;/layer3/layer3.10/relu_1/Relu=20;/layer3/layer3.11/relu/Relu=4;/layer3/layer3.11/relu_1/Relu=20;/layer3/layer3.12/relu/Relu=4;/layer3/layer3.12/relu_1/Relu=20;/layer3/layer3.13/relu/Relu=4;/layer3/layer3.13/relu_1/Relu=24;/layer3/layer3.14/relu/Relu=4;/layer3/layer3.14/relu_1/Relu=27;/layer3/layer3.15/relu/Relu=4;/layer3/layer3.15/relu_1/Relu=30;/layer3/layer3.16/relu/Relu=4;/layer3/layer3.16/relu_1/Relu=27;/layer3/layer3.17/relu/Relu=9;/layer3/layer3.17/relu_1/Relu=33;/layer3/layer3.2/relu/Relu=3;/layer3/layer3.2/relu_1/Relu=15;/layer3/layer3.3/relu/Relu=4;/layer3/layer3.3/relu_1/Relu=15;/layer3/layer3.4/relu/Relu=3;/layer3/layer3.4/relu_1/Relu=15;/layer3/layer3.5/relu/Relu=3;/layer3/layer3.5/relu_1/Relu=16;/layer3/layer3.6/relu/Relu=3;/layer3/layer3.6/relu_1/Relu=16;/layer3/layer3.7/relu/Relu=3;/layer3/layer3.7/relu_1/Relu=16;/layer3/layer3.8/relu/Relu=3;/layer3/layer3.8/relu_1/Relu=17;/layer3/layer3.9/relu/Relu=3;/layer3/layer3.9/relu_1/Relu=18']}}
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TIME_EXE = shutil.which("time")
-CUDA_BACKENDS = ("phantom", "heongpu")
+CUDA_BACKENDS = ("phantom", "heongpu", "cheddar")
+CHEDDAR_SCALE_BITS = (30, 35, 40)
+DEFAULT_VEC_OPTION = "-VEC:conv_parl"
+DEFAULT_CKKS_OPTION = "-CKKS:q0=60:sf=56:N=65536"
+DEFAULT_P2C_OPTION = "-P2C:lib=cheddar"
+DEFAULT_DF_TEMPLATE = "/tmp/{model}.bin"
 
 
 def resolve_path(path, base_dir=None):
@@ -187,7 +105,36 @@ def run_command(command, label, env=None):
     return ret
 
 
-def rewrite_p2c_option(p2c_option, backend):
+def split_option_parts(option, prefix):
+    if not option:
+        return []
+    stripped = option
+    if stripped.startswith(prefix):
+        stripped = stripped[len(prefix):]
+    elif stripped.startswith(prefix[1:]):
+        stripped = stripped[len(prefix) - 1:]
+    return [part for part in stripped.split(":") if part]
+
+
+def dedupe_parts(parts):
+    seen = set()
+    result = []
+    for part in parts:
+        if part in seen:
+            continue
+        seen.add(part)
+        result.append(part)
+    return result
+
+
+def resolve_data_file(data_file, model, repo_root):
+    if not data_file:
+        return None
+    formatted = data_file.replace("{model}", model)
+    return resolve_path(formatted, repo_root)
+
+
+def rewrite_p2c_option(p2c_option, backend, data_file=None):
     if backend not in CUDA_BACKENDS:
         raise ValueError(
             f"Unsupported backend '{backend}'. Choose from: {', '.join(CUDA_BACKENDS)}"
@@ -197,65 +144,119 @@ def rewrite_p2c_option(p2c_option, backend):
 
     rewritten = []
     has_lib = False
-    for part in p2c_option[len("-P2C:") :].split(":"):
+    has_df = False
+    for part in p2c_option[len("-P2C:"):].split(":"):
         if part.startswith("lib="):
             rewritten.append(f"lib={backend}")
             has_lib = True
-        elif backend == "heongpu" and part.startswith("df="):
-            continue
+        elif part.startswith("df="):
+            has_df = True
+            if data_file is not None:
+                rewritten.append(f"df={data_file}")
+            else:
+                rewritten.append(part)
         else:
             rewritten.append(part)
 
     if not has_lib:
         rewritten.insert(0, f"lib={backend}")
+    if data_file is not None and not has_df:
+        rewritten.append(f"df={data_file}")
     return "-P2C:" + ":".join(rewritten)
 
 
-def parser_option(model, backend="phantom", enable_fusion=False):
-    """
-    Get the compilation option based on the model name.
-    """
+def rewrite_ckks_option(ckks_option, backend):
+    if backend != "cheddar":
+        return ckks_option
+    if not ckks_option.startswith("-CKKS:"):
+        raise ValueError(f"Invalid CKKS option: {ckks_option}")
 
-    config = CONFIG.get(model)
-    if config is None:
-        raise ValueError(f"Configuration for model '{model}' not found.")
+    parts = [part for part in ckks_option[len("-CKKS:"):].split(":") if part]
+    rewritten = []
+    has_n = False
+    has_sf = False
+    for part in parts:
+        if part.startswith("sf="):
+            has_sf = True
+            try:
+                requested = int(part.split("=", 1)[1])
+            except ValueError:
+                rewritten.append(part)
+                continue
+            scale = min(
+                CHEDDAR_SCALE_BITS,
+                key=lambda candidate: (abs(candidate - requested), -candidate),
+            )
+            rewritten.append(f"sf={scale}")
+        elif part.startswith("N="):
+            has_n = True
+            rewritten.append("N=65536")
+        else:
+            rewritten.append(part)
 
-    options = [config["vec"]]
+    if not has_n:
+        rewritten.append("N=65536")
+    if not has_sf:
+        rewritten.append("sf=40")
+    return "-CKKS:" + ":".join(rewritten)
 
+
+def build_sihe_option(model, user_sihe_options, enable_bwr=False):
+    model_config = MODEL_CONFIG[model]
     sihe_parts = []
-    sihe_opt = config.get("sihe")
-    if sihe_opt:
-        if sihe_opt.startswith("-SIHE:"):
-            sihe_opt = sihe_opt[len("-SIHE:") :]
-        elif sihe_opt.startswith("SIHE:"):
-            sihe_opt = sihe_opt[len("SIHE:") :]
-        sihe_parts.extend(part for part in sihe_opt.split(":") if part)
+    for option in user_sihe_options:
+        sihe_parts.extend(split_option_parts(option, "-SIHE:"))
+    if enable_bwr:
+        sihe_parts.append("bwr")
+    sihe_parts.extend(model_config.get("relu_sihe", []))
+    sihe_parts = dedupe_parts(sihe_parts)
 
-    # `bwr` lowers relu directly into Phantom-only bootstrap_with_relu.
-    # HEonGPU currently supports only the regular bootstrap path.
-    if backend == "heongpu":
-        sihe_parts = [part for part in sihe_parts if part != "bwr"]
+    if not sihe_parts:
+        return None
+    return "-SIHE:" + ":".join(sihe_parts)
 
-    if "relu_vr_def" in config and "relu_vr" in config:
-        sihe_parts.append(f"relu_vr_def={config['relu_vr_def']}")
-        sihe_parts.append(f"relu_vr={config['relu_vr']}")
 
-    if sihe_parts:
-        options.append(f"-SIHE:{':'.join(sihe_parts)}")
+def build_ckks_option(ckks_option, backend, enable_sbm=False):
+    ckks_parts = split_option_parts(ckks_option, "-CKKS:")
+    if enable_sbm:
+        ckks_parts.append("sbm")
+    ckks_parts = dedupe_parts(ckks_parts)
+    return rewrite_ckks_option("-CKKS:" + ":".join(ckks_parts), backend)
 
-    options.append(config["ckks"])
-    if enable_fusion:
+
+def build_compile_options(model, args, repo_root):
+    options = [args.vec]
+
+    sihe_option = build_sihe_option(model, args.sihe_options, enable_bwr=args.bwr)
+    if sihe_option:
+        options.append(sihe_option)
+
+    options.append(build_ckks_option(args.ckks, args.backend, enable_sbm=args.sbm))
+    if args.fusion:
         options.append("-CKKS:fus")
-    options.append(rewrite_p2c_option(config["p2c"], backend))
+    options.append(
+        rewrite_p2c_option(
+            args.p2c,
+            args.backend,
+            data_file=resolve_data_file(args.df, model, repo_root),
+        )
+    )
+
+    for extra_option in args.compiler_options:
+        options.append(extra_option)
     return options
 
 
-def get_model_input_filename(model, config):
+def get_model_input_filename(model, model_dir, args):
+    if args.input_name:
+        return args.input_name
+
+    config = MODEL_CONFIG[model]
     if "input" in config:
         return config["input"]
     for suffix in ("_pre.onnx", ".onnx", "_train.onnx"):
         candidate = f"{model}{suffix}"
-        if os.path.exists(os.path.join(model_dir_global, candidate)):
+        if os.path.exists(os.path.join(model_dir, candidate)):
             return candidate
     return f"{model}_pre.onnx"
 
@@ -279,7 +280,7 @@ def generate_target_source(repo_root, model, input_file, inc_file, target_source
         raise FileNotFoundError(f"onnx2c script not found: {onnx2c}")
 
     os.makedirs(os.path.dirname(target_source), exist_ok=True)
-    include_stmt = f'#include "{os.path.basename(inc_file)}"\n'
+    include_stmt = f'#include "{os.path.basename(inc_file)}"\\n'
 
     with tempfile.NamedTemporaryFile(
         mode="w",
@@ -311,25 +312,14 @@ def generate_target_source(repo_root, model, input_file, inc_file, target_source
             os.remove(temp_output)
 
 
-def compile_model(cmplr, model, input_file, output_file, keep=False,
-                  backend="phantom", enable_fusion=False):
-    """
-    Compile the model with the given commands and options.
-    """
-
+def compile_model(cmplr, model, input_file, output_file, compile_options, keep=False):
     if not os.path.exists(cmplr):
         raise FileNotFoundError(f"Compiler not found: {cmplr}")
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Model file not found: {input_file}")
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    command = [
-        cmplr,
-        *parser_option(model, backend=backend, enable_fusion=enable_fusion),
-        input_file,
-        "-o",
-        output_file,
-    ]
+    command = [cmplr, *compile_options, input_file, "-o", output_file]
     ret = run_command(command, f"Compile {model}")
 
     if not keep:
@@ -339,10 +329,6 @@ def compile_model(cmplr, model, input_file, output_file, keep=False,
 
 
 def link_target(build_script, build_dir, repo_root, model_dir, model, input_file, inc_file):
-    """
-    Build the model inference target.
-    """
-
     if not os.path.exists(build_script):
         raise FileNotFoundError(f"Build script not found: {build_script}")
 
@@ -362,19 +348,11 @@ def link_target(build_script, build_dir, repo_root, model_dir, model, input_file
     return run_command(command, f"Build target {model}", env=env)
 
 
-def inference(prog, input_file, idx, num):
-    """
-    Execute the model inference program.
-    """
-
-    command = [prog, input_file, str(idx), str(num)]
-    return run_command(command, "Inference")
-
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Compile ACE example models and optionally build their GPU inference targets."
+            "Compile ACE example models and optionally build their GPU inference targets. "
+            "Only ReLU-related SIHE options stay model-specific; vec/sihe/ckks/p2c are user-configurable."
         )
     )
     parser.add_argument(
@@ -404,11 +382,10 @@ def parse_args():
     )
     parser.add_argument(
         "--backend",
-        default="phantom",
+        default="cheddar",
         choices=CUDA_BACKENDS,
         help=(
-            "Compilation backend used for `-P2C:lib=...` and the default "
-            "generated `.onnx.inc` directory."
+            "Compilation backend used for `-P2C:lib=...` and the default generated `.onnx.inc` directory. Default: cheddar."
         ),
     )
     parser.add_argument(
@@ -416,6 +393,60 @@ def parse_args():
         action="append",
         dest="models",
         help="Compile only the specified model. Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--input-name",
+        help="Override the ONNX input filename for all selected models.",
+    )
+    parser.add_argument(
+        "--vec",
+        default=DEFAULT_VEC_OPTION,
+        help=f"Vectorization option passed to fhe_cmplr. Default: {DEFAULT_VEC_OPTION}",
+    )
+    parser.add_argument(
+        "--sihe",
+        action="append",
+        dest="sihe_options",
+        default=[],
+        help=(
+            "Additional SIHE option. Can be passed multiple times. Accepts either `foo:bar` or `-SIHE:foo:bar`. "
+            "Model-specific ReLU SIHE options are appended automatically."
+        ),
+    )
+    parser.add_argument(
+        "--bwr",
+        action="store_true",
+        help="Append `bwr` to the SIHE options for every selected model.",
+    )
+    parser.add_argument(
+        "--ckks",
+        default=DEFAULT_CKKS_OPTION,
+        help=f"CKKS option passed to fhe_cmplr. Default: {DEFAULT_CKKS_OPTION}",
+    )
+    parser.add_argument(
+        "--sbm",
+        action="store_true",
+        help="Append `sbm` to the CKKS options for every selected model.",
+    )
+    parser.add_argument(
+        "--p2c",
+        default=DEFAULT_P2C_OPTION,
+        help=f"P2C option passed to fhe_cmplr. Default: {DEFAULT_P2C_OPTION}",
+    )
+    parser.add_argument(
+        "--df",
+        default=DEFAULT_DF_TEMPLATE,
+        help=(
+            "Set or override `df=...` in the P2C option for every selected model. "
+            f"Supports `{{model}}` in the path. Default: {DEFAULT_DF_TEMPLATE}"
+        ),
+    )
+    parser.add_argument(
+        "--compiler-option",
+        action="append",
+        dest="compiler_options",
+        default=[],
+        help="Extra compiler option appended after vec/sihe/ckks/p2c. Can be passed multiple times.",
     )
     parser.add_argument(
         "--keep",
@@ -436,33 +467,27 @@ def parse_args():
         "--fusion",
         action="store_true",
         help=(
-            "Enable CKKS fusion (`-CKKS:fus`) during compilation. "
-            "The compiler still only activates the pass when the target backend is Phantom."
+            "Enable CKKS fusion (`-CKKS:fus`) during compilation. The compiler still only activates the pass when the target backend is Phantom."
         ),
     )
     return parser.parse_args()
 
 
 def validate_models(models):
-    unknown_models = [model for model in models if model not in CONFIG]
+    unknown_models = [model for model in models if model not in MODEL_CONFIG]
     if unknown_models:
         raise ValueError(
-            f"Unknown model(s): {', '.join(unknown_models)}. "
-            f"Available models: {', '.join(CONFIG)}"
+            f"Unknown model(s): {', '.join(unknown_models)}. Available models: {', '.join(MODEL_CONFIG)}"
         )
 
 
 def main():
     args = parse_args()
     repo_root = resolve_path(args.root)
-    compiler = resolve_path(
-        args.compiler or get_default_compiler(repo_root),
-        repo_root,
-    )
+    compiler = resolve_path(args.compiler or get_default_compiler(repo_root), repo_root)
     model_dir = resolve_path(args.model_dir or "model", repo_root)
     link_dir = resolve_path(
-        args.link_dir
-        or os.path.join("fhe-cmplr", "rtlib", args.backend, "example"),
+        args.link_dir or os.path.join("fhe-cmplr", "rtlib", args.backend, "example"),
         repo_root,
     )
     build_script = resolve_path(
@@ -471,7 +496,7 @@ def main():
     )
     build_dir = resolve_path(args.build_dir or "release", repo_root)
 
-    models = args.models or list(CONFIG)
+    models = args.models or list(MODEL_CONFIG)
     validate_models(models)
 
     print(f"ACE root: {repo_root}")
@@ -481,15 +506,27 @@ def main():
     print(f"Link dir: {link_dir}")
     print(f"Build script: {build_script}")
     print(f"Build dir: {build_dir}")
+    print(f"Compiler vec option: {args.vec}")
+    print(f"Compiler ckks option: {args.ckks}")
+    print(f"Compiler p2c option: {args.p2c}")
+    if args.sbm:
+        print("Compiler sbm: enabled")
+    if args.df:
+        print(f"Compiler df template: {args.df}")
+    if args.bwr:
+        print("Compiler bwr: enabled")
+    if args.sihe_options:
+        print(f"User SIHE options: {args.sihe_options}")
+    if args.compiler_options:
+        print(f"Extra compiler options: {args.compiler_options}")
 
     exit_code = 0
-    global model_dir_global
-    model_dir_global = model_dir
 
     for model in models:
-        config = CONFIG[model]
-        input_file = os.path.join(model_dir, get_model_input_filename(model, config))
+        input_file = os.path.join(model_dir, get_model_input_filename(model, model_dir, args))
         output_file = os.path.join(link_dir, f"{model}_gpu.onnx.inc")
+        compile_options = build_compile_options(model, args, repo_root)
+        print(f"Resolved compile options for {model}: {shlex.join(compile_options)}")
 
         try:
             if not args.skip_compile:
@@ -498,9 +535,8 @@ def main():
                     model,
                     input_file,
                     output_file,
+                    compile_options,
                     keep=args.keep,
-                    backend=args.backend,
-                    enable_fusion=args.fusion,
                 )
                 if compile_ret.returncode != 0:
                     exit_code = compile_ret.returncode

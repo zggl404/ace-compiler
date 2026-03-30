@@ -55,12 +55,15 @@ void Cheddar_rotate(CIPHER res, CIPHER op, int step);
 void Cheddar_conjugate(CIPHER res, CIPHER op);
 void Cheddar_rescale(CIPHER res, CIPHER op);
 void Cheddar_mod_switch(CIPHER res, CIPHER op);
+void Cheddar_level_down(CIPHER res, CIPHER op, int level);
 void Cheddar_relin(CIPHER res, CIPHER3 op);
 void Cheddar_bootstrap(CIPHER res, CIPHER op, int level, int slot);
 void Cheddar_copy(CIPHER res, CIPHER op);
 void Cheddar_zero(CIPHER res);
 void Cheddar_free_ciph(CIPHER res);
 void Cheddar_free_plain(PLAIN res);
+
+bool Need_bts();
 
 SCALE_T Cheddar_scale(CIPHER res);
 LEVEL_T Cheddar_level(CIPHER res);

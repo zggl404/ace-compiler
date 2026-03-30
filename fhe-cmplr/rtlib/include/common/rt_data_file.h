@@ -36,6 +36,14 @@ bool Rt_data_is_plaintext(struct RT_DATA_FILE* file);
 
 uint64_t Rt_data_size(struct RT_DATA_FILE* file);
 
+uint64_t Rt_data_entry_count(struct RT_DATA_FILE* file);
+
+uint32_t Rt_data_entry_size(struct RT_DATA_FILE* file, uint32_t index);
+
+uint32_t Rt_data_entry_scale(struct RT_DATA_FILE* file, uint32_t index);
+
+uint32_t Rt_data_entry_level(struct RT_DATA_FILE* file, uint32_t index);
+
 uint64_t Rt_data_entry_offset(struct RT_DATA_FILE* file, uint32_t index,
                               uint64_t size);
 

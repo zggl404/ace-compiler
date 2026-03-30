@@ -13,7 +13,12 @@
 #include "common/rt_api.h"
 #include "common/rtlib_timing.h"
 
+#define ATTRIBUTE_WEAK __attribute__((weak))
+
+ATTRIBUTE_WEAK void Pre_run_main_graph() {}
+
 void Run_main_graph() {
+  Pre_run_main_graph();
   RTLIB_TM_START(RTM_MAIN_GRAPH, rtm);
   bool ret = Main_graph();
   RTLIB_TM_END(RTM_MAIN_GRAPH, rtm);

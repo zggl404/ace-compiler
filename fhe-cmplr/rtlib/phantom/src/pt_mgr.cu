@@ -77,6 +77,8 @@ void Pt_mgr_fini() {
   Pt_mgr._sync_read = false;
 }
 
+bool Pt_pre_encode() { return false; }
+
 void Pt_prefetch(uint32_t index) { (void)index; }
 
 void* Pt_get(uint32_t index, size_t len, uint32_t scale, uint32_t level) {

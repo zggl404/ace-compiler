@@ -126,11 +126,14 @@ Notes:
 ## 3. Compiling example models with `scripts/ace_compile.py`
 The model compilation entry point is now `scripts/ace_compile.py`. It is designed to work both inside Docker and directly on the host machine, and it auto-detects the repository root from `ACE_ROOT` or the script location.
 
-By default, the script resolves paths relative to its own location. The generated `.onnx.inc` directory depends on `--backend`:
+For the current CLI and the refactored option model, see `doc/ACE_COMPILE.md`.
+
+By default, the script resolves paths relative to its own location. The default backend is `cheddar`, so the generated `.onnx.inc` files go to `fhe-cmplr/rtlib/cheddar/example` unless `--backend` is overridden:
 
 - compiler: prefer `<repo>/release/driver/fhe_cmplr`, fallback to `<repo>/ace_cmplr/bin/fhe_cmplr`
 - model directory: `<repo>/model`
 - generated `.onnx.inc` directory:
+  - default `cheddar`: `<repo>/fhe-cmplr/rtlib/cheddar/example`
   - `phantom`: `<repo>/fhe-cmplr/rtlib/phantom/example`
   - `heongpu`: `<repo>/fhe-cmplr/rtlib/heongpu/example`
 - target build helper: `<repo>/scripts/build_target_gpu.sh`
@@ -151,6 +154,14 @@ python3 scripts/ace_compile.py --backend heongpu --model conv_16x16x32x3 --skip-
 ```
 
 This switches the compiler flag to `-P2C:lib=heongpu` and emits the generated include under `fhe-cmplr/rtlib/heongpu/example`.
+
+To generate CHEDDAR-flavored code with the default settings:
+
+```bash
+python3 scripts/ace_compile.py --model resnet20_cifar10 --skip-link
+```
+
+This uses `-P2C:lib=cheddar:df=/tmp/{model}.bin` by default and emits the generated include under `fhe-cmplr/rtlib/cheddar/example`.
 
 ### 3.2 Compile all configured models
 
@@ -198,12 +209,15 @@ Supported options:
 
 - `--root`: ACE repository root. Defaults to `ACE_ROOT` or the directory of `scripts/ace_compile.py`.
 - `--compiler`: path to `fhe_cmplr`.
-- `--backend`: CUDA backend used for `-P2C:lib=...`. Supported values: `phantom`, `heongpu`.
+- `--backend`: CUDA backend used for `-P2C:lib=...`. Supported values: `phantom`, `heongpu`, `cheddar`. Default: `cheddar`.
 - `--model-dir`: directory containing `*_pre.onnx` and `*_gpu.cu`.
 - `--link-dir`: output directory for generated `*.onnx.inc` files.
 - `--build-script`: path to `scripts/build_target_gpu.sh`.
 - `--build-dir`: build directory passed to `scripts/build_target_gpu.sh` through `ACE_BUILD_DIR`.
 - `--model`: compile only the specified model; pass multiple times to build multiple models.
+- `--bwr`: append `bwr` to the SIHE options for all selected models.
+- `--sbm`: append `sbm` to the CKKS options for all selected models.
+- `--df`: set or override `-P2C:df=...` for all selected models; supports `{model}` in the path. Default: `/tmp/{model}.bin`.
 - `--keep`: keep compiler-generated intermediate `.t` and `.json` files.
 - `--fusion`: enable `-CKKS:fus` during compilation. Effective only when the target backend is `phantom`.
 - `--skip-link`: skip the target build step.
@@ -211,9 +225,15 @@ Supported options:
 
 Current HEonGPU notes:
 
-- `scripts/ace_compile.py --backend heongpu` automatically removes the default `:df=...` option from model presets because the current HEonGPU runtime path uses inline constants only.
+- `scripts/ace_compile.py` adds `--df=/tmp/{model}.bin` by default and keeps it as part of `-P2C:df=...`; whether it is consumed depends on the generated program and runtime path.
 - The current HEonGPU runtime supports the generic CKKS path used by standard add/sub/mul/rotate/rescale/mod-switch/relin codegen.
 - Bootstrap runtime support is not enabled yet for HEonGPU; programs that emit bootstrap calls will compile, but the runtime will stop with a clear error if that path is executed.
+
+Current CHEDDAR notes:
+
+- `scripts/ace_compile.py` adds `--df=/tmp/{model}.bin` by default and keeps it as part of `-P2C:df=...`; whether it is consumed depends on the generated program and runtime path.
+- For CHEDDAR, `scripts/ace_compile.py` rewrites CKKS options to `N=65536` and snaps `sf` to the supported profile values `30/35/40`.
+- CHEDDAR bootstrap is now enabled in runtime. The runtime auto-prepares boot keys lazily per requested slot size (for example `4096/8192/16384` in `resnet20_cifar10`).
 
 You can always inspect the latest CLI help with:
 

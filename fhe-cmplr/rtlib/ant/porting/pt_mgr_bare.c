@@ -15,4 +15,6 @@ bool Pt_mgr_init(const char* fname) { return false; }
 
 void Pt_mgr_fini() {}
 
+bool Pt_pre_encode() { return false; }
+
 void Init_rtlib_timing() {}

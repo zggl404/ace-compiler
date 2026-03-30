@@ -8,9 +8,13 @@
 
 #include "common/pt_mgr.h"
 
+#include <exception>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
+
+#include <cuda_runtime_api.h>
 
 #include "common/error.h"
 #include "common/rt_data_file.h"
@@ -25,8 +29,15 @@ struct PT_MGR {
 };
 
 static PT_MGR Pt_mgr = {0};
+static std::vector<PLAINTEXT> Pt_cache;
+static std::vector<size_t>    Pt_cache_len;
+static std::vector<uint32_t>  Pt_cache_scale;
+static std::vector<uint32_t>  Pt_cache_level;
+static std::vector<uint8_t>   Pt_cache_valid;
+static bool                   Pt_cache_ready = false;
 
 static size_t Pt_msg_dump_count();
+static float* Msg_ptr(uint32_t index, uint64_t ofst, size_t len);
 static void   Dump_msg_preview(const char* tag, uint32_t index, size_t ofst,
                                const float* data, size_t len, uint32_t scale,
                                uint32_t level);
@@ -62,6 +73,12 @@ bool Pt_mgr_init(const char* fname) {
           "failed to malloc rt data buffer");
   bool fill_ok = Rt_data_fill(Pt_mgr._file, Pt_mgr._msg_buf, Pt_mgr._msg_size);
   FMT_ASSERT(fill_ok, "failed to fill rt data from file");
+  Pt_cache.clear();
+  Pt_cache_len.clear();
+  Pt_cache_scale.clear();
+  Pt_cache_level.clear();
+  Pt_cache_valid.clear();
+  Pt_cache_ready = false;
   return true;
 }
 
@@ -73,8 +90,101 @@ void Pt_mgr_fini() {
   free(Pt_mgr._msg_buf);
   Pt_mgr._msg_buf   = NULL;
   Pt_mgr._msg_size  = 0;
+  Pt_cache.clear();
+  Pt_cache_len.clear();
+  Pt_cache_scale.clear();
+  Pt_cache_level.clear();
+  Pt_cache_valid.clear();
+  Pt_cache_ready = false;
   Block_io_fini(Pt_mgr._sync_read);
   Pt_mgr._sync_read = false;
+}
+
+bool Pt_pre_encode() {
+  IS_TRUE(Pt_mgr._file != NULL, "pt mgr is not initialized");
+  if (Pt_cache_ready) {
+    return true;
+  }
+  if (Rt_data_is_plaintext(Pt_mgr._file)) {
+    return false;
+  }
+
+  uint64_t entry_count = Rt_data_entry_count(Pt_mgr._file);
+  uint64_t max_pre_encode = entry_count < 64 ? entry_count : 64;
+  const char* cap_env = getenv(ENV_PT_PRE_ENCODE_COUNT);
+  if (cap_env != NULL) {
+    uint64_t cap = strtoull(cap_env, NULL, 10);
+    if (cap == 0) {
+      max_pre_encode = entry_count;
+    } else {
+      max_pre_encode = cap < entry_count ? cap : entry_count;
+    }
+  }
+  uint64_t reserve_mb = 4096;
+  const char* reserve_env = getenv(ENV_PT_PRE_ENCODE_RESERVE_MB);
+  if (reserve_env != NULL) {
+    uint64_t parsed = strtoull(reserve_env, NULL, 10);
+    if (parsed > 0) {
+      reserve_mb = parsed;
+    }
+  }
+  size_t reserve_bytes = (size_t)reserve_mb * 1024 * 1024;
+
+  Pt_cache.clear();
+  Pt_cache.resize(entry_count);
+  Pt_cache_len.assign(entry_count, 0);
+  Pt_cache_scale.assign(entry_count, 0);
+  Pt_cache_level.assign(entry_count, 0);
+  Pt_cache_valid.assign(entry_count, 0);
+
+  uint64_t pre_encoded = 0;
+  for (uint32_t index = 0; index < entry_count; ++index) {
+    if (index >= max_pre_encode) {
+      break;
+    }
+    size_t free_bytes  = 0;
+    size_t total_bytes = 0;
+    if (cudaMemGetInfo(&free_bytes, &total_bytes) == cudaSuccess &&
+        free_bytes <= reserve_bytes) {
+      fprintf(stderr,
+              "[pt_mgr] pre-encode stopped at index=%u/%llu: free memory %llu "
+              "MB <= reserve %llu MB\n",
+              index, (unsigned long long)entry_count,
+              (unsigned long long)(free_bytes / 1024 / 1024),
+              (unsigned long long)reserve_mb);
+      break;
+    }
+    uint32_t size_bytes = Rt_data_entry_size(Pt_mgr._file, index);
+    FMT_ASSERT(size_bytes % sizeof(float) == 0,
+               "invalid rt data entry size for index=%u", index);
+    size_t   len   = size_bytes / sizeof(float);
+    uint32_t scale = Rt_data_entry_scale(Pt_mgr._file, index);
+    uint32_t level = Rt_data_entry_level(Pt_mgr._file, index);
+    float*   data  = Msg_ptr(index, 0, len);
+
+    try {
+      Encode_float(&Pt_cache[index], data, len, scale, level);
+    } catch (const std::exception& ex) {
+      fprintf(stderr,
+              "[pt_mgr] pre-encode stopped at index=%u/%llu: %s\n",
+              index, (unsigned long long)entry_count, ex.what());
+      break;
+    } catch (...) {
+      fprintf(stderr,
+              "[pt_mgr] pre-encode stopped at index=%u/%llu: unknown error\n",
+              index, (unsigned long long)entry_count);
+      break;
+    }
+    Pt_cache_len[index]   = len;
+    Pt_cache_scale[index] = scale;
+    Pt_cache_level[index] = level;
+    Pt_cache_valid[index] = 1;
+    ++pre_encoded;
+  }
+  Pt_cache_ready = true;
+  fprintf(stderr, "[pt_mgr] pre-encoded %llu/%llu entries\n",
+          (unsigned long long)pre_encoded, (unsigned long long)entry_count);
+  return true;
 }
 
 void Pt_prefetch(uint32_t index) { (void)index; }
@@ -192,6 +302,12 @@ static void Dump_msg_preview(const char* tag, uint32_t index, size_t ofst,
 
 void* Pt_from_msg(void* pt, uint32_t index, size_t len, uint32_t scale,
                   uint32_t level) {
+  if (Pt_cache_ready && index < Pt_cache_valid.size() && Pt_cache_valid[index] &&
+      Pt_cache_len[index] == len && Pt_cache_scale[index] == scale &&
+      Pt_cache_level[index] == level) {
+    fhe::rt::cheddar::Copy_plain_inner(((PLAIN)pt)->inner, Pt_cache[index].inner);
+    return pt;
+  }
   float* data = Msg_ptr(index, 0, len);
   Dump_msg_preview("Pt_from_msg", index, 0, data, len, scale, level);
   Encode_float((PLAIN)pt, data, len, scale, level);

@@ -125,6 +125,25 @@ uint64_t Rt_data_size(struct RT_DATA_FILE* file) {
   return file->_hdr._lut_ofst - DATA_FILE_PAGE_SIZE;
 }
 
+uint64_t Rt_data_entry_count(struct RT_DATA_FILE* file) {
+  return file->_hdr._ent_count;
+}
+
+uint32_t Rt_data_entry_size(struct RT_DATA_FILE* file, uint32_t index) {
+  IS_TRUE(index < file->_hdr._ent_count, "index out of entry range");
+  return file->_lut[index]._size;
+}
+
+uint32_t Rt_data_entry_scale(struct RT_DATA_FILE* file, uint32_t index) {
+  IS_TRUE(index < file->_hdr._ent_count, "index out of entry range");
+  return (uint32_t)file->_lut[index]._scale;
+}
+
+uint32_t Rt_data_entry_level(struct RT_DATA_FILE* file, uint32_t index) {
+  IS_TRUE(index < file->_hdr._ent_count, "index out of entry range");
+  return (uint32_t)file->_lut[index]._level;
+}
+
 uint64_t Rt_data_entry_offset(struct RT_DATA_FILE* file, uint32_t index,
                               uint64_t size) {
   IS_TRUE(file->_hdr._ent_type != DE_PLAINTEXT, "bad entry type");

@@ -27,6 +27,9 @@ bool Pt_mgr_init(const char* fname);
 //! @brief Finalize plaintext manager
 void Pt_mgr_fini();
 
+//! @brief Pre-encode all available message entries into backend plaintexts
+bool Pt_pre_encode();
+
 //! @brief Prefetch plaintext from disk to memory
 void Pt_prefetch(uint32_t index);
 
