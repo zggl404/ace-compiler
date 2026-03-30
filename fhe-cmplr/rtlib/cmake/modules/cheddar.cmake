@@ -12,6 +12,9 @@ function(build_external_cheddar)
   endif()
 
   set(CHEDDAR_DEFAULT_SOURCE_DIR "${PROJECT_SOURCE_DIR}/../../backend/cheddar-fhe")
+  set(CHEDDAR_URL "https://github.com/zggl404/cheddar-fhe.git")
+  set(CHEDDAR_URL_SSH "git@github.com:zggl404/cheddar-fhe.git")
+  set(CHEDDAR_GIT_TAG "main")
 
   if(DEFINED ENV{RTLIB_CHEDDAR_SOURCE_DIR} AND
      IS_DIRECTORY "$ENV{RTLIB_CHEDDAR_SOURCE_DIR}")
@@ -19,11 +22,44 @@ function(build_external_cheddar)
   elseif(IS_DIRECTORY "${CHEDDAR_DEFAULT_SOURCE_DIR}")
     set(CHEDDAR_SOURCE_DIR "${CHEDDAR_DEFAULT_SOURCE_DIR}")
   else()
-    message(FATAL_ERROR
-      "CHEDDAR source not found. Set RTLIB_CHEDDAR_SOURCE_DIR to a local checkout.")
+    include(FetchContent)
+
+    if(EXTERNAL_URL_SSH)
+      set(REPO_CHEDDAR_URL ${CHEDDAR_URL_SSH})
+    else()
+      set(REPO_CHEDDAR_URL ${CHEDDAR_URL})
+    endif()
+    if(DEFINED ENV{RTLIB_CHEDDAR_REPO_URL} AND
+       NOT "$ENV{RTLIB_CHEDDAR_REPO_URL}" STREQUAL "")
+      set(REPO_CHEDDAR_URL "$ENV{RTLIB_CHEDDAR_REPO_URL}")
+    endif()
+    if(DEFINED ENV{RTLIB_CHEDDAR_GIT_TAG} AND
+       NOT "$ENV{RTLIB_CHEDDAR_GIT_TAG}" STREQUAL "")
+      set(CHEDDAR_GIT_TAG "$ENV{RTLIB_CHEDDAR_GIT_TAG}")
+    endif()
+
+    message(STATUS "Cloning External Repository   : ${REPO_CHEDDAR_URL} @ ${CHEDDAR_GIT_TAG}")
+    FetchContent_Declare(
+      cheddar_external
+      GIT_REPOSITORY ${REPO_CHEDDAR_URL}
+      GIT_TAG ${CHEDDAR_GIT_TAG}
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_GetProperties(cheddar_external)
+    if(NOT cheddar_external_POPULATED)
+      if(POLICY CMP0169)
+        cmake_policy(PUSH)
+        cmake_policy(SET CMP0169 OLD)
+      endif()
+      FetchContent_Populate(cheddar_external)
+      if(POLICY CMP0169)
+        cmake_policy(POP)
+      endif()
+    endif()
+    set(CHEDDAR_SOURCE_DIR "${cheddar_external_SOURCE_DIR}")
   endif()
 
-  message(STATUS "Using local CHEDDAR source     : ${CHEDDAR_SOURCE_DIR}")
+  message(STATUS "Using CHEDDAR source           : ${CHEDDAR_SOURCE_DIR}")
 
   if(DEFINED BUILD_UNITTEST)
     set(_CHEDDAR_SAVED_BUILD_UNITTEST ${BUILD_UNITTEST})
