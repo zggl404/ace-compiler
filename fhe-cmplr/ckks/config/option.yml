@@ -95,6 +95,9 @@ group:
     - name: rgn_scl_bts_mng
       abbrev_name: sbm
       description: Region based scale/bootstrap management
+    - name: rgn_scl_mng
+      abbrev_name: sm
+      description: Region based scale management without bootstrap planning
     - name: rgn_bts_mng
       abbrev_name: bm
       description: Region based bootstrap management

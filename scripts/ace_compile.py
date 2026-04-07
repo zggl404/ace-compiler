@@ -216,10 +216,12 @@ def build_sihe_option(model, user_sihe_options, enable_bwr=False):
     return "-SIHE:" + ":".join(sihe_parts)
 
 
-def build_ckks_option(ckks_option, backend, enable_sbm=False):
+def build_ckks_option(ckks_option, backend, enable_sbm=False, enable_sm=False):
     ckks_parts = split_option_parts(ckks_option, "-CKKS:")
     if enable_sbm:
         ckks_parts.append("sbm")
+    if enable_sm:
+        ckks_parts.append("sm")
     ckks_parts = dedupe_parts(ckks_parts)
     return rewrite_ckks_option("-CKKS:" + ":".join(ckks_parts), backend)
 
@@ -231,7 +233,11 @@ def build_compile_options(model, args, repo_root):
     if sihe_option:
         options.append(sihe_option)
 
-    options.append(build_ckks_option(args.ckks, args.backend, enable_sbm=args.sbm))
+    options.append(
+        build_ckks_option(
+            args.ckks, args.backend, enable_sbm=args.sbm, enable_sm=args.sm
+        )
+    )
     if args.fusion:
         options.append("-CKKS:fus")
     options.append(
@@ -429,6 +435,11 @@ def parse_args():
         help="Append `sbm` to the CKKS options for every selected model.",
     )
     parser.add_argument(
+        "--sm",
+        action="store_true",
+        help="Append `sm` to the CKKS options for every selected model.",
+    )
+    parser.add_argument(
         "--p2c",
         default=DEFAULT_P2C_OPTION,
         help=f"P2C option passed to fhe_cmplr. Default: {DEFAULT_P2C_OPTION}",
@@ -483,6 +494,8 @@ def validate_models(models):
 
 def main():
     args = parse_args()
+    if args.sbm and args.sm:
+        raise ValueError("`--sbm` and `--sm` cannot be enabled at the same time.")
     repo_root = resolve_path(args.root)
     compiler = resolve_path(args.compiler or get_default_compiler(repo_root), repo_root)
     model_dir = resolve_path(args.model_dir or "model", repo_root)
@@ -511,6 +524,8 @@ def main():
     print(f"Compiler p2c option: {args.p2c}")
     if args.sbm:
         print("Compiler sbm: enabled")
+    if args.sm:
+        print("Compiler sm: enabled")
     if args.df:
         print(f"Compiler df template: {args.df}")
     if args.bwr:
