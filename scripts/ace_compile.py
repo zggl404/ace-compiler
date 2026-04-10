@@ -216,12 +216,27 @@ def build_sihe_option(model, user_sihe_options, enable_bwr=False):
     return "-SIHE:" + ":".join(sihe_parts)
 
 
-def build_ckks_option(ckks_option, backend, enable_sbm=False, enable_sm=False):
+def upsert_ckks_kv_option(parts, key, value):
+    prefix = f"{key}="
+    rewritten = [part for part in parts if not part.startswith(prefix)]
+    rewritten.append(f"{prefix}{value}")
+    return rewritten
+
+
+def build_ckks_option(
+    ckks_option,
+    backend,
+    enable_sbm=False,
+    enable_sm=False,
+    input_cipher_lvl=None,
+):
     ckks_parts = split_option_parts(ckks_option, "-CKKS:")
     if enable_sbm:
         ckks_parts.append("sbm")
     if enable_sm:
         ckks_parts.append("sm")
+    if input_cipher_lvl is not None:
+        ckks_parts = upsert_ckks_kv_option(ckks_parts, "icl", input_cipher_lvl)
     ckks_parts = dedupe_parts(ckks_parts)
     return rewrite_ckks_option("-CKKS:" + ":".join(ckks_parts), backend)
 
@@ -235,7 +250,11 @@ def build_compile_options(model, args, repo_root):
 
     options.append(
         build_ckks_option(
-            args.ckks, args.backend, enable_sbm=args.sbm, enable_sm=args.sm
+            args.ckks,
+            args.backend,
+            enable_sbm=args.sbm,
+            enable_sm=args.sm,
+            input_cipher_lvl=args.icl,
         )
     )
     if args.fusion:
@@ -430,6 +449,14 @@ def parse_args():
         help=f"CKKS option passed to fhe_cmplr. Default: {DEFAULT_CKKS_OPTION}",
     )
     parser.add_argument(
+        "--icl",
+        type=int,
+        help=(
+            "Set `icl=<val>` in the CKKS options to control the input ciphertext level. "
+            "Overrides any existing `icl=` already present in `--ckks`."
+        ),
+    )
+    parser.add_argument(
         "--sbm",
         action="store_true",
         help="Append `sbm` to the CKKS options for every selected model.",
@@ -521,6 +548,8 @@ def main():
     print(f"Build dir: {build_dir}")
     print(f"Compiler vec option: {args.vec}")
     print(f"Compiler ckks option: {args.ckks}")
+    if args.icl is not None:
+        print(f"Compiler icl: {args.icl}")
     print(f"Compiler p2c option: {args.p2c}")
     if args.sbm:
         print("Compiler sbm: enabled")
