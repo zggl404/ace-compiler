@@ -93,8 +93,18 @@ extern "C" {
   DECL_RTM(RTM_BS_SLOT_TO_COEFF, 3) \
   /* plaintext encoding */          \
   DECL_RTM(RTM_PT_ENCODE, 1)        \
+  DECL_RTM(RTM_PT_ENCODE_DATA, 1)   \
+  DECL_RTM(RTM_PT_ENCODE_MASK, 1)   \
   /* plaintext manager */           \
-  DECL_RTM(RTM_PT_GET, 1)
+  DECL_RTM(RTM_PT_GET, 1)           \
+  DECL_RTM(RTM_PT_FREE, 1)          \
+  /* ciphertext lifecycle */        \
+  DECL_RTM(RTM_CT_COPY, 1)          \
+  DECL_RTM(RTM_CT_ZERO, 1)          \
+  DECL_RTM(RTM_CT_FREE, 1)          \
+  /* graph io */                    \
+  DECL_RTM(RTM_IO_INPUT, 1)         \
+  DECL_RTM(RTM_IO_OUTPUT, 1)
 
 //! internal timing ID
 enum RTM_LIB_EVENT {

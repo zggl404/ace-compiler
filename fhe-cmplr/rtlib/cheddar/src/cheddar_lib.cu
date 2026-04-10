@@ -424,7 +424,6 @@ public:
     if (requested_slots <= 0) {
       requested_slots = full_slots_;
     }
-    Ensure_bootstrap_slot(requested_slots);
 
     bool zero_input = Is_zero(op1);
     Ciphertext input;
@@ -604,6 +603,9 @@ private:
     }
     ui_ = std::make_unique<UI>(context_);
     pow2_rotation_keys_ = Use_pow2_rotation_keys();
+    if (boot_requested_) {
+      Ensure_bootstrap_slot(full_slots_);
+    }
 
     std::unordered_set<int> prepared_rots;
     for (size_t i = 0; i < prog_param->_num_rot_idx; ++i) {
@@ -742,7 +744,7 @@ private:
     for (size_t i = 0; i < len && i < values.size(); ++i) {
       values[i] = Complex(static_cast<double>(input[i]), 0.0);
     }
-    context_->encoder_.Encode(pt, Map_logical_level(level),
+    context_->encoder_.EncodeGPU(pt, Map_logical_level(level),
                               Scale_from_degree(sc_degree, level), values);
   }
 
@@ -752,7 +754,7 @@ private:
     for (size_t i = 0; i < len && i < values.size(); ++i) {
       values[i] = Complex(value, 0.0);
     }
-    context_->encoder_.Encode(pt, Map_logical_level(level),
+    context_->encoder_.EncodeGPU(pt, Map_logical_level(level),
                               Scale_from_degree(sc_degree, level), values);
   }
 
@@ -1004,6 +1006,7 @@ void Finalize_context() {
     Pt_mgr_fini();
   }
   CHEDDAR_CONTEXT::Fini_context();
+  RTLIB_TM_REPORT();
   Io_fini();
 }
 

@@ -64,8 +64,10 @@ void Report_rtlib_timing() {
     need_close = true;
   }
 
-  fprintf(fp, "%-24s\t%12s\t%12s\n", "RTLib functions", "Count", "Elapse");
-  fprintf(fp, "%-24s\t%12s\t%12s\n", LONG_BAR, SHORT_BAR, SHORT_BAR);
+  fprintf(fp, "%-24s\t%12s\t%14s\t%12s\n", "RTLib functions", "Count",
+          "Elapse(ms)", "Avg(ms)");
+  fprintf(fp, "%-24s\t%12s\t%14s\t%12s\n", LONG_BAR, SHORT_BAR,
+          "------------", SHORT_BAR);
   uint64_t sum[RTLIB_TIMING_MAX_LEVEL] = {0};
   uint32_t par[RTLIB_TIMING_MAX_LEVEL] = {0};
   int32_t  index                       = 0;
@@ -76,9 +78,9 @@ void Report_rtlib_timing() {
       IS_TRUE(curr < RTLIB_TIMING_MAX_LEVEL, "exceed max level");
       while (curr < index) {
         // output previous sub total and reset sum to zero
-        fprintf(fp, "%*s%-24s\t%12s\t%12.6f sec\n", index - 1, "",
+        fprintf(fp, "%*s%-24s\t%12s\t%14.3f\t%12s\n", index - 1, "",
                 name[par[index - 1]] + 4, "sub total",
-                (double)sum[index] / 1000000000.0);
+                (double)sum[index] / 1000000.0, "-");
         sum[index] = 0;
         par[index] = 0;
         --index;
@@ -86,26 +88,23 @@ void Report_rtlib_timing() {
       sum[curr] += (Rtlib_timing[i] - Rtlib_sub_timing[i]);
       par[curr] = i;
       if (Rtlib_count[i] != 0) {
-        double ctm = (double)Rtlib_timing[i] / 1000000000.0;
-        double stm = (double)Rtlib_sub_timing[i] / 1000000000.0;
-        if (stm > 0) {
-          fprintf(fp, "%*s%-24s\t%12ld\t%12.6f sec (%.6f - %.6f)\n", curr, "",
-                  name[i] + 4, Rtlib_count[i], ctm - stm, ctm, stm);
-        } else {
-          fprintf(fp, "%*s%-24s\t%12ld\t%12.6f sec\n", curr, "", name[i] + 4,
-                  Rtlib_count[i], ctm);
-        }
+        double exclusive_ms =
+            (double)(Rtlib_timing[i] - Rtlib_sub_timing[i]) / 1000000.0;
+        double avg_ms = exclusive_ms / (double)Rtlib_count[i];
+        fprintf(fp, "%*s%-24s\t%12ld\t%14.3f\t%12.3f\n", curr, "",
+                name[i] + 4, Rtlib_count[i], exclusive_ms, avg_ms);
       } else {
-        fprintf(fp, "%*s%-24s\t%12c\t%12c\n", curr, "", name[i] + 4, '-', '-');
+        fprintf(fp, "%*s%-24s\t%12c\t%14c\t%12c\n", curr, "", name[i] + 4,
+                '-', '-', '-');
       }
       index = curr;
     }
   }
   while (index > 0) {
     // output previous sub total
-    fprintf(fp, "%*s%-24s\t%12s\t%12.6f sec\n", index - 1, "",
+    fprintf(fp, "%*s%-24s\t%12s\t%14.3f\t%12s\n", index - 1, "",
             name[par[index - 1]] + 4, "sub total",
-            (double)sum[index] / 1000000000.0);
+            (double)sum[index] / 1000000.0, "-");
     --index;
   }
 

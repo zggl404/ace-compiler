@@ -305,7 +305,9 @@ void* Pt_from_msg(void* pt, uint32_t index, size_t len, uint32_t scale,
   if (Pt_cache_ready && index < Pt_cache_valid.size() && Pt_cache_valid[index] &&
       Pt_cache_len[index] == len && Pt_cache_scale[index] == scale &&
       Pt_cache_level[index] == level) {
+    RTLIB_TM_START(RTM_PT_GET, rtm);
     fhe::rt::cheddar::Copy_plain_inner(((PLAIN)pt)->inner, Pt_cache[index].inner);
+    RTLIB_TM_END(RTM_PT_GET, rtm);
     return pt;
   }
   float* data = Msg_ptr(index, 0, len);
