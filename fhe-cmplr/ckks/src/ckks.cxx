@@ -21,6 +21,7 @@
 #include "resbm.h"
 #include "rt_validate_scale_level.h"
 #include "scale_manager.h"
+#include "sm.h"
 
 using namespace air::base;
 
@@ -54,6 +55,29 @@ GLOB_SCOPE* Ckks_driver(GLOB_SCOPE* glob, core::LOWER_CTX* lower_ctx,
          it != new_glob->End_func_scope(); ++it) {
       FUNC_SCOPE*   ckks_func = &(*it);
       SCALE_MANAGER scale_mngr(driver_ctx, config, ckks_func, lower_ctx);
+      scale_mngr.Run();
+      core::CTX_PARAM_ANA ctx_param_ana(ckks_func, lower_ctx, driver_ctx,
+                                        config);
+      ctx_param_ana.Run();
+    }
+  } else if (config->Rgn_scl_mng()) {
+    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = glob->Begin_func_scope();
+         it != glob->End_func_scope(); ++it) {
+      FUNC_SCOPE* func      = &(*it);
+      FUNC_SCOPE* ckks_func = &sihe2ckks_lower.Lower_server_func(func);
+    }
+
+    SM sm(driver_ctx, config, new_glob, lower_ctx);
+    sm.Perform();
+
+    for (GLOB_SCOPE::FUNC_SCOPE_ITER it = new_glob->Begin_func_scope();
+         it != new_glob->End_func_scope(); ++it) {
+      FUNC_SCOPE* ckks_func = &(*it);
+      CKKS_CONFIG sm_scale_cfg = *config;
+      if (sm.Applied()) {
+        sm_scale_cfg._rgn_scl_bts_mng = true;
+      }
+      SCALE_MANAGER scale_mngr(driver_ctx, &sm_scale_cfg, ckks_func, lower_ctx);
       scale_mngr.Run();
       core::CTX_PARAM_ANA ctx_param_ana(ckks_func, lower_ctx, driver_ctx,
                                         config);

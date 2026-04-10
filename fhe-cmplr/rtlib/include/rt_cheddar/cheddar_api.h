@@ -41,6 +41,10 @@ void Cheddar_encode_float_mask_cst_lvl(PLAIN plain, float input, size_t len,
                                        SCALE_T sc_degree, int level);
 void Cheddar_encode_double_mask_cst_lvl(PLAIN plain, double input, size_t len,
                                         SCALE_T sc_degree, int level);
+void Cheddar_encrypt_double(CIPHER res, double* input, size_t len,
+                            SCALE_T sc_degree, LEVEL_T level);
+void Cheddar_app_relu(CIPHER res, CIPHER op, size_t len,
+                      LEVEL_T consumed_levels);
 
 void Cheddar_add_ciph(CIPHER res, CIPHER op1, CIPHER op2);
 void Cheddar_sub_ciph(CIPHER res, CIPHER op1, CIPHER op2);

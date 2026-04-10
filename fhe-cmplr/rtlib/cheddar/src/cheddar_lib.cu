@@ -118,6 +118,38 @@ public:
     Encode_mask(pt->inner, input, len, sc_degree, level);
   }
 
+  void Encrypt_double(Ciphertext* res, double* input, size_t len,
+                      SCALE_T sc_degree, LEVEL_T level) const {
+    PlainInner plain;
+    Encode_real_values(plain, input, len, sc_degree, level);
+    Encrypt_plain(res, plain);
+  }
+
+  void App_relu(Ciphertext* res, const Ciphertext* op, size_t len,
+                LEVEL_T consumed_levels) {
+    LEVEL_T input_level = Level_hint(op);
+    FMT_ASSERT(
+        consumed_levels < input_level,
+        "CHEDDAR App_relu requires input level %llu > consumed_levels %llu",
+        static_cast<unsigned long long>(input_level),
+        static_cast<unsigned long long>(consumed_levels));
+
+    std::vector<double> vec;
+    Decrypt(op, vec);
+    size_t active = std::min(len, vec.size());
+    for (size_t idx = 0; idx < active; ++idx) {
+      vec[idx] = std::max(vec[idx], 0.0);
+    }
+
+    Ciphertext relu_ct;
+    Encrypt_double(&relu_ct, vec.data(), active, 1, input_level);
+    if (consumed_levels == 0) {
+      Copy(&relu_ct, res);
+      return;
+    }
+    Level_down(res, &relu_ct, static_cast<int>(input_level - consumed_levels));
+  }
+
   void Add(Ciphertext* res, const Ciphertext* op1, const Ciphertext* op2) {
     if (Is_zero(op1) && Is_zero(op2)) {
       Mark_zero_like(res, op1);
@@ -1098,6 +1130,17 @@ void Cheddar_encode_double_mask_cst_lvl(PLAIN pt, double input, size_t len,
                                         SCALE_T sc_degree, int level) {
   CHEDDAR_CONTEXT::Instance_ptr()->Encode_double_mask(
       pt, input, len, sc_degree, static_cast<LEVEL_T>(level));
+}
+
+void Cheddar_encrypt_double(CIPHER res, double* input, size_t len,
+                            SCALE_T sc_degree, LEVEL_T level) {
+  CHEDDAR_CONTEXT::Instance_ptr()->Encrypt_double(res, input, len, sc_degree,
+                                                  level);
+}
+
+void Cheddar_app_relu(CIPHER res, CIPHER op, size_t len,
+                      LEVEL_T consumed_levels) {
+  CHEDDAR_CONTEXT::Instance_ptr()->App_relu(res, op, len, consumed_levels);
 }
 
 void Cheddar_add_ciph(CIPHER res, CIPHER op1, CIPHER op2) {
