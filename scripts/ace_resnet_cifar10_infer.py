@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import argparse
+import json
 import os
 import shlex
 import shutil
@@ -14,22 +15,40 @@ import tempfile
 import ace_compile
 
 
-RESNET_CIFAR10_MODELS = [
+SUPPORTED_RESNET_MODELS = [
     "resnet20_cifar10",
     "resnet32_cifar10",
+    "resnet32_cifar100",
     "resnet44_cifar10",
     "resnet56_cifar10",
     "resnet110_cifar10",
 ]
 
+MODEL_RUNTIME_CONFIG = {
+    "resnet20_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet32_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet32_cifar100": {"class_count": 100, "dataset": "cifar100"},
+    "resnet44_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet56_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet110_cifar10": {"class_count": 10, "dataset": "cifar10"},
+}
+
 MODEL_ALIASES = {
     "20": "resnet20_cifar10",
     "32": "resnet32_cifar10",
+    "32_100": "resnet32_cifar100",
+    "32_cifar100": "resnet32_cifar100",
+    "32-cifar100": "resnet32_cifar100",
+    "32c100": "resnet32_cifar100",
     "44": "resnet44_cifar10",
     "56": "resnet56_cifar10",
     "110": "resnet110_cifar10",
     "resnet20": "resnet20_cifar10",
     "resnet32": "resnet32_cifar10",
+    "resnet32_100": "resnet32_cifar100",
+    "resnet32-cifar100": "resnet32_cifar100",
+    "resnet32c100": "resnet32_cifar100",
+    "cifar100": "resnet32_cifar100",
     "resnet44": "resnet44_cifar10",
     "resnet56": "resnet56_cifar10",
     "resnet110": "resnet110_cifar10",
@@ -40,17 +59,19 @@ DEFAULT_MAIN_INC = os.path.join(
 )
 DEFAULT_LINK_DIR = os.path.join("fhe-cmplr", "rtlib", "cheddar", "example")
 DEFAULT_CIFAR10 = "cifar-10-batches-bin"
+DEFAULT_CIFAR100 = "cifar-100-binary"
 DEFAULT_ROT_KEY_MODE = "pow2"
 DEFAULT_ENCODE_MODE = "ondemand"
 DEFAULT_PRE_ENCODE_COUNT = 64
+DEFAULT_TOP_TIMING_COUNT = 5
 
 
 def normalize_model_name(model):
     normalized = MODEL_ALIASES.get(model, model)
-    if normalized not in RESNET_CIFAR10_MODELS:
+    if normalized not in SUPPORTED_RESNET_MODELS:
         raise ValueError(
             "Unsupported model '{}'. Available models: {}".format(
-                model, ", ".join(RESNET_CIFAR10_MODELS)
+                model, ", ".join(SUPPORTED_RESNET_MODELS)
             )
         )
     return normalized
@@ -58,7 +79,7 @@ def normalize_model_name(model):
 
 def normalize_models(models):
     if not models:
-        return list(RESNET_CIFAR10_MODELS)
+        return list(SUPPORTED_RESNET_MODELS)
 
     normalized = []
     seen = set()
@@ -71,27 +92,44 @@ def normalize_models(models):
     return normalized
 
 
-def resolve_cifar10_input(cifar10_arg, repo_root):
-    resolved = ace_compile.resolve_path(cifar10_arg, repo_root)
+def resolve_cifar_input(dataset_arg, repo_root, dataset):
+    resolved = ace_compile.resolve_path(dataset_arg, repo_root)
     if os.path.isfile(resolved):
         return resolved
 
     if os.path.isdir(resolved):
-        candidate = os.path.join(resolved, "test_batch.bin")
-        if os.path.isfile(candidate):
-            return candidate
+        candidates = {
+            "cifar10": ("test_batch.bin", "test.bin"),
+            "cifar100": ("test.bin", "test_batch.bin"),
+        }[dataset]
+        for candidate_name in candidates:
+            candidate = os.path.join(resolved, candidate_name)
+            if os.path.isfile(candidate):
+                return candidate
         raise FileNotFoundError(
-            "CIFAR-10 directory does not contain test_batch.bin: {}".format(resolved)
+            "{} directory does not contain {}: {}".format(
+                dataset,
+                " or ".join(candidates),
+                resolved,
+            )
         )
 
     raise FileNotFoundError(
-        "CIFAR-10 input not found: {}. Pass a test_batch.bin file or its parent directory.".format(
-            resolved
+        "{} input not found: {}. Pass the binary test file or its parent directory.".format(
+            dataset, resolved
         )
     )
 
 
-def build_driver_source(model, main_inc):
+def get_model_class_count(model):
+    return MODEL_RUNTIME_CONFIG[model]["class_count"]
+
+
+def get_model_dataset(model):
+    return MODEL_RUNTIME_CONFIG[model]["dataset"]
+
+
+def build_driver_source(model, main_inc, class_count):
     main_inc = os.path.abspath(main_inc)
     return """//-*-c-*-
 //=============================================================================
@@ -101,17 +139,18 @@ def build_driver_source(model, main_inc):
 //
 //=============================================================================
 
-#define CIFAR_CLASS_COUNT 10
+#define CIFAR_CLASS_COUNT {class_count}
 #include "{main_inc}"
 #include "{model}_gpu.onnx.inc"
-""".format(main_inc=main_inc, model=model)
+""".format(main_inc=main_inc, model=model, class_count=class_count)
 
 
 def create_driver_file(model, main_inc):
     temp_dir = tempfile.mkdtemp(prefix=f"{model}_gpu_")
     driver_path = os.path.join(temp_dir, f"{model}_gpu.cu")
+    class_count = get_model_class_count(model)
     with open(driver_path, "w") as handle:
-        handle.write(build_driver_source(model, main_inc))
+        handle.write(build_driver_source(model, main_inc, class_count))
     return driver_path
 
 
@@ -169,6 +208,137 @@ def apply_runtime_env_overrides(env, args):
     return env
 
 
+def parse_time_output(time_output):
+    if not time_output:
+        return None
+
+    parts = time_output.strip().split()
+    if len(parts) < 2:
+        return {"raw": time_output.strip()}
+
+    result = {"raw": time_output.strip()}
+    try:
+        result["wall_time_sec"] = float(parts[0])
+    except ValueError:
+        pass
+    try:
+        result["max_rss_kb"] = int(parts[1])
+    except ValueError:
+        pass
+    return result
+
+
+def parse_rtlib_timing_report(report_text):
+    if not report_text:
+        return None
+
+    entries = []
+    for line in report_text.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 4:
+            continue
+
+        name = parts[0].strip()
+        if not name or name == "RTLib functions":
+            continue
+
+        entry = {
+            "name": name,
+            "count_text": parts[1].strip(),
+            "exclusive_ms_text": parts[2].strip(),
+            "avg_ms_text": parts[3].strip(),
+        }
+        if entry["count_text"] == "sub total":
+            entry["kind"] = "subtotal"
+        elif entry["count_text"].isdigit():
+            entry["kind"] = "metric"
+            entry["count"] = int(entry["count_text"])
+        else:
+            entry["kind"] = "other"
+
+        try:
+            entry["exclusive_ms"] = float(entry["exclusive_ms_text"])
+        except ValueError:
+            pass
+        try:
+            entry["avg_ms"] = float(entry["avg_ms_text"])
+        except ValueError:
+            pass
+
+        entries.append(entry)
+
+    if not entries:
+        return None
+    return {"entries": entries}
+
+
+def load_timing_file(path, parser):
+    if not path or not os.path.isfile(path):
+        return None
+
+    with open(path, "r") as handle:
+        content = handle.read()
+    return parser(content)
+
+
+def get_top_rtlib_entries(rtlib_timing, limit=DEFAULT_TOP_TIMING_COUNT):
+    if not rtlib_timing:
+        return []
+
+    entries = [
+        entry
+        for entry in rtlib_timing["entries"]
+        if entry.get("kind") == "metric"
+        and "exclusive_ms" in entry
+        and entry["name"] != "MAIN_GRAPH"
+    ]
+    entries.sort(key=lambda entry: entry["exclusive_ms"], reverse=True)
+    return entries[:limit]
+
+
+def find_rtlib_entry(rtlib_timing, name):
+    if not rtlib_timing:
+        return None
+
+    for entry in rtlib_timing["entries"]:
+        if entry.get("kind") == "metric" and entry["name"] == name:
+            return entry
+    return None
+
+
+def print_timing_summary(model, timing_info):
+    system_timing = timing_info.get("system")
+    rtlib_timing = timing_info.get("rtlib")
+
+    if system_timing and "wall_time_sec" in system_timing:
+        wall_time = system_timing["wall_time_sec"]
+        max_rss = system_timing.get("max_rss_kb")
+        if max_rss is None:
+            print(f"[TIMING] {model}: wall_time_sec={wall_time:.3f}")
+        else:
+            print(
+                f"[TIMING] {model}: wall_time_sec={wall_time:.3f}, "
+                f"max_rss_kb={max_rss}"
+            )
+
+    main_graph = find_rtlib_entry(rtlib_timing, "MAIN_GRAPH")
+    if main_graph is not None:
+        print(
+            f"[TIMING] {model}: rtlib MAIN_GRAPH exclusive_ms="
+            f"{main_graph['exclusive_ms']:.3f}, count={main_graph['count']}, "
+            f"avg_ms={main_graph.get('avg_ms', 0.0):.3f}"
+        )
+
+    top_entries = get_top_rtlib_entries(rtlib_timing)
+    if top_entries:
+        print(f"[TIMING] {model}: top rtlib events by exclusive time")
+        for entry in top_entries:
+            print(
+                f"  - {entry['name']}: exclusive_ms={entry['exclusive_ms']:.3f}, "
+                f"count={entry['count']}, avg_ms={entry.get('avg_ms', 0.0):.3f}"
+            )
+
+
 def run_inference(executable, cifar10_bin, index, num, args):
     if num <= 0:
         raise ValueError("--num must be greater than 0")
@@ -176,21 +346,57 @@ def run_inference(executable, cifar10_bin, index, num, args):
     end = index + num - 1
     command = [executable, cifar10_bin, str(index), str(end)]
     env = apply_runtime_env_overrides(os.environ.copy(), args)
+    time_output_file = None
+    rtlib_timing_file = None
+    timing_info = None
 
-    timed_command = ace_compile.build_timed_command(command)
+    if args.capture_timing:
+        time_fd, time_output_file = tempfile.mkstemp(prefix="ace_time_", suffix=".txt")
+        os.close(time_fd)
+        rtlib_fd, rtlib_timing_file = tempfile.mkstemp(
+            prefix="ace_rtlib_", suffix=".txt"
+        )
+        os.close(rtlib_fd)
+        env["RTLIB_TIMING_OUTPUT"] = rtlib_timing_file
+        if ace_compile.TIME_EXE is not None:
+            timed_command = [
+                ace_compile.TIME_EXE,
+                "-f",
+                "%e %M",
+                "-o",
+                time_output_file,
+                *command,
+            ]
+        else:
+            timed_command = command
+    else:
+        timed_command = ace_compile.build_timed_command(command)
+
     print("Run command: {}".format(shlex.join(timed_command)))
     ret = subprocess.run(timed_command, env=env)
+
+    if args.capture_timing:
+        timing_info = {
+            "system": load_timing_file(time_output_file, parse_time_output),
+            "rtlib": load_timing_file(rtlib_timing_file, parse_rtlib_timing_report),
+        }
+        print_timing_summary(os.path.basename(executable), timing_info)
+        if time_output_file and os.path.exists(time_output_file):
+            os.remove(time_output_file)
+        if rtlib_timing_file and os.path.exists(rtlib_timing_file):
+            os.remove(rtlib_timing_file)
+
     if ret.returncode == 0:
         print("Run {} : SUCCESS!".format(os.path.basename(executable)))
     else:
         print("Run {} : FAILED!".format(os.path.basename(executable)))
-    return ret
+    return {"returncode": ret.returncode, "timing": timing_info}
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Compile cheddar ResNet20/32/44/56/110 targets and run real CIFAR-10 "
+            "Compile cheddar ResNet CIFAR targets and run real CIFAR-10/CIFAR-100 "
             "inference with the shared Phantom CIFAR runtime main."
         )
     )
@@ -235,8 +441,9 @@ def parse_args():
         action="append",
         dest="models",
         help=(
-            "Model to run. Supports resnet20/resnet32/resnet44/resnet56/resnet110 "
-            "or the full *_cifar10 names. Can be passed multiple times."
+            "Model to run. Supports resnet20/resnet32/resnet44/resnet56/resnet110, "
+            "resnet32_cifar100, or the full *_cifar10/*_cifar100 names. "
+            "Can be passed multiple times."
         ),
     )
     parser.add_argument(
@@ -338,7 +545,12 @@ def parse_args():
     parser.add_argument(
         "--cifar10",
         default=DEFAULT_CIFAR10,
-        help="Path to test_batch.bin, or the directory that contains it.",
+        help="Path to CIFAR-10 test_batch.bin, or the directory that contains it.",
+    )
+    parser.add_argument(
+        "--cifar100",
+        default=DEFAULT_CIFAR100,
+        help="Path to CIFAR-100 test.bin, or the directory that contains it.",
     )
     parser.add_argument(
         "-i",
@@ -392,6 +604,21 @@ def parse_args():
         action="store_true",
         help="Keep the generated temporary *_gpu.cu wrapper in the cheddar example directory.",
     )
+    parser.add_argument(
+        "--capture-timing",
+        action="store_true",
+        help=(
+            "Capture and summarize runtime execution timing, including wall-clock "
+            "time and parsed CHEDDAR rtlib timing."
+        ),
+    )
+    parser.add_argument(
+        "--timing-json",
+        help=(
+            "Write captured timing summaries as JSON. Relative paths are resolved "
+            "from --root. Implies --capture-timing."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -403,6 +630,8 @@ def main():
         raise ValueError("`--num` must be greater than 0.")
     if args.pre_encode_count is not None and args.pre_encode_count < 0:
         raise ValueError("`--pre-encode-count` must be >= 0.")
+    if args.timing_json:
+        args.capture_timing = True
     repo_root = ace_compile.resolve_path(args.root)
     compiler = ace_compile.resolve_path(
         args.compiler or ace_compile.get_default_compiler(repo_root), repo_root
@@ -415,6 +644,7 @@ def main():
     build_dir = ace_compile.resolve_path(args.build_dir or "release", repo_root)
     main_inc = ace_compile.resolve_path(args.main_inc, repo_root)
     default_link_dir = ace_compile.resolve_path(DEFAULT_LINK_DIR, repo_root)
+    timing_json = ace_compile.resolve_path(args.timing_json, repo_root)
 
     if not os.path.isfile(main_inc):
         raise FileNotFoundError(f"Main inc file not found: {main_inc}")
@@ -430,9 +660,17 @@ def main():
     args.backend = "cheddar"
     models = normalize_models(args.models)
 
-    cifar10_bin = None
+    cifar_inputs = {}
     if not args.skip_run:
-        cifar10_bin = resolve_cifar10_input(args.cifar10, repo_root)
+        datasets = {get_model_dataset(model) for model in models}
+        if "cifar10" in datasets:
+            cifar_inputs["cifar10"] = resolve_cifar_input(
+                args.cifar10, repo_root, "cifar10"
+            )
+        if "cifar100" in datasets:
+            cifar_inputs["cifar100"] = resolve_cifar_input(
+                args.cifar100, repo_root, "cifar100"
+            )
 
     print(f"ACE root: {repo_root}")
     print(f"Compiler: {compiler}")
@@ -462,8 +700,11 @@ def main():
         print(f"User SIHE options: {args.sihe_options}")
     if args.compiler_options:
         print(f"Extra compiler options: {args.compiler_options}")
-    if cifar10_bin is not None:
-        print(f"CIFAR-10 file: {cifar10_bin}")
+    if "cifar10" in cifar_inputs:
+        print(f"CIFAR-10 file: {cifar_inputs['cifar10']}")
+    if "cifar100" in cifar_inputs:
+        print(f"CIFAR-100 file: {cifar_inputs['cifar100']}")
+    if cifar_inputs:
         print(f"Infer images: [{args.index}, {args.index + args.num - 1}]")
     print(f"Rotation key mode: {args.rot_key_mode}")
     print(f"Encode mode: {args.encode_mode}")
@@ -476,8 +717,13 @@ def main():
         print(f"Pre-encode count: {pre_encode_count}")
     if args.omp_threads is not None:
         print(f"OMP threads override: {args.omp_threads}")
+    if args.capture_timing:
+        print("Timing capture: enabled")
+    if timing_json:
+        print(f"Timing JSON: {timing_json}")
 
     exit_code = 0
+    timing_results = {}
 
     for model in models:
         print()
@@ -488,6 +734,7 @@ def main():
         input_file = os.path.join(
             model_dir, ace_compile.get_model_input_filename(model, model_dir, args)
         )
+        model_dataset = get_model_dataset(model)
         output_file = os.path.join(link_dir, f"{model}_gpu.onnx.inc")
         generated_driver = None
         copied_driver = os.path.join(link_dir, f"{model}_gpu.cu")
@@ -535,15 +782,17 @@ def main():
                 print(f"Executable: {executable}")
 
             if not args.skip_run:
-                run_ret = run_inference(
+                run_info = run_inference(
                     executable,
-                    cifar10_bin,
+                    cifar_inputs[model_dataset],
                     args.index,
                     args.num,
                     args,
                 )
-                if run_ret.returncode != 0:
-                    exit_code = run_ret.returncode
+                if run_info["timing"] is not None:
+                    timing_results[model] = run_info["timing"]
+                if run_info["returncode"] != 0:
+                    exit_code = run_info["returncode"]
         except (FileNotFoundError, ValueError) as err:
             print(err, file=sys.stderr)
             exit_code = 1
@@ -556,6 +805,14 @@ def main():
                 and os.path.exists(copied_driver)
             ):
                 os.remove(copied_driver)
+
+    if timing_json and timing_results:
+        timing_dir = os.path.dirname(timing_json)
+        if timing_dir:
+            os.makedirs(timing_dir, exist_ok=True)
+        with open(timing_json, "w") as handle:
+            json.dump(timing_results, handle, indent=2, sort_keys=True)
+        print(f"Timing JSON written to: {timing_json}")
 
     return exit_code
 
