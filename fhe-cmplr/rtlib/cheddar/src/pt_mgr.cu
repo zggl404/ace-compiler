@@ -120,16 +120,6 @@ bool Pt_pre_encode() {
       max_pre_encode = cap < entry_count ? cap : entry_count;
     }
   }
-  uint64_t reserve_mb = 4096;
-  const char* reserve_env = getenv(ENV_PT_PRE_ENCODE_RESERVE_MB);
-  if (reserve_env != NULL) {
-    uint64_t parsed = strtoull(reserve_env, NULL, 10);
-    if (parsed > 0) {
-      reserve_mb = parsed;
-    }
-  }
-  size_t reserve_bytes = (size_t)reserve_mb * 1024 * 1024;
-
   Pt_cache.clear();
   Pt_cache.resize(entry_count);
   Pt_cache_len.assign(entry_count, 0);
@@ -140,18 +130,6 @@ bool Pt_pre_encode() {
   uint64_t pre_encoded = 0;
   for (uint32_t index = 0; index < entry_count; ++index) {
     if (index >= max_pre_encode) {
-      break;
-    }
-    size_t free_bytes  = 0;
-    size_t total_bytes = 0;
-    if (cudaMemGetInfo(&free_bytes, &total_bytes) == cudaSuccess &&
-        free_bytes <= reserve_bytes) {
-      fprintf(stderr,
-              "[pt_mgr] pre-encode stopped at index=%u/%llu: free memory %llu "
-              "MB <= reserve %llu MB\n",
-              index, (unsigned long long)entry_count,
-              (unsigned long long)(free_bytes / 1024 / 1024),
-              (unsigned long long)reserve_mb);
       break;
     }
     uint32_t size_bytes = Rt_data_entry_size(Pt_mgr._file, index);

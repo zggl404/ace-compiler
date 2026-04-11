@@ -41,11 +41,6 @@
 //! cap (best effort until resource limit).
 #define ENV_PT_PRE_ENCODE_COUNT "PT_PRE_ENCODE_COUNT"
 
-//! environment variable to reserve device memory for graph execution
-//! PT_PRE_ENCODE_RESERVE_MB=int: stop pre-encode when free GPU memory is below
-//! this threshold. default: 4096 MB.
-#define ENV_PT_PRE_ENCODE_RESERVE_MB "PT_PRE_ENCODE_RESERVE_MB"
-
 //! environment variable to control using even polynomial
 //! in mod_reduce of bootstrapping
 #define ENV_BOOTSTRAP_EVEN_POLY "RTLIB_BTS_EVEN_POLY"
