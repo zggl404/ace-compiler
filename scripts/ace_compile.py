@@ -505,7 +505,7 @@ def parse_args():
         "--fusion",
         action="store_true",
         help=(
-            "Enable CKKS fusion (`-CKKS:fus`) during compilation. The compiler still only activates the pass when the target backend is Phantom."
+            "Enable CKKS fusion (`-CKKS:fus`) during compilation. The compiler activates the pass for Phantom and Cheddar backends."
         ),
     )
     return parser.parse_args()

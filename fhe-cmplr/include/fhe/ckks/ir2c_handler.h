@@ -104,8 +104,9 @@ public:
     air::base::NODE_PTR parent = ctx.Parent(1);
 
     AIR_ASSERT(parent != air::base::Null_ptr && parent->Is_st());
-    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
-                   "Mul_plain_rescale is only supported for PHANTOM provider");
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM ||
+                       ctx.Provider() == core::PROVIDER::CHEDDAR,
+                   "Mul_plain_rescale is only supported for PHANTOM and CHEDDAR providers");
     ctx << "Mul_plain_rescale(&";
     ctx.Emit_st_var(parent);
     ctx << ", ";
@@ -121,8 +122,9 @@ public:
     air::base::NODE_PTR parent = ctx.Parent(1);
 
     AIR_ASSERT(parent != air::base::Null_ptr && parent->Is_st());
-    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
-                   "Rotate_add_reduce is only supported for PHANTOM provider");
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM ||
+                       ctx.Provider() == core::PROVIDER::CHEDDAR,
+                   "Rotate_add_reduce is only supported for PHANTOM and CHEDDAR providers");
 
     uint32_t   step_count       = 0;
     const int* steps            = node->Attr<int>(nn::core::ATTR::RNUM,
@@ -148,8 +150,9 @@ public:
     air::base::NODE_PTR parent = ctx.Parent(1);
 
     AIR_ASSERT(parent != air::base::Null_ptr && parent->Is_st());
-    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
-                   "Linear_transform is only supported for PHANTOM provider");
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM ||
+                       ctx.Provider() == core::PROVIDER::CHEDDAR,
+                   "Linear_transform is only supported for PHANTOM and CHEDDAR providers");
 
     uint32_t   step_count = 0;
     const int* steps =
@@ -211,8 +214,9 @@ public:
   void Handle_blocking_rotate(VISITOR* visitor, air::base::NODE_PTR node) {
     IR2C_CTX& ctx = visitor->Context();
 
-    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
-                   "Blocking_rotate is only supported for PHANTOM provider");
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM ||
+                       ctx.Provider() == core::PROVIDER::CHEDDAR,
+                   "Blocking_rotate is only supported for PHANTOM and CHEDDAR providers");
 
     uint32_t   step_count = 0;
     const int* steps =
@@ -238,8 +242,9 @@ public:
                                      air::base::NODE_PTR node) {
     IR2C_CTX& ctx = visitor->Context();
 
-    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
-                   "Block_linear_transform is only supported for PHANTOM provider");
+    AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM ||
+                       ctx.Provider() == core::PROVIDER::CHEDDAR,
+                   "Block_linear_transform is only supported for PHANTOM and CHEDDAR providers");
 
     uint32_t   block_count = 0;
     const int* bank_steps =

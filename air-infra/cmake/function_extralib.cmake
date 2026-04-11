@@ -65,16 +65,37 @@ endfunction()
 
 # Find the Pybind11 library
 function(find_pybind11_lib MESSAGE)
-  find_package(pybind11 REQUIRED)
+  find_package(pybind11 QUIET CONFIG)
 
-  if(pybind11_FOUND)
+  if(NOT pybind11_FOUND)
+    execute_process(
+      COMMAND ${Python3_EXECUTABLE} -m pybind11 --includes
+      OUTPUT_VARIABLE pybind11_include_flags
+      RESULT_VARIABLE pybind11_include_status
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+    )
+    if(pybind11_include_status EQUAL 0)
+      string(REPLACE " " ";" pybind11_include_flags "${pybind11_include_flags}")
+      set(pybind11_INCLUDE_DIRS "")
+      foreach(include_flag IN LISTS pybind11_include_flags)
+        if(include_flag MATCHES "^-I(.+)$")
+          list(APPEND pybind11_INCLUDE_DIRS "${CMAKE_MATCH_1}")
+        endif()
+      endforeach()
+      set(pybind11_LIBRARIES "")
+    endif()
+  endif()
+
+  if(pybind11_INCLUDE_DIRS)
     message(STATUS "pybind11_INCLUDE_DIRS         : ${pybind11_INCLUDE_DIRS}")
     message(STATUS "pybind11_LIBRARIES            : ${pybind11_LIBRARIES}")
   else()
     message(FATAL_ERROR "pybind11 not found. Please make sure pybind11 is installed.")
   endif()
 
-  include_directories(${pybind11_INCLUDE_DIRS}/include)
+  include_directories(${pybind11_INCLUDE_DIRS})
+  set(pybind11_INCLUDE_DIRS ${pybind11_INCLUDE_DIRS} PARENT_SCOPE)
   set(pybind11_LIBRARIES ${pybind11_LIBRARIES} PARENT_SCOPE)
 endfunction()
 

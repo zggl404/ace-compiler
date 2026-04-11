@@ -1402,7 +1402,8 @@ R_CODE CKKS_FUSION_PASS::Pre_run() {
 
   _provider = poly2c_cfg.Provider();
   _active   = Get_config().Fusion() &&
-            _provider == core::PROVIDER::PHANTOM;
+            (_provider == core::PROVIDER::PHANTOM ||
+             _provider == core::PROVIDER::CHEDDAR);
   return R_CODE::NORMAL;
 }
 

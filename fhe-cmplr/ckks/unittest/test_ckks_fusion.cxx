@@ -848,6 +848,12 @@ TEST(CKKS_FUSION, mul_plain_rescale_enabled_for_phantom) {
   EXPECT_EQ(ir.find("CKKS.rescale"), std::string::npos);
 }
 
+TEST(CKKS_FUSION, mul_plain_rescale_enabled_for_cheddar) {
+  std::string ir = Run_mul_plain_rescale_case(true, "cheddar");
+  EXPECT_NE(ir.find("CKKS.mul_plain_rescale"), std::string::npos);
+  EXPECT_EQ(ir.find("CKKS.rescale"), std::string::npos);
+}
+
 TEST(CKKS_FUSION, nested_mul_plain_rescale_enabled_for_phantom) {
   std::string ir = Run_nested_mul_plain_rescale_case(true, "phantom");
   EXPECT_NE(ir.find("CKKS.mul_plain_rescale"), std::string::npos);
@@ -870,6 +876,38 @@ TEST(CKKS_FUSION, linear_transform_semantics_preserved) {
   R_CODE       ret   = R_CODE::NORMAL;
   TEST_COMPILER harness;
   ret = Init_compiler(&harness, true, "phantom");
+  ASSERT_EQ(ret, R_CODE::NORMAL);
+
+  CKKS_IR_GEN gen(harness.cmplr.Lower_ctx());
+  Build_linear_transform_case(gen);
+  harness.cmplr.Update_glob_scope(gen.Glob());
+
+  LinearTransformSignature before;
+  ASSERT_TRUE(
+      Extract_linear_transform_before(gen.Main_container()->Stmt_list().Begin_stmt(),
+                                      &before));
+
+  auto& fusion_pass =
+      harness.cmplr.Get_pass<CKKS_FUSION_PASS,
+                             fhe::driver::PASS_ID::CKKS_FUSION>();
+  ASSERT_EQ(fusion_pass.Pre_run(), R_CODE::NORMAL);
+  ASSERT_EQ(fusion_pass.Run(), R_CODE::NORMAL);
+
+  LinearTransformSignature after;
+  ASSERT_TRUE(
+      Extract_linear_transform_after(gen.Main_container()->Stmt_list().Begin_stmt(),
+                                     &after));
+  EXPECT_EQ(before.To_string(), after.To_string());
+
+  std::string ir = gen.Main_container()->Stmt_list().To_str();
+  EXPECT_NE(ir.find("CKKS.linear_transform"), std::string::npos);
+  EXPECT_EQ(ir.find("CKKS.rescale"), std::string::npos);
+}
+
+TEST(CKKS_FUSION, linear_transform_semantics_preserved_for_cheddar) {
+  R_CODE       ret   = R_CODE::NORMAL;
+  TEST_COMPILER harness;
+  ret = Init_compiler(&harness, true, "cheddar");
   ASSERT_EQ(ret, R_CODE::NORMAL);
 
   CKKS_IR_GEN gen(harness.cmplr.Lower_ctx());

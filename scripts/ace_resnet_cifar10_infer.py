@@ -538,8 +538,8 @@ def parse_args():
         "--fusion",
         action="store_true",
         help=(
-            "Append `-CKKS:fus` during compilation. It is accepted for CLI compatibility, "
-            "but the fusion pass is only effective on the Phantom backend."
+            "Append `-CKKS:fus` during compilation. The CKKS fusion pass is "
+            "effective on the Phantom and Cheddar backends."
         ),
     )
     parser.add_argument(
