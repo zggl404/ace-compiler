@@ -106,7 +106,7 @@ public:
   void                     Clear_rotate_index() { _rotate_index.clear(); }
   const std::set<int32_t>& Get_rotate_index() const { return _rotate_index; }
   void                     Print(std::ostream& out = std::cout);
-  uint32_t                 Mul_depth_of_bootstrap();
+  uint32_t                 Mul_depth_of_bootstrap(bool with_relu = false);
   uint32_t                 Get_modulus_bit_num() const;
 
   uint32_t Get_per_part_size() const {

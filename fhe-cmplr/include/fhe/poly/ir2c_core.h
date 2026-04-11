@@ -219,8 +219,9 @@ public:
           const uint32_t* with_relu =
               val->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
           if (with_relu != nullptr) {
-            AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
-                           "Bootstrap_with_relu is only supported for PHANTOM provider");
+            AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM ||
+                               ctx.Provider() == core::PROVIDER::CHEDDAR,
+                           "Bootstrap_with_relu is only supported for PHANTOM and CHEDDAR providers");
           }
           ctx << (with_relu != nullptr ? "Bootstrap_with_relu(&" : "Bootstrap(&");
           ctx.Emit_var(node);
@@ -260,8 +261,9 @@ public:
         const uint32_t* with_relu =
             val->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
         if (with_relu != nullptr) {
-          AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM,
-                         "Bootstrap_with_relu is only supported for PHANTOM provider");
+          AIR_ASSERT_MSG(ctx.Provider() == core::PROVIDER::PHANTOM ||
+                             ctx.Provider() == core::PROVIDER::CHEDDAR,
+                         "Bootstrap_with_relu is only supported for PHANTOM and CHEDDAR providers");
         }
         ctx << (with_relu != nullptr ? "Bootstrap_with_relu(&" : "Bootstrap(&");
         ctx.Emit_preg_id(node->Preg_id());

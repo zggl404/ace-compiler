@@ -33,6 +33,10 @@ namespace core {
 // and mul_depth of bootstrapping is 19.
 #define BOOTSTRAP_MUL_DEPTH_UNDER_THRESHOLD 15
 #define BOOTSTRAP_MUL_DEPTH_ABOVE_THRESHOLD 19
+// Cheddar bootstrap_with_relu currently lowers to bootstrap + app_relu.
+// Based on measured runtime consumption, app_relu adds 8 mul_depth on top of
+// the bootstrap cost.
+#define BOOTSTRAP_WITH_RELU_EXTRA_MUL_DEPTH 8
 
 #define LOW_MUL_LEVEL_PRIME_COUNT  1
 #define HIGH_MUL_LEVEL_PRIME_COUNT 16
@@ -127,13 +131,15 @@ void CTX_PARAM::Print(std::ostream& out) {
   out << "}" << std::endl;
 }
 
-uint32_t CTX_PARAM::Mul_depth_of_bootstrap() {
+uint32_t CTX_PARAM::Mul_depth_of_bootstrap(bool with_relu) {
   uint32_t hw = Get_hamming_weight();
-  if (hw > 0 && hw <= HAMMING_WEIGHT_THRESHOLD) {
-    return BOOTSTRAP_MUL_DEPTH_UNDER_THRESHOLD;
-  } else {
-    return BOOTSTRAP_MUL_DEPTH_ABOVE_THRESHOLD;
+  uint32_t depth = (hw > 0 && hw <= HAMMING_WEIGHT_THRESHOLD)
+                       ? BOOTSTRAP_MUL_DEPTH_UNDER_THRESHOLD
+                       : BOOTSTRAP_MUL_DEPTH_ABOVE_THRESHOLD;
+  if (with_relu) {
+    depth += BOOTSTRAP_WITH_RELU_EXTRA_MUL_DEPTH;
   }
+  return depth;
 }
 
 uint32_t CTX_PARAM::Get_p_prime_num() const {

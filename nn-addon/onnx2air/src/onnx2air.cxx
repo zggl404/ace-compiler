@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 
 #include "air/base/container.h"
 #include "air/base/st.h"
@@ -36,8 +37,10 @@ GLOB_SCOPE* Onnx2air_driver(GLOB_SCOPE*                    glob,
                             const air::driver::DRIVER_CTX* driver_ctx,
                             const ONNX2AIR_CONFIG& cfg, const char* ifile) {
   onnx::ModelProto onnx_model;
-  std::ifstream    input(ifile);
-  onnx_model.ParseFromIstream(&input);
+  std::ifstream    input(ifile, std::ios::binary);
+  std::string      serialized((std::istreambuf_iterator<char>(input)),
+                              std::istreambuf_iterator<char>());
+  if (!onnx_model.ParseFromString(serialized)) return nullptr;
   nn::onnx2air::AIRGEN air_gen(glob);
   air_gen.Directory_path_set(Get_directory_path(std::string(ifile)));
   if (air_gen.Process_graph(onnx_model) == false) return nullptr;

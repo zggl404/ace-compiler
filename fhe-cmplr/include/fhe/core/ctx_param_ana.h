@@ -962,12 +962,12 @@ RETV CKKS_ANA_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR bootstrap) {
   // 1. get mul_level of bootstrap result
   CTX_PARAM_ANA_CTX& ana_ctx   = visitor->Context();
   uint32_t           mul_level = ana_ctx.Top_mul_level();
+  const uint32_t*    with_relu =
+      bootstrap->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
 
   // 2. handle redundant bootstrap
   if (!ana_ctx.Rgn_scl_bts_mng() && !ana_ctx.Rgn_bts_mng()) {
     NODE_PTR        child = bootstrap->Child(0);
-    const uint32_t* with_relu =
-        bootstrap->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
     const uint32_t* rescale_lev_attr =
         child->Attr<uint32_t>(FHE_ATTR_KIND::RESCALE_LEVEL);
     AIR_ASSERT(rescale_lev_attr != nullptr);
@@ -1025,7 +1025,8 @@ RETV CKKS_ANA_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR bootstrap) {
 
   // 3. update function mul_level
   uint32_t bootstrap_mul_depth =
-      ana_ctx.Lower_ctx()->Get_ctx_param().Mul_depth_of_bootstrap();
+      ana_ctx.Lower_ctx()->Get_ctx_param().Mul_depth_of_bootstrap(
+          with_relu != nullptr);
   uint32_t tot_mul_level = bootstrap_mul_depth + mul_level;
   ana_ctx.Update_mul_level(tot_mul_level);
 
