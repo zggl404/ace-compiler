@@ -256,4 +256,5 @@ TEST_F(TEST_BTS_SCALE_MNG, Test_bootstrap_input_level_config) {
   ASSERT_EQ(config.Bootstrap_level_reserve(), 2u);
   ASSERT_EQ(config.Bootstrap_consumable_level(16), 14u);
   ASSERT_EQ(config.Bootstrap_consumable_level(2), 0u);
+  ASSERT_EQ(config.Effective_bootstrap_mul_depth(15), 13u);
 }

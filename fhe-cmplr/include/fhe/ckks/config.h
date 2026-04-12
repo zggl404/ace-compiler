@@ -53,6 +53,10 @@ public:
     uint32_t reserve = Bootstrap_level_reserve();
     return raw_level > reserve ? raw_level - reserve : 0;
   }
+
+  uint32_t Effective_bootstrap_mul_depth(uint32_t raw_depth) const {
+    return Bootstrap_consumable_level(raw_depth);
+  }
 };
 
 }  // namespace ckks

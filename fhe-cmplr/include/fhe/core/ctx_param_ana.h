@@ -156,6 +156,10 @@ public:
     return _config->Bootstrap_input_level();
   }
 
+  uint32_t Effective_bootstrap_mul_depth(uint32_t raw_depth) const {
+    return _config->Effective_bootstrap_mul_depth(raw_depth);
+  }
+
   //! @brief Set mul_level of SSA_VER ver is undetermined.
   void           Record_undeterm(SSA_VER_ID ver) { _undeterm_ver.insert(ver); }
   const VER_SET& Undeterm_ssa_ver(void) const { return _undeterm_ver; }
@@ -1028,9 +1032,9 @@ RETV CKKS_ANA_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR bootstrap) {
                 " output mul_level: ", std::to_string(mul_level), "\n");
 
   // 3. update function mul_level
-  uint32_t bootstrap_mul_depth =
+  uint32_t bootstrap_mul_depth = ana_ctx.Effective_bootstrap_mul_depth(
       ana_ctx.Lower_ctx()->Get_ctx_param().Mul_depth_of_bootstrap(
-          with_relu != nullptr);
+          with_relu != nullptr));
   uint32_t tot_mul_level = bootstrap_mul_depth + mul_level;
   ana_ctx.Update_mul_level(tot_mul_level);
 
