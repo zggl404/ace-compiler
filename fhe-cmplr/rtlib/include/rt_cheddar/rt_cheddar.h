@@ -423,9 +423,8 @@ inline CIPHER Rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
   std::vector<PLAIN>     plain_refs =
       fhe::rt::cheddar::detail::Collect_plain_refs(plain_storage);
   for (size_t idx = 0; idx < step_values.size(); ++idx) {
-    *plain_refs[idx] = *(PLAIN)Pt_from_msg(
-        plain_refs[idx], static_cast<uint32_t>(plain_base + idx), plain_len,
-        scale, level);
+    Pt_from_msg(plain_refs[idx], static_cast<uint32_t>(plain_base + idx),
+                plain_len, scale, level);
   }
   Cheddar_rotate_mul_sum(res, op, static_cast<uint32_t>(step_values.size()),
                          post_rescale, plain_refs.data(), step_values.data());

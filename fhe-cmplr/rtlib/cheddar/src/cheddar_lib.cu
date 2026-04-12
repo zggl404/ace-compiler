@@ -650,6 +650,8 @@ public:
                                    int grid_shift, uint32_t post_rescale,
                                    const int* bank_steps,
                                    LoadPlainFn load_plain) {
+    constexpr uint32_t kMaxDirectPAccumTerms = 8;
+
     if (block_count == 0 || grid_count == 0) {
       Zero(res);
       if (post_rescale != 0) {
@@ -684,78 +686,122 @@ public:
       }
     }
 
-    Ciphertext total;
-    bool       has_total = false;
+    std::vector<std::vector<::cheddar::DvConstView<Word>>> bank_views;
+    bank_views.reserve(block_count);
+    for (uint32_t block = 0; block < block_count; ++block) {
+      bank_views.push_back(bank[block].inner.ConstViewVector(0, true));
+    }
+
+    std::vector<Plaintext>         grid_plains(block_count);
+    std::vector<::cheddar::DvConstView<Word>> pt_views;
+    pt_views.reserve(block_count);
+
+    Ciphertext accum;
+    bool       accum_init = false;
     for (uint32_t grid = 0; grid < grid_count; ++grid) {
-      Plaintext grid_plain;
-      load_plain(grid, 0, &grid_plain);
+      pt_views.clear();
+      int    grid_slots = Slots_hint(op);
+      double grid_scale = 0.0;
+      for (uint32_t block = 0; block < block_count; ++block) {
+        load_plain(grid, block, &grid_plains[block]);
+        pt_views.push_back(grid_plains[block].inner.ConstView());
+        grid_slots = std::max(grid_slots, Slots_hint(&grid_plains[block]));
+        if (block == 0) {
+          grid_scale =
+              bank[block].inner.GetScale() * grid_plains[block].inner.GetScale();
+        }
+      }
 
       Ciphertext grid_acc;
-      context_->Mult(grid_acc.inner, bank[0].inner, grid_plain.inner);
-      grid_acc.is_zero = false;
+      bool       grid_acc_init = false;
+      for (uint32_t block_base = 0; block_base < block_count;
+           block_base += kMaxDirectPAccumTerms) {
+        uint32_t chunk_terms =
+            std::min<uint32_t>(kMaxDirectPAccumTerms, block_count - block_base);
+        std::vector<std::vector<::cheddar::DvConstView<Word>>> chunk_bank_views(
+            bank_views.begin() + block_base,
+            bank_views.begin() + block_base + chunk_terms);
+        std::vector<::cheddar::DvConstView<Word>> chunk_pt_views(
+            pt_views.begin() + block_base,
+            pt_views.begin() + block_base + chunk_terms);
 
-      for (uint32_t block = 1; block < block_count; ++block) {
-        load_plain(grid, block, &grid_plain);
-        Ciphertext next;
-        context_->MultPlainAdd(next.inner, bank[block].inner, grid_plain.inner,
-                               grid_acc.inner);
-        next.is_zero = false;
-        grid_acc = std::move(next);
+        if (!grid_acc_init) {
+          grid_acc.inner.RemoveRx();
+          grid_acc.inner.ModifyNP(bank[0].inner.GetNP());
+          grid_acc.inner.SetScale(grid_scale);
+          grid_acc.inner.SetNumSlots(grid_slots);
+          auto grid_acc_view = grid_acc.inner.ViewVector(0, true);
+          context_->elem_handler_.PAccum(grid_acc_view, bank[0].inner.GetNP(),
+                                         chunk_bank_views, chunk_pt_views);
+          grid_acc.is_zero = false;
+          grid_acc_init = true;
+          continue;
+        }
+
+        Ciphertext next_grid_acc;
+        next_grid_acc.inner.RemoveRx();
+        next_grid_acc.inner.ModifyNP(bank[0].inner.GetNP());
+        next_grid_acc.inner.SetScale(grid_scale);
+        next_grid_acc.inner.SetNumSlots(grid_slots);
+        chunk_bank_views.push_back(grid_acc.inner.ConstViewVector(0, true));
+        auto next_grid_acc_view = next_grid_acc.inner.ViewVector(0, true);
+        context_->elem_handler_.PAccum(next_grid_acc_view,
+                                       bank[0].inner.GetNP(), chunk_bank_views,
+                                       chunk_pt_views);
+        next_grid_acc.is_zero = false;
+        grid_acc = std::move(next_grid_acc);
       }
+      FMT_ASSERT(grid_acc_init,
+                 "CHEDDAR block rotate mul sum expected non-empty block "
+                 "accumulation");
 
       int raw_grid_step = static_cast<int>(grid) * grid_shift;
       int normalized_grid_step =
           Normalize_rotation_step(raw_grid_step, Slots_hint(&grid_acc));
-
-      if (!has_total) {
+      if (!accum_init) {
         if (normalized_grid_step == 0) {
-          total = std::move(grid_acc);
+          accum = std::move(grid_acc);
         } else {
           const Evk* rot_key = nullptr;
           if (Try_get_exact_rotation_key(&grid_acc, normalized_grid_step,
                                          &rot_key)) {
-            context_->HRot(total.inner, grid_acc.inner, *rot_key,
+            context_->HRot(accum.inner, grid_acc.inner, *rot_key,
                            normalized_grid_step);
-            total.is_zero = false;
+            accum.is_zero = false;
           } else {
-            Rotate(&total, &grid_acc, raw_grid_step);
+            Rotate(&accum, &grid_acc, raw_grid_step);
           }
         }
-        has_total = true;
+        accum_init = true;
         continue;
       }
 
-      Ciphertext next_total;
+      Ciphertext next;
       if (normalized_grid_step == 0) {
-        Add(&next_total, &total, &grid_acc);
+        Add(&next, &accum, &grid_acc);
       } else {
         const Evk* rot_key = nullptr;
         if (Try_get_exact_rotation_key(&grid_acc, normalized_grid_step,
                                        &rot_key)) {
-          context_->HRotAdd(next_total.inner, grid_acc.inner, total.inner,
-                            *rot_key, normalized_grid_step);
-          next_total.is_zero = false;
+          context_->HRotAdd(next.inner, grid_acc.inner, accum.inner, *rot_key,
+                            normalized_grid_step);
+          next.is_zero = false;
         } else {
-          Ciphertext rotated_grid;
-          Rotate(&rotated_grid, &grid_acc, raw_grid_step);
-          Add(&next_total, &total, &rotated_grid);
+          Ciphertext rotated;
+          Rotate(&rotated, &grid_acc, raw_grid_step);
+          Add(&next, &accum, &rotated);
         }
       }
-      total = std::move(next_total);
+      accum = std::move(next);
     }
 
-    if (!has_total) {
-      Zero(res);
-      if (post_rescale != 0) {
-        Rescale(res, res);
-      }
-      return;
-    }
+    FMT_ASSERT(accum_init,
+               "CHEDDAR block rotate mul sum expected non-empty accumulation");
 
     if (post_rescale != 0) {
-      Rescale(res, &total);
+      Rescale(res, &accum);
     } else {
-      *res = std::move(total);
+      *res = std::move(accum);
       res->is_zero = false;
     }
   }
@@ -823,8 +869,8 @@ public:
         [&](uint32_t grid, uint32_t block, Plaintext* plain) {
           uint64_t row = plain_base +
                          static_cast<uint64_t>(grid) * block_count + block;
-          *plain = *(PLAIN)Pt_from_msg(plain, static_cast<uint32_t>(row),
-                                       plain_len, scale, level);
+          Pt_from_msg(plain, static_cast<uint32_t>(row), plain_len, scale,
+                      level);
         });
   }
 
