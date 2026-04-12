@@ -62,6 +62,8 @@ void Cheddar_mod_switch(CIPHER res, CIPHER op);
 void Cheddar_level_down(CIPHER res, CIPHER op, int level);
 void Cheddar_relin(CIPHER res, CIPHER3 op);
 void Cheddar_bootstrap(CIPHER res, CIPHER op, int level, int slot);
+void Cheddar_bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot,
+                                 double relu_value_range);
 void Cheddar_rotate_add_reduce(CIPHER res, CIPHER op, uint32_t step_count,
                                uint32_t rotate_self, const int* steps);
 void Cheddar_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,

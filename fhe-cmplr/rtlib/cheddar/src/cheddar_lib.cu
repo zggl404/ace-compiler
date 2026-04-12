@@ -503,6 +503,16 @@ public:
     }
   }
 
+  void Bootstrap_with_relu(Ciphertext* res, const Ciphertext* op1, int level,
+                           int slot, double relu_value_range) {
+    (void)relu_value_range;
+    Bootstrap(res, op1, level, slot);
+    size_t relu_len =
+        slot > 0 ? static_cast<size_t>(slot)
+                 : static_cast<size_t>(Degree() / 2);
+    App_relu(res, res, relu_len, 0);
+  }
+
   void Rotate_add_reduce(Ciphertext* res, const Ciphertext* op,
                          uint32_t step_count, uint32_t rotate_self,
                          const int* steps) {
@@ -1555,6 +1565,12 @@ void Cheddar_encrypt_double(CIPHER res, double* input, size_t len,
 void Cheddar_app_relu(CIPHER res, CIPHER op, size_t len,
                       LEVEL_T consumed_levels) {
   CHEDDAR_CONTEXT::Instance_ptr()->App_relu(res, op, len, consumed_levels);
+}
+
+void Cheddar_bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot,
+                                 double relu_value_range) {
+  CHEDDAR_CONTEXT::Instance_ptr()->Bootstrap_with_relu(
+      res, op, level, slot, relu_value_range);
 }
 
 void Cheddar_add_ciph(CIPHER res, CIPHER op1, CIPHER op2) {

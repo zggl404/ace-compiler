@@ -212,7 +212,7 @@ inline CIPHER Bootstrap(CIPHER res, CIPHER op, int level, int slot) {
 }
 
 inline CIPHER Bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot,
-                                  double relu_value_range) {
+                                  double relu_value_range = 1.0) {
   START_TIMER
   Phantom_bootstrap_with_relu(res, op, level, slot, relu_value_range);
   END_TIMER("Bootstrap_with_relu")
