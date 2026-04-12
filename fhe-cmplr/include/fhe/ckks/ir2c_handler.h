@@ -179,7 +179,7 @@ public:
         uint64_t base_idx = ctx.Append_plain_table_rows(
             node->Child(1)->Const(), step_count, *plain_len, *plain_scale,
             *plain_level);
-        ctx << ", " << base_idx;
+        ctx << ", static_cast<uint64_t>(" << base_idx << ")";
       } else {
         ctx << ", ";
         ctx.template Emit_const_buffer_address<RETV, VISITOR>(visitor,
@@ -275,7 +275,7 @@ public:
       uint64_t base_idx = ctx.Append_plain_table_rows(
           node->Child(2)->Const(), block_count * (*grid_count), *plain_len,
           *plain_scale, *plain_level);
-      ctx << ", " << base_idx;
+      ctx << ", static_cast<uint64_t>(" << base_idx << ")";
     } else {
       ctx << ", ";
       ctx.template Emit_const_buffer_address<RETV, VISITOR>(visitor,

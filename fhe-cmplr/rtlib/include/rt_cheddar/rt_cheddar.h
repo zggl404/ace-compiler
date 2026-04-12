@@ -348,97 +348,12 @@ inline void Collect_step_plain_pairs(std::vector<int>& steps,
   Collect_step_plain_pairs(steps, plains, rest...);
 }
 
-inline void Build_rotated_bank(std::vector<CIPHERTEXT>& bank, CIPHER op,
-                               const std::vector<int>& steps) {
-  for (size_t idx = 0; idx < steps.size(); ++idx) {
-    if (steps[idx] == 0) {
-      Copy_ciph(&bank[idx], op);
-    } else {
-      Rotate_ciph(&bank[idx], op, steps[idx]);
-    }
+inline std::vector<PLAIN> Collect_plain_refs(std::vector<PLAINTEXT>& plains) {
+  std::vector<PLAIN> refs(plains.size());
+  for (size_t idx = 0; idx < plains.size(); ++idx) {
+    refs[idx] = &plains[idx];
   }
-}
-
-template <typename LoadPlainFn>
-inline CIPHER Rotate_mul_sum_impl(CIPHER res, CIPHER op,
-                                  uint32_t expected_term_count,
-                                  uint32_t post_rescale,
-                                  const std::vector<int>& steps,
-                                  LoadPlainFn load_plain) {
-  (void)expected_term_count;
-  CIPHERTEXT accum;
-  bool       first_term = true;
-  for (size_t idx = 0; idx < steps.size(); ++idx) {
-    CIPHERTEXT rotated;
-    if (steps[idx] == 0) {
-      Copy_ciph(&rotated, op);
-    } else {
-      Rotate_ciph(&rotated, op, steps[idx]);
-    }
-
-    PLAINTEXT plain;
-    load_plain(idx, &plain);
-
-    CIPHERTEXT term;
-    Mul_plain(&term, &rotated, &plain);
-    if (first_term) {
-      accum = std::move(term);
-      first_term = false;
-    } else {
-      Add_ciph(&accum, &accum, &term);
-    }
-    Free_plain(&plain);
-  }
-
-  if (first_term) {
-    Zero_ciph(res);
-    return res;
-  }
-  if (post_rescale != 0) {
-    return Rescale_ciph(res, &accum);
-  }
-  *res = std::move(accum);
-  return res;
-}
-
-template <typename LoadPlainFn>
-inline void Block_rotate_mul_sum_impl(CIPHER res, CIPHER op,
-                                      uint32_t expected_block_count,
-                                      uint32_t grid_count, int grid_shift,
-                                      uint32_t post_rescale,
-                                      const std::vector<int>& bank_steps,
-                                      LoadPlainFn load_plain) {
-  (void)expected_block_count;
-  std::vector<CIPHERTEXT> bank(bank_steps.size());
-  Build_rotated_bank(bank, op, bank_steps);
-
-  CIPHERTEXT grid_acc;
-  CIPHERTEXT product;
-  CIPHERTEXT rotated_grid;
-  Zero_ciph(res);
-
-  for (uint32_t grid = 0; grid < grid_count; ++grid) {
-    Zero_ciph(&grid_acc);
-    for (size_t block = 0; block < bank.size(); ++block) {
-      PLAINTEXT plain;
-      load_plain(grid, static_cast<uint32_t>(block), &plain);
-      Mul_plain(&product, &bank[block], &plain);
-      Add_ciph(&grid_acc, &grid_acc, &product);
-      Free_plain(&plain);
-    }
-
-    int step = static_cast<int>(grid) * grid_shift;
-    if (step == 0) {
-      Copy_ciph(&rotated_grid, &grid_acc);
-    } else {
-      Rotate_ciph(&rotated_grid, &grid_acc, step);
-    }
-    Add_ciph(res, res, &rotated_grid);
-  }
-
-  if (post_rescale != 0) {
-    Rescale_ciph(res, res);
-  }
+  return refs;
 }
 
 }  // namespace detail
@@ -456,12 +371,8 @@ inline CIPHER Rotate_add_reduce(CIPHER res, CIPHER op, uint32_t step_count,
                                 uint32_t rotate_self, Steps... steps) {
   std::vector<int> step_values =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  Copy_ciph(res, op);
-  CIPHERTEXT tmp;
-  for (size_t idx = 0; idx < step_values.size(); ++idx) {
-    Rotate_ciph(&tmp, rotate_self != 0 ? res : op, step_values[idx]);
-    Add_ciph(res, res, &tmp);
-  }
+  Cheddar_rotate_add_reduce(res, op, static_cast<uint32_t>(step_values.size()),
+                            rotate_self, step_values.data());
   (void)step_count;
   return res;
 }
@@ -474,9 +385,10 @@ inline CIPHER Rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
   std::vector<PLAIN> plains;
   fhe::rt::cheddar::detail::Collect_step_plain_pairs(steps, plains, step0,
                                                      plain0, rest...);
-  return fhe::rt::cheddar::detail::Rotate_mul_sum_impl(
-      res, op, term_count, post_rescale, steps,
-      [&](size_t idx, PLAIN plain) { *plain = *plains[idx]; });
+  Cheddar_rotate_mul_sum(res, op, static_cast<uint32_t>(steps.size()),
+                         post_rescale, plains.data(), steps.data());
+  (void)term_count;
+  return res;
 }
 
 template <typename... Steps>
@@ -486,12 +398,18 @@ inline CIPHER Rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
                              Steps... steps) {
   std::vector<int> step_values =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  return fhe::rt::cheddar::detail::Rotate_mul_sum_impl(
-      res, op, term_count, post_rescale, step_values,
-      [&](size_t idx, PLAIN plain) {
-        Encode_float(plain, const_cast<float*>(plain_data + idx * plain_len),
-                     plain_len, scale, level);
-      });
+  std::vector<PLAINTEXT> plain_storage(step_values.size());
+  std::vector<PLAIN>     plain_refs =
+      fhe::rt::cheddar::detail::Collect_plain_refs(plain_storage);
+  for (size_t idx = 0; idx < step_values.size(); ++idx) {
+    Encode_float(plain_refs[idx],
+                 const_cast<float*>(plain_data + idx * plain_len), plain_len,
+                 scale, level);
+  }
+  Cheddar_rotate_mul_sum(res, op, static_cast<uint32_t>(step_values.size()),
+                         post_rescale, plain_refs.data(), step_values.data());
+  (void)term_count;
+  return res;
 }
 
 template <typename... Steps>
@@ -501,13 +419,18 @@ inline CIPHER Rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
                              Steps... steps) {
   std::vector<int> step_values =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  return fhe::rt::cheddar::detail::Rotate_mul_sum_impl(
-      res, op, term_count, post_rescale, step_values,
-      [&](size_t idx, PLAIN plain) {
-        *plain = *(PLAIN)Pt_from_msg(plain,
-                                     static_cast<uint32_t>(plain_base + idx),
-                                     plain_len, scale, level);
-      });
+  std::vector<PLAINTEXT> plain_storage(step_values.size());
+  std::vector<PLAIN>     plain_refs =
+      fhe::rt::cheddar::detail::Collect_plain_refs(plain_storage);
+  for (size_t idx = 0; idx < step_values.size(); ++idx) {
+    *plain_refs[idx] = *(PLAIN)Pt_from_msg(
+        plain_refs[idx], static_cast<uint32_t>(plain_base + idx), plain_len,
+        scale, level);
+  }
+  Cheddar_rotate_mul_sum(res, op, static_cast<uint32_t>(step_values.size()),
+                         post_rescale, plain_refs.data(), step_values.data());
+  (void)term_count;
+  return res;
 }
 
 template <typename... Args>
@@ -521,13 +444,8 @@ inline void Blocking_rotate(CIPHER res, CIPHER op, uint32_t step_count,
                             Steps... steps) {
   std::vector<int> step_values =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  for (size_t idx = 0; idx < step_values.size(); ++idx) {
-    if (step_values[idx] == 0) {
-      Copy_ciph(res + idx, op);
-    } else {
-      Rotate_ciph(res + idx, op, step_values[idx]);
-    }
-  }
+  Cheddar_blocking_rotate(res, op, static_cast<uint32_t>(step_values.size()),
+                          step_values.data());
   (void)step_count;
 }
 
@@ -539,13 +457,22 @@ inline void Block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
                                  LEVEL_T level, Steps... steps) {
   std::vector<int> bank_steps =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  fhe::rt::cheddar::detail::Block_rotate_mul_sum_impl(
-      res, op, block_count, grid_count, grid_shift, post_rescale, bank_steps,
-      [&](uint32_t grid, uint32_t block, PLAIN plain) {
-        uint64_t row = static_cast<uint64_t>(grid) * bank_steps.size() + block;
-        Encode_float(plain, const_cast<float*>(plain_data + row * plain_len),
-                     plain_len, scale, level);
-      });
+  std::vector<PLAINTEXT> plain_storage(static_cast<size_t>(grid_count) *
+                                       bank_steps.size());
+  std::vector<PLAIN> plain_refs =
+      fhe::rt::cheddar::detail::Collect_plain_refs(plain_storage);
+  for (uint32_t grid = 0; grid < grid_count; ++grid) {
+    for (size_t block = 0; block < bank_steps.size(); ++block) {
+      uint64_t row = static_cast<uint64_t>(grid) * bank_steps.size() + block;
+      Encode_float(plain_refs[row],
+                   const_cast<float*>(plain_data + row * plain_len), plain_len,
+                   scale, level);
+    }
+  }
+  Cheddar_block_rotate_mul_sum(
+      res, op, static_cast<uint32_t>(bank_steps.size()), grid_count, grid_shift,
+      post_rescale, plain_refs.data(), bank_steps.data());
+  (void)block_count;
 }
 
 template <typename... Steps>
@@ -556,14 +483,25 @@ inline void Block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
                                  LEVEL_T level, Steps... steps) {
   std::vector<int> bank_steps =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  fhe::rt::cheddar::detail::Block_rotate_mul_sum_impl(
-      res, op, block_count, grid_count, grid_shift, post_rescale, bank_steps,
-      [&](uint32_t grid, uint32_t block, PLAIN plain) {
-        uint64_t row = plain_base +
-                       static_cast<uint64_t>(grid) * bank_steps.size() + block;
-        *plain = *(PLAIN)Pt_from_msg(plain, static_cast<uint32_t>(row), plain_len,
-                                     scale, level);
-      });
+  std::vector<PLAINTEXT> plain_storage(static_cast<size_t>(grid_count) *
+                                       bank_steps.size());
+  std::vector<PLAIN> plain_refs =
+      fhe::rt::cheddar::detail::Collect_plain_refs(plain_storage);
+  for (uint32_t grid = 0; grid < grid_count; ++grid) {
+    for (size_t block = 0; block < bank_steps.size(); ++block) {
+      uint64_t plain_idx =
+          static_cast<uint64_t>(grid) * bank_steps.size() + block;
+      uint64_t msg_row = plain_base + plain_idx;
+      *plain_refs[plain_idx] =
+          *(PLAIN)Pt_from_msg(plain_refs[plain_idx],
+                              static_cast<uint32_t>(msg_row), plain_len, scale,
+                              level);
+    }
+  }
+  Cheddar_block_rotate_mul_sum(
+      res, op, static_cast<uint32_t>(bank_steps.size()), grid_count, grid_shift,
+      post_rescale, plain_refs.data(), bank_steps.data());
+  (void)block_count;
 }
 
 void Dump_ciph(CIPHER ct, size_t start, size_t len);

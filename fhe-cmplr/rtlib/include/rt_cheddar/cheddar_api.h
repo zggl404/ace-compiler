@@ -62,6 +62,17 @@ void Cheddar_mod_switch(CIPHER res, CIPHER op);
 void Cheddar_level_down(CIPHER res, CIPHER op, int level);
 void Cheddar_relin(CIPHER res, CIPHER3 op);
 void Cheddar_bootstrap(CIPHER res, CIPHER op, int level, int slot);
+void Cheddar_rotate_add_reduce(CIPHER res, CIPHER op, uint32_t step_count,
+                               uint32_t rotate_self, const int* steps);
+void Cheddar_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
+                            uint32_t post_rescale, PLAIN const* plains,
+                            const int* steps);
+void Cheddar_blocking_rotate(CIPHER res, CIPHER op, uint32_t step_count,
+                             const int* steps);
+void Cheddar_block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
+                                  uint32_t grid_count, int grid_shift,
+                                  uint32_t post_rescale, PLAIN const* plains,
+                                  const int* bank_steps);
 void Cheddar_copy(CIPHER res, CIPHER op);
 void Cheddar_zero(CIPHER res);
 void Cheddar_free_ciph(CIPHER res);
