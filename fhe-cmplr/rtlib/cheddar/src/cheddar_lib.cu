@@ -580,10 +580,10 @@ public:
     Init_mul_accumulator(&accum, op, plains[0], accum_slots);
 
     if (can_use_many) {
-      std::vector<PlainInner> plain_inners;
-      plain_inners.reserve(term_count);
+      std::vector<PlainInner> plain_inners(term_count);
       for (uint32_t idx = 0; idx < term_count; ++idx) {
-        plain_inners.push_back(plains[idx]->inner);
+        fhe::rt::cheddar::Copy_plain_inner(plain_inners[idx],
+                                           plains[idx]->inner);
       }
       context_->HRotPMadManyUnsafe(accum.inner, op->inner, plain_inners,
                                    ui_->GetEvkMap(), normalized_steps);
