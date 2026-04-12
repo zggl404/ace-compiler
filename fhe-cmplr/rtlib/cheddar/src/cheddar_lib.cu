@@ -558,13 +558,11 @@ public:
     }
 
     std::vector<int> normalized_steps(term_count, 0);
-    int              accum_slots = Slots_hint(op);
     bool             can_use_many =
         !op->inner.HasRx() && op->inner.GetNP().num_aux_ == 0;
 
     for (uint32_t idx = 0; idx < term_count; ++idx) {
       const Plaintext* plain = plains[idx];
-      accum_slots = std::max(accum_slots, Slots_hint(plain));
       normalized_steps[idx] =
           Normalize_rotation_step(steps[idx], std::max(Slots_hint(op),
                                                        Slots_hint(plain)));
@@ -577,19 +575,41 @@ public:
     }
 
     Ciphertext accum;
-    Init_mul_accumulator(&accum, op, plains[0], accum_slots);
-
-    if (can_use_many) {
-      std::vector<PlainInner> plain_inners(term_count);
-      for (uint32_t idx = 0; idx < term_count; ++idx) {
-        fhe::rt::cheddar::Copy_plain_inner(plain_inners[idx],
-                                           plains[idx]->inner);
-      }
-      context_->HRotPMadManyUnsafe(accum.inner, op->inner, plain_inners,
-                                   ui_->GetEvkMap(), normalized_steps);
+    const Plaintext* first_plain = plains[0];
+    const int        first_step = normalized_steps[0];
+    if (first_step == 0) {
+      context_->Mult(accum.inner, op->inner, first_plain->inner);
       accum.is_zero = false;
     } else {
-      for (uint32_t idx = 0; idx < term_count; ++idx) {
+      const Evk* rot_key = nullptr;
+      if (Try_get_exact_rotation_key(op, first_step, &rot_key)) {
+        Ciphertext rotated;
+        context_->HRot(rotated.inner, op->inner, *rot_key, first_step);
+        rotated.is_zero = false;
+        context_->Mult(accum.inner, rotated.inner, first_plain->inner);
+        accum.is_zero = false;
+      } else {
+        Ciphertext rotated;
+        Rotate(&rotated, op, steps[0]);
+        context_->Mult(accum.inner, rotated.inner, first_plain->inner);
+        accum.is_zero = false;
+      }
+    }
+
+    if (can_use_many && term_count > 1) {
+      std::vector<PlainInner> plain_inners(term_count - 1);
+      std::vector<int>        rest_steps;
+      rest_steps.reserve(term_count - 1);
+      for (uint32_t idx = 1; idx < term_count; ++idx) {
+        fhe::rt::cheddar::Copy_plain_inner(plain_inners[idx - 1],
+                                           plains[idx]->inner);
+        rest_steps.push_back(normalized_steps[idx]);
+      }
+      context_->HRotPMadManyUnsafe(accum.inner, op->inner, plain_inners,
+                                   ui_->GetEvkMap(), rest_steps);
+      accum.is_zero = false;
+    } else {
+      for (uint32_t idx = 1; idx < term_count; ++idx) {
         const Plaintext* plain = plains[idx];
         Ciphertext       next;
         const int        normalized_step = normalized_steps[idx];
@@ -624,36 +644,12 @@ public:
     }
   }
 
-  void Blocking_rotate(Ciphertext* res, const Ciphertext* op,
-                       uint32_t step_count, const int* steps) {
-    for (uint32_t idx = 0; idx < step_count; ++idx) {
-      if (Is_zero(op)) {
-        Mark_zero_like(res + idx, op);
-        continue;
-      }
-
-      int normalized_step =
-          Normalize_rotation_step(steps[idx], Slots_hint(op));
-      if (normalized_step == 0) {
-        Copy(op, res + idx);
-        continue;
-      }
-
-      const Evk* rot_key = nullptr;
-      if (Try_get_exact_rotation_key(op, normalized_step, &rot_key)) {
-        context_->HRot((res + idx)->inner, op->inner, *rot_key,
-                       normalized_step);
-        (res + idx)->is_zero = false;
-      } else {
-        Rotate(res + idx, op, steps[idx]);
-      }
-    }
-  }
-
-  void Block_rotate_mul_sum(Ciphertext* res, const Ciphertext* op,
-                            uint32_t block_count, uint32_t grid_count,
-                            int grid_shift, uint32_t post_rescale,
-                            PLAIN const* plains, const int* bank_steps) {
+  template <typename LoadPlainFn>
+  void Block_rotate_mul_sum_loaded(Ciphertext* res, const Ciphertext* op,
+                                   uint32_t block_count, uint32_t grid_count,
+                                   int grid_shift, uint32_t post_rescale,
+                                   const int* bank_steps,
+                                   LoadPlainFn load_plain) {
     if (block_count == 0 || grid_count == 0) {
       Zero(res);
       if (post_rescale != 0) {
@@ -688,24 +684,20 @@ public:
       }
     }
 
-    int accum_slots = Slots_hint(op);
-    for (uint32_t row = 0; row < grid_count * block_count; ++row) {
-      accum_slots = std::max(accum_slots, Slots_hint(plains[row]));
-    }
-
     Ciphertext total;
     bool       has_total = false;
     for (uint32_t grid = 0; grid < grid_count; ++grid) {
-      const Plaintext* first_plain = plains[static_cast<size_t>(grid) *
-                                         block_count];
-      Ciphertext grid_acc;
-      Init_mul_accumulator(&grid_acc, op, first_plain, accum_slots);
+      Plaintext grid_plain;
+      load_plain(grid, 0, &grid_plain);
 
-      for (uint32_t block = 0; block < block_count; ++block) {
-        const Plaintext* plain =
-            plains[static_cast<size_t>(grid) * block_count + block];
+      Ciphertext grid_acc;
+      context_->Mult(grid_acc.inner, bank[0].inner, grid_plain.inner);
+      grid_acc.is_zero = false;
+
+      for (uint32_t block = 1; block < block_count; ++block) {
+        load_plain(grid, block, &grid_plain);
         Ciphertext next;
-        context_->MultPlainAdd(next.inner, bank[block].inner, plain->inner,
+        context_->MultPlainAdd(next.inner, bank[block].inner, grid_plain.inner,
                                grid_acc.inner);
         next.is_zero = false;
         grid_acc = std::move(next);
@@ -766,6 +758,74 @@ public:
       *res = std::move(total);
       res->is_zero = false;
     }
+  }
+
+  void Blocking_rotate(Ciphertext* res, const Ciphertext* op,
+                       uint32_t step_count, const int* steps) {
+    for (uint32_t idx = 0; idx < step_count; ++idx) {
+      if (Is_zero(op)) {
+        Mark_zero_like(res + idx, op);
+        continue;
+      }
+
+      int normalized_step =
+          Normalize_rotation_step(steps[idx], Slots_hint(op));
+      if (normalized_step == 0) {
+        Copy(op, res + idx);
+        continue;
+      }
+
+      const Evk* rot_key = nullptr;
+      if (Try_get_exact_rotation_key(op, normalized_step, &rot_key)) {
+        context_->HRot((res + idx)->inner, op->inner, *rot_key,
+                       normalized_step);
+        (res + idx)->is_zero = false;
+      } else {
+        Rotate(res + idx, op, steps[idx]);
+      }
+    }
+  }
+
+  void Block_rotate_mul_sum(Ciphertext* res, const Ciphertext* op,
+                            uint32_t block_count, uint32_t grid_count,
+                            int grid_shift, uint32_t post_rescale,
+                            PLAIN const* plains, const int* bank_steps) {
+    Block_rotate_mul_sum_loaded(
+        res, op, block_count, grid_count, grid_shift, post_rescale, bank_steps,
+        [&](uint32_t grid, uint32_t block, Plaintext* plain) {
+          *plain = *plains[static_cast<size_t>(grid) * block_count + block];
+        });
+  }
+
+  void Block_rotate_mul_sum_float(Ciphertext* res, const Ciphertext* op,
+                                  uint32_t block_count, uint32_t grid_count,
+                                  int grid_shift, uint32_t post_rescale,
+                                  const float* plain_data, size_t plain_len,
+                                  SCALE_T scale, LEVEL_T level,
+                                  const int* bank_steps) {
+    Block_rotate_mul_sum_loaded(
+        res, op, block_count, grid_count, grid_shift, post_rescale, bank_steps,
+        [&](uint32_t grid, uint32_t block, Plaintext* plain) {
+          uint64_t row = static_cast<uint64_t>(grid) * block_count + block;
+          Encode_float(plain, const_cast<float*>(plain_data + row * plain_len),
+                       plain_len, scale, level);
+        });
+  }
+
+  void Block_rotate_mul_sum_msg(Ciphertext* res, const Ciphertext* op,
+                                uint32_t block_count, uint32_t grid_count,
+                                int grid_shift, uint32_t post_rescale,
+                                uint64_t plain_base, size_t plain_len,
+                                SCALE_T scale, LEVEL_T level,
+                                const int* bank_steps) {
+    Block_rotate_mul_sum_loaded(
+        res, op, block_count, grid_count, grid_shift, post_rescale, bank_steps,
+        [&](uint32_t grid, uint32_t block, Plaintext* plain) {
+          uint64_t row = plain_base +
+                         static_cast<uint64_t>(grid) * block_count + block;
+          *plain = *(PLAIN)Pt_from_msg(plain, static_cast<uint32_t>(row),
+                                       plain_len, scale, level);
+        });
   }
 
   void Copy(const Ciphertext* op, Ciphertext* res) {
@@ -1531,6 +1591,31 @@ void Cheddar_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
 void Cheddar_blocking_rotate(CIPHER res, CIPHER op, uint32_t step_count,
                              const int* steps) {
   CHEDDAR_CONTEXT::Instance_ptr()->Blocking_rotate(res, op, step_count, steps);
+}
+
+void Cheddar_block_rotate_mul_sum_float(CIPHER res, CIPHER op,
+                                        uint32_t block_count,
+                                        uint32_t grid_count, int grid_shift,
+                                        uint32_t post_rescale,
+                                        const float* plain_data,
+                                        size_t plain_len, SCALE_T scale,
+                                        LEVEL_T level,
+                                        const int* bank_steps) {
+  CHEDDAR_CONTEXT::Instance_ptr()->Block_rotate_mul_sum_float(
+      res, op, block_count, grid_count, grid_shift, post_rescale, plain_data,
+      plain_len, scale, level, bank_steps);
+}
+
+void Cheddar_block_rotate_mul_sum_msg(CIPHER res, CIPHER op,
+                                      uint32_t block_count,
+                                      uint32_t grid_count, int grid_shift,
+                                      uint32_t post_rescale,
+                                      uint64_t plain_base, size_t plain_len,
+                                      SCALE_T scale, LEVEL_T level,
+                                      const int* bank_steps) {
+  CHEDDAR_CONTEXT::Instance_ptr()->Block_rotate_mul_sum_msg(
+      res, op, block_count, grid_count, grid_shift, post_rescale, plain_base,
+      plain_len, scale, level, bank_steps);
 }
 
 void Cheddar_block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,

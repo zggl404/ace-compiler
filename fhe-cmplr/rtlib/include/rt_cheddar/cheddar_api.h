@@ -69,6 +69,21 @@ void Cheddar_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t term_count,
                             const int* steps);
 void Cheddar_blocking_rotate(CIPHER res, CIPHER op, uint32_t step_count,
                              const int* steps);
+void Cheddar_block_rotate_mul_sum_float(CIPHER res, CIPHER op,
+                                        uint32_t block_count,
+                                        uint32_t grid_count, int grid_shift,
+                                        uint32_t post_rescale,
+                                        const float* plain_data,
+                                        size_t plain_len, SCALE_T scale,
+                                        LEVEL_T level,
+                                        const int* bank_steps);
+void Cheddar_block_rotate_mul_sum_msg(CIPHER res, CIPHER op,
+                                      uint32_t block_count,
+                                      uint32_t grid_count, int grid_shift,
+                                      uint32_t post_rescale,
+                                      uint64_t plain_base, size_t plain_len,
+                                      SCALE_T scale, LEVEL_T level,
+                                      const int* bank_steps);
 void Cheddar_block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
                                   uint32_t grid_count, int grid_shift,
                                   uint32_t post_rescale, PLAIN const* plains,

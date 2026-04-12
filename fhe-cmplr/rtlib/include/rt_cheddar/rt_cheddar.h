@@ -457,21 +457,9 @@ inline void Block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
                                  LEVEL_T level, Steps... steps) {
   std::vector<int> bank_steps =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  std::vector<PLAINTEXT> plain_storage(static_cast<size_t>(grid_count) *
-                                       bank_steps.size());
-  std::vector<PLAIN> plain_refs =
-      fhe::rt::cheddar::detail::Collect_plain_refs(plain_storage);
-  for (uint32_t grid = 0; grid < grid_count; ++grid) {
-    for (size_t block = 0; block < bank_steps.size(); ++block) {
-      uint64_t row = static_cast<uint64_t>(grid) * bank_steps.size() + block;
-      Encode_float(plain_refs[row],
-                   const_cast<float*>(plain_data + row * plain_len), plain_len,
-                   scale, level);
-    }
-  }
-  Cheddar_block_rotate_mul_sum(
+  Cheddar_block_rotate_mul_sum_float(
       res, op, static_cast<uint32_t>(bank_steps.size()), grid_count, grid_shift,
-      post_rescale, plain_refs.data(), bank_steps.data());
+      post_rescale, plain_data, plain_len, scale, level, bank_steps.data());
   (void)block_count;
 }
 
@@ -483,24 +471,9 @@ inline void Block_rotate_mul_sum(CIPHER res, CIPHER op, uint32_t block_count,
                                  LEVEL_T level, Steps... steps) {
   std::vector<int> bank_steps =
       fhe::rt::cheddar::detail::Collect_steps(steps...);
-  std::vector<PLAINTEXT> plain_storage(static_cast<size_t>(grid_count) *
-                                       bank_steps.size());
-  std::vector<PLAIN> plain_refs =
-      fhe::rt::cheddar::detail::Collect_plain_refs(plain_storage);
-  for (uint32_t grid = 0; grid < grid_count; ++grid) {
-    for (size_t block = 0; block < bank_steps.size(); ++block) {
-      uint64_t plain_idx =
-          static_cast<uint64_t>(grid) * bank_steps.size() + block;
-      uint64_t msg_row = plain_base + plain_idx;
-      *plain_refs[plain_idx] =
-          *(PLAIN)Pt_from_msg(plain_refs[plain_idx],
-                              static_cast<uint32_t>(msg_row), plain_len, scale,
-                              level);
-    }
-  }
-  Cheddar_block_rotate_mul_sum(
+  Cheddar_block_rotate_mul_sum_msg(
       res, op, static_cast<uint32_t>(bank_steps.size()), grid_count, grid_shift,
-      post_rescale, plain_refs.data(), bank_steps.data());
+      post_rescale, plain_base, plain_len, scale, level, bank_steps.data());
   (void)block_count;
 }
 
