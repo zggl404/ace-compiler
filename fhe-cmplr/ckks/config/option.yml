@@ -56,6 +56,12 @@ group:
       kind: int
       value: 16
       value_maker: "="
+    - name: bootstrap_input_lvl
+      abbrev_name: bil
+      description: Set minimum input ciphertext level required by bootstrapping
+      kind: int
+      value: 1
+      value_maker: "="
     - name: min_bts_lvl
       abbrev_name: mnbl
       description: Set min level of result ciphertext of bootstrapping

@@ -244,3 +244,16 @@ void TEST_BTS_SCALE_MNG::Run_test_region_builder() {
 TEST_F(TEST_BTS_SCALE_MNG, Test_region_non_mul_op_src) {
   Run_test_region_builder();
 }
+
+TEST_F(TEST_BTS_SCALE_MNG, Test_bootstrap_input_level_config) {
+  CKKS_CONFIG config;
+  ASSERT_EQ(config.Bootstrap_input_level(), 1u);
+  ASSERT_EQ(config.Bootstrap_level_reserve(), 0u);
+  ASSERT_EQ(config.Bootstrap_consumable_level(16), 16u);
+
+  config._bootstrap_input_lvl = 3;
+  ASSERT_EQ(config.Bootstrap_input_level(), 3u);
+  ASSERT_EQ(config.Bootstrap_level_reserve(), 2u);
+  ASSERT_EQ(config.Bootstrap_consumable_level(16), 14u);
+  ASSERT_EQ(config.Bootstrap_consumable_level(2), 0u);
+}

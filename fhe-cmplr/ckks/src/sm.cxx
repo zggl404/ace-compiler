@@ -415,7 +415,8 @@ private:
                          const CUT_TYPE& fixed_bts_cut) {
     AIR_ASSERT(scale_lev.Scale() == scale_lev.Level());
     const CUT_TYPE& rs_cut =
-        Context()->Min_cut(region_id, 1, MIN_CUT_RESCALE);
+        Context()->Min_cut(region_id, Context()->Bootstrap_input_level(),
+                           MIN_CUT_RESCALE);
     for (REGION_ELEM_ID elem_id : rs_cut.Cut_elem()) {
       Add_rescale_point(elem_id);
     }
@@ -779,11 +780,14 @@ R_CODE SM::Perform() {
   REGION_ID last_region(region_cntr.Region_cnt() - 1);
   auto max_consumable = [&](REGION_ID band_src,
                             const CUT_TYPE* band_src_fixed_cut) -> uint32_t {
-    if (band_src_fixed_cut != nullptr) return _config->Max_bts_lvl();
-    if (band_src.Value() == 1 && _config->Input_cipher_lvl() > 0) {
-      return _config->Input_cipher_lvl() - 1;
+    if (band_src_fixed_cut != nullptr) {
+      return _config->Bootstrap_consumable_level(_config->Max_bts_lvl());
     }
-    return _config->Max_bts_lvl();
+    if (band_src.Value() == 1 && _config->Input_cipher_lvl() > 0) {
+      return _config->Bootstrap_consumable_level(_config->Input_cipher_lvl() -
+                                                 1);
+    }
+    return _config->Bootstrap_consumable_level(_config->Max_bts_lvl());
   };
   REGION_ID        src(1);
   const CUT_TYPE*  src_fixed_cut = nullptr;

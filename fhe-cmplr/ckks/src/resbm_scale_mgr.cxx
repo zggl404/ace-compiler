@@ -465,7 +465,8 @@ void SCALE_MGR::Collect_redundant_bootstrap(CONST_SCC_NODE_PTR scc_node) {
 void SCALE_MGR::Handle_dst_region(const SCALE_LEVEL& scale_lev) {
   // 1. Min_cut for rescale points
   AIR_ASSERT(scale_lev.Scale() == scale_lev.Level());
-  const CUT_TYPE& rs_cut = Context()->Min_cut(Dst_region(), 1, MIN_CUT_RESCALE);
+  const CUT_TYPE& rs_cut = Context()->Min_cut(
+      Dst_region(), Context()->Bootstrap_input_level(), MIN_CUT_RESCALE);
   Plan()->Set_cut(Dst_region(), rs_cut);
   double region_laten = Rescale_latency(rs_cut, scale_lev.Level());
 

@@ -401,6 +401,9 @@ public:
   MEMPOOL*                Mem_pool(void) { return &_mem_pool; }
   REGION_CUT&             Rescale_cut(void) { return _rs_cut; }
   REGION_CUT&             Bootstrap_cut(void) { return _bts_cut; }
+  uint32_t                Bootstrap_input_level(void) const {
+    return Config()->Bootstrap_input_level();
+  }
   uint32_t                Min_bts_lev(void) const {
     return std::min(Config()->Min_bts_lvl(), Max_bts_lvl() / 2);
   }

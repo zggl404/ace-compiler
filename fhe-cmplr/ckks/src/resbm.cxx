@@ -60,11 +60,13 @@ void RESBM::Cal_min_laten_plan() {
   // plan
   for (uint32_t src_id = 1; src_id < Region_cntr()->Region_cnt(); ++src_id) {
     // calculate max allowed cipher level of start region.
-    uint32_t consumable_level = Ckks_cfg()->Max_bts_lvl();
+    uint32_t consumable_level =
+        Ckks_cfg()->Bootstrap_consumable_level(Ckks_cfg()->Max_bts_lvl());
     uint32_t min_bts_level    = (src_id == 1 ? 1 : Context()->Min_bts_lev());
     if (src_id == 1 && Ckks_cfg()->Input_cipher_lvl() > 0) {
       // ciphertext level is one higher than the consumable value.
-      consumable_level = Ckks_cfg()->Input_cipher_lvl() - 1;
+      consumable_level = Ckks_cfg()->Bootstrap_consumable_level(
+          Ckks_cfg()->Input_cipher_lvl() - 1);
     }
 
     REGION_ID src(src_id);

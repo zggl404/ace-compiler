@@ -152,6 +152,10 @@ public:
     return 0;
   }
 
+  uint32_t Bootstrap_input_level() const {
+    return _config->Bootstrap_input_level();
+  }
+
   //! @brief Set mul_level of SSA_VER ver is undetermined.
   void           Record_undeterm(SSA_VER_ID ver) { _undeterm_ver.insert(ver); }
   const VER_SET& Undeterm_ssa_ver(void) const { return _undeterm_ver; }
@@ -1031,7 +1035,7 @@ RETV CKKS_ANA_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR bootstrap) {
   ana_ctx.Update_mul_level(tot_mul_level);
 
   // 4. handle child bootstrap child node
-  const uint32_t child_mul_level = 1;
+  const uint32_t child_mul_level = ana_ctx.Bootstrap_input_level();
   ana_ctx.Push_mul_level(child_mul_level);
 
   (void)visitor->template Visit<RETV>(bootstrap->Child(0));

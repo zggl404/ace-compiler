@@ -9,6 +9,8 @@
 #ifndef FHE_CKKS_CONFIG_H
 #define FHE_CKKS_CONFIG_H
 
+#include <algorithm>
+
 #include "air/driver/common_config.h"
 #include "air/driver/driver_ctx.h"
 #include "air/util/debug.h"
@@ -38,6 +40,19 @@ enum TRACE_DETAIL : uint64_t {
 struct CKKS_CONFIG : public fhe::ckks::CKKS_OPTION_CONFIG {
 public:
   CKKS_CONFIG(void) {}
+
+  uint32_t Bootstrap_input_level() const {
+    return std::max<uint32_t>(1, this->Bootstrap_input_lvl());
+  }
+
+  uint32_t Bootstrap_level_reserve() const {
+    return Bootstrap_input_level() - 1;
+  }
+
+  uint32_t Bootstrap_consumable_level(uint32_t raw_level) const {
+    uint32_t reserve = Bootstrap_level_reserve();
+    return raw_level > reserve ? raw_level - reserve : 0;
+  }
 };
 
 }  // namespace ckks
