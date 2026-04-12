@@ -45,6 +45,8 @@ public:
   static constexpr const char* SLOT = "slot";
   // mark bootstrap node fused from relu lowering
   static constexpr const char* WITH_RELU = "with_relu";
+  // relu value range attached to fused bootstrap_with_relu nodes
+  static constexpr const char* RELU_VALUE_RANGE = "relu_value_range";
 
   // sharding
   static constexpr const char* SHARDING   = "sharding";

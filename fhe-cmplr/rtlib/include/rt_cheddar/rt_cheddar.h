@@ -274,9 +274,11 @@ inline CIPHER Bootstrap(CIPHER res, CIPHER op, int level, int slot) {
       [&]() { Cheddar_bootstrap(res, op, level, slot); });
 }
 
-inline CIPHER Bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot) {
+inline CIPHER Bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot,
+                                  double relu_value_range) {
   return Trace_cheddar_fhe(
       static_cast<uint32_t>(fhe::core::RTM_FHE_BOOTSTRAP), res, [&]() {
+        (void)relu_value_range;
         Cheddar_bootstrap(res, op, level, slot);
         size_t relu_len =
             slot > 0 ? static_cast<size_t>(slot)

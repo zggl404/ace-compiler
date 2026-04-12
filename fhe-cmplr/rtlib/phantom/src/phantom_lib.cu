@@ -615,8 +615,11 @@ public:
         //     _evaluator->evaluator.mod_switch_to_inplace(*res, target_level);
         // }
     }
-    void Bootstrap_with_relu(Ciphertext *op1, Ciphertext *res, int level, int slot)
+    void Bootstrap_with_relu(Ciphertext *op1, Ciphertext *res, int level, int slot,
+                             double relu_value_range)
     {
+        (void)level;
+        (void)relu_value_range;
         Ciphertext input = *op1;
 
         switch (slot)
@@ -1179,9 +1182,11 @@ void Phantom_bootstrap(CIPHER res, CIPHER op, int level, int slot)
 {
     PHANTOM_CONTEXT::Context()->Bootstrap(op, res, level, slot);
 }
-void Phantom_bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot)
+void Phantom_bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot,
+                                 double relu_value_range)
 {
-    PHANTOM_CONTEXT::Context()->Bootstrap_with_relu(op, res, level, slot);
+    PHANTOM_CONTEXT::Context()->Bootstrap_with_relu(op, res, level, slot,
+                                                    relu_value_range);
 }
 
 void Phantom_free_ciph(CIPHER ct)

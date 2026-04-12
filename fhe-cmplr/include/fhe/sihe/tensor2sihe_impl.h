@@ -177,8 +177,14 @@ RETV TENSOR2SIHE_IMPL::Handle_relu(VISITOR* visitor, NODE_PTR node) {
   {
     NODE_PTR bs_node = sihe_gen.Gen_bootstrap(op0, slot, spos);
     if (fused_bootstrap_with_relu) {
-      uint32_t with_relu = 1;
+      uint32_t with_relu        = 1;
+      double   relu_value_range = ctx.Relu_vr(node->Attr("name"));
       bs_node->Set_attr(nn::core::ATTR::WITH_RELU, &with_relu, 1);
+      bs_node->Set_attr(nn::core::ATTR::RELU_VALUE_RANGE, &relu_value_range,
+                        1);
+      ctx.Trace(TD_RELU_VR, "Relu range for ", node->Attr("name"), " is [-",
+                relu_value_range, ", ", relu_value_range,
+                "] (bootstrap_with_relu)\n");
     }
     STMT_PTR st_bs_node = cntr->New_stp(bs_node, bs_tmp, spos);
     visitor->Context().Prepend(st_bs_node);

@@ -234,6 +234,10 @@ public:
           if (with_relu != nullptr) {
             const uint32_t* slot = val->Attr<uint32_t>(nn::core::ATTR::SLOT);
             ctx << ", " << (slot == nullptr ? 0 : *slot);
+            const double* relu_value_range =
+                val->Attr<double>(nn::core::ATTR::RELU_VALUE_RANGE);
+            ctx << ", "
+                << (relu_value_range == nullptr ? 1.0 : *relu_value_range);
           }
           ctx << ")";
           return;
@@ -280,6 +284,9 @@ public:
         if (with_relu != nullptr) {
           const uint32_t* slot = val->Attr<uint32_t>(nn::core::ATTR::SLOT);
           ctx << ", " << (slot == nullptr ? 0 : *slot);
+          const double* relu_value_range =
+              val->Attr<double>(nn::core::ATTR::RELU_VALUE_RANGE);
+          ctx << ", " << (relu_value_range == nullptr ? 1.0 : *relu_value_range);
         }
       } else {
         ctx << "Copy_ciph(&";

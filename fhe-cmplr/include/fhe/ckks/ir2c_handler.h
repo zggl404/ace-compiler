@@ -392,7 +392,13 @@ public:
     ctx << ", " << (mul_lev == nullptr ? 0 : *mul_lev);
 
     const uint32_t* slot = node->Attr<uint32_t>(nn::core::ATTR::SLOT);
-    ctx << ", " << (slot == nullptr ? 0 : *slot) << ")";
+    ctx << ", " << (slot == nullptr ? 0 : *slot);
+    if (with_relu != nullptr) {
+      const double* relu_value_range =
+          node->Attr<double>(nn::core::ATTR::RELU_VALUE_RANGE);
+      ctx << ", " << (relu_value_range == nullptr ? 1.0 : *relu_value_range);
+    }
+    ctx << ")";
     if (!ctx._need_bts) {
       ctx._need_bts = true;
     }

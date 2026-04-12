@@ -299,6 +299,8 @@ RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
   const uint32_t* slot_idx       = node->Attr<uint32_t>(slot_key, &slot_count);
   const uint32_t* with_relu_attr =
       node->Attr<uint32_t>(nn::core::ATTR::WITH_RELU);
+  const double* relu_value_range_attr =
+      node->Attr<double>(nn::core::ATTR::RELU_VALUE_RANGE);
 
   // Check if Python has a registered lowering for this op
   if (sihe::Should_skip_lowering("fhe::sihe", "bootstrap")) {
@@ -318,6 +320,10 @@ RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
     }
     if (with_relu_attr != nullptr) {
       new_bootstrap->Set_attr(nn::core::ATTR::WITH_RELU, with_relu_attr, 1);
+    }
+    if (relu_value_range_attr != nullptr) {
+      new_bootstrap->Set_attr(nn::core::ATTR::RELU_VALUE_RANGE,
+                              relu_value_range_attr, 1);
     }
     return RETV(new_bootstrap);
   }
@@ -359,6 +365,10 @@ RETV SIHE2CKKS_IMPL::Handle_bootstrap(VISITOR* visitor, NODE_PTR node) {
   ckks_bootstrap->Set_attr(slot_key, slot_idx, slot_count);
   if (with_relu_attr != nullptr) {
     ckks_bootstrap->Set_attr(nn::core::ATTR::WITH_RELU, with_relu_attr, 1);
+  }
+  if (relu_value_range_attr != nullptr) {
+    ckks_bootstrap->Set_attr(nn::core::ATTR::RELU_VALUE_RANGE,
+                             relu_value_range_attr, 1);
   }
 
   return RETV(ckks_bootstrap);

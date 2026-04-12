@@ -66,7 +66,8 @@ void Phantom_rescale(CIPHER res, CIPHER op);
 void Phantom_mod_switch(CIPHER res, CIPHER op);
 void Phantom_relin(CIPHER res, CIPHER3 op);
 void Phantom_bootstrap(CIPHER res, CIPHER op, int level, int slot);
-void Phantom_bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot);
+void Phantom_bootstrap_with_relu(CIPHER res, CIPHER op, int level, int slot,
+                                 double relu_value_range);
 void Phantom_copy(CIPHER res, CIPHER op);
 void Phantom_zero(CIPHER res);
 void Phantom_free_ciph(CIPHER res);
