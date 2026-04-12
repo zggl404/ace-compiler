@@ -485,6 +485,15 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--bil",
+        type=int,
+        help=(
+            "Set `bil=<val>` in the CKKS options to control the minimum bootstrap "
+            "input ciphertext level. Overrides any existing `bil=` already present "
+            "in `--ckks`."
+        ),
+    )
+    parser.add_argument(
         "--sbm",
         action="store_true",
         help="Append `sbm` to the CKKS options for every selected model.",
@@ -626,6 +635,8 @@ def main():
     args = parse_args()
     if args.sbm and args.sm:
         raise ValueError("`--sbm` and `--sm` cannot be enabled at the same time.")
+    if args.bil is not None and args.bil < 1:
+        raise ValueError("`--bil` must be greater than or equal to 1.")
     if args.num <= 0:
         raise ValueError("`--num` must be greater than 0.")
     if args.pre_encode_count is not None and args.pre_encode_count < 0:
@@ -685,6 +696,8 @@ def main():
     print(f"Compiler ckks option: {args.ckks}")
     if args.icl is not None:
         print(f"Compiler icl: {args.icl}")
+    if args.bil is not None:
+        print(f"Compiler bil: {args.bil}")
     print(f"Compiler p2c option: {args.p2c}")
     if args.df:
         print(f"Compiler df template: {args.df}")

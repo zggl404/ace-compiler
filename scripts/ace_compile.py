@@ -229,6 +229,7 @@ def build_ckks_option(
     enable_sbm=False,
     enable_sm=False,
     input_cipher_lvl=None,
+    bootstrap_input_lvl=None,
 ):
     ckks_parts = split_option_parts(ckks_option, "-CKKS:")
     if enable_sbm:
@@ -237,6 +238,9 @@ def build_ckks_option(
         ckks_parts.append("sm")
     if input_cipher_lvl is not None:
         ckks_parts = upsert_ckks_kv_option(ckks_parts, "icl", input_cipher_lvl)
+    if bootstrap_input_lvl is not None:
+        ckks_parts = upsert_ckks_kv_option(ckks_parts, "bil",
+                                           bootstrap_input_lvl)
     ckks_parts = dedupe_parts(ckks_parts)
     return rewrite_ckks_option("-CKKS:" + ":".join(ckks_parts), backend)
 
@@ -255,6 +259,7 @@ def build_compile_options(model, args, repo_root):
             enable_sbm=args.sbm,
             enable_sm=args.sm,
             input_cipher_lvl=args.icl,
+            bootstrap_input_lvl=args.bil,
         )
     )
     if args.fusion:
@@ -457,6 +462,15 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--bil",
+        type=int,
+        help=(
+            "Set `bil=<val>` in the CKKS options to control the minimum bootstrap "
+            "input ciphertext level. Overrides any existing `bil=` already present "
+            "in `--ckks`."
+        ),
+    )
+    parser.add_argument(
         "--sbm",
         action="store_true",
         help="Append `sbm` to the CKKS options for every selected model.",
@@ -523,6 +537,8 @@ def main():
     args = parse_args()
     if args.sbm and args.sm:
         raise ValueError("`--sbm` and `--sm` cannot be enabled at the same time.")
+    if args.bil is not None and args.bil < 1:
+        raise ValueError("`--bil` must be greater than or equal to 1.")
     repo_root = resolve_path(args.root)
     compiler = resolve_path(args.compiler or get_default_compiler(repo_root), repo_root)
     model_dir = resolve_path(args.model_dir or "model", repo_root)
@@ -550,6 +566,8 @@ def main():
     print(f"Compiler ckks option: {args.ckks}")
     if args.icl is not None:
         print(f"Compiler icl: {args.icl}")
+    if args.bil is not None:
+        print(f"Compiler bil: {args.bil}")
     print(f"Compiler p2c option: {args.p2c}")
     if args.sbm:
         print("Compiler sbm: enabled")
