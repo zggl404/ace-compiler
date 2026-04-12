@@ -6,6 +6,7 @@
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -64,6 +65,20 @@ DEFAULT_ROT_KEY_MODE = "pow2"
 DEFAULT_ENCODE_MODE = "ondemand"
 DEFAULT_PRE_ENCODE_COUNT = 64
 DEFAULT_TOP_TIMING_COUNT = 5
+DEFAULT_APP_RELU_DEBUG_DUMP_LEN = 8
+
+APP_RELU_DEBUG_HELPER_MARKER = "ACE_APP_RELU_DEBUG_HELPER"
+MAIN_GRAPH_ANCHOR = "bool Main_graph() {\n"
+APP_RELU_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)(?P<result>\w+)\s*=\s*"
+    r"(?P<variant>App_relu(?:_\d+)?)\("
+    r"(?P<lhs>[^,]+),\s*(?P<rhs>[^,]+),\s*(?P<mask_len>\d+)\);\s*$"
+)
+BOOTSTRAP_WITH_RELU_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)Bootstrap_with_relu\(\s*&(?P<result>\w+),\s*&(?P<input>\w+),\s*"
+    r"(?P<level>\d+),\s*(?P<mask_len>\d+),\s*(?P<relu_range>\d+)\);\s*$"
+)
+APP_RELU_NODE_PATTERN = re.compile(r"^\s*//\s*(?P<node>/.+/Relu)\s*$")
 
 
 def normalize_model_name(model):
@@ -185,6 +200,187 @@ def find_example_executable(build_dir, model):
     raise FileNotFoundError(
         "Built executable not found for {} under {}".format(model, build_dir)
     )
+
+
+def build_app_relu_debug_helper():
+    return """// {marker}
+static int32_t g_ace_app_relu_debug_counter = 0;
+
+static void Ace_reset_app_relu_debug_counter(void) {{
+  g_ace_app_relu_debug_counter = 0;
+}}
+
+static void Ace_debug_cipher_stage(const char* node_name, const char* stage_name,
+                                   CIPHERTEXT* ct, uint32_t mask_len,
+                                   uint32_t dump_len) {{
+  char     label[512];
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  snprintf(label, sizeof(label), "%s/%s", node_name, stage_name);
+  Dump_cipher_msg(label, ct, actual_dump_len);
+}}
+
+static void Ace_debug_plain_relu(const char* node_name, CIPHERTEXT* output_ct,
+                                 uint32_t mask_len, uint32_t dump_len) {{
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  double* plain_vals = Get_msg(output_ct);
+  printf("[%s/plain_relu]: [", node_name);
+  for (uint32_t idx = 0; idx < actual_dump_len; ++idx) {{
+    double relu_val = plain_vals[idx] > 0.0 ? plain_vals[idx] : 0.0;
+    if (idx > 0) {{
+      printf(", ");
+    }}
+    printf("%.6g", relu_val);
+  }}
+  printf("]\\n");
+  free(plain_vals);
+}}
+
+static void Ace_debug_app_relu(const char* node_name, const char* relu_api,
+                               CIPHERTEXT* input_ct, CIPHERTEXT* output_ct,
+                               int32_t level_hint, uint32_t mask_len,
+                               int32_t relu_meta, uint32_t dump_len) {{
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  ++g_ace_app_relu_debug_counter;
+  printf(
+      "[DEBUG][APP_RELU][%d] node=%s api=%s mask_len=%u level=%d level_hint=%d relu_meta=%d dump_len=%u\\n",
+      g_ace_app_relu_debug_counter, node_name, relu_api, mask_len,
+      (int)Level(output_ct), level_hint, relu_meta, actual_dump_len);
+  if (input_ct != NULL) {{
+    Ace_debug_cipher_stage(node_name, "input", input_ct, mask_len,
+                           actual_dump_len);
+  }}
+  Ace_debug_cipher_stage(node_name, "output", output_ct, mask_len,
+                         actual_dump_len);
+  if (relu_api != NULL && relu_api[0] != 'B' && level_hint >= 0 &&
+      relu_meta >= 0) {{
+    Ace_debug_plain_relu(node_name, output_ct, mask_len, actual_dump_len);
+  }}
+}}
+
+static void Ace_debug_app_relu_summary(void) {{
+  printf("[DEBUG][APP_RELU] total_calls=%d\\n", g_ace_app_relu_debug_counter);
+}}
+""".format(marker=APP_RELU_DEBUG_HELPER_MARKER)
+
+
+def instrument_app_relu_debug(inc_path, dump_len):
+    if dump_len <= 0:
+        raise ValueError("App ReLU debug dump length must be greater than 0.")
+
+    with open(inc_path, "r") as handle:
+        content = handle.read()
+
+    if APP_RELU_DEBUG_HELPER_MARKER in content:
+        existing_calls = max(content.count("Ace_debug_app_relu(") - 1, 0)
+        return {
+            "already_instrumented": True,
+            "call_count": existing_calls,
+            "nodes": [],
+        }
+
+    if MAIN_GRAPH_ANCHOR not in content:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: failed to find Main_graph() anchor."
+        )
+
+    helper_block = build_app_relu_debug_helper() + "\n"
+    content = content.replace(
+        MAIN_GRAPH_ANCHOR,
+        helper_block + MAIN_GRAPH_ANCHOR,
+        1,
+    )
+
+    content = content.replace(
+        MAIN_GRAPH_ANCHOR,
+        MAIN_GRAPH_ANCHOR + "  Ace_reset_app_relu_debug_counter();\n",
+        1,
+    )
+
+    summary_anchor = "  return true;\n}\n\nint Get_input_count() {\n"
+    if summary_anchor not in content:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: failed to find Main_graph() epilogue."
+        )
+    content = content.replace(
+        summary_anchor,
+        "  Ace_debug_app_relu_summary();\n" + summary_anchor,
+        1,
+    )
+
+    instrumented_lines = []
+    nodes = []
+    pending_node = None
+    call_count = 0
+
+    for line in content.splitlines(keepends=True):
+        node_match = APP_RELU_NODE_PATTERN.match(line)
+        if node_match:
+            pending_node = node_match.group("node")
+            instrumented_lines.append(line)
+            continue
+
+        call_match = APP_RELU_CALL_PATTERN.match(line)
+        instrumented_lines.append(line)
+        if call_match is not None:
+            call_count += 1
+            node_name = pending_node or f"/debug/AppRelu/{call_count}"
+            relu_variant = call_match.group("variant")
+            result_var = call_match.group("result")
+            input_var = call_match.group("rhs").strip()
+            mask_len = call_match.group("mask_len")
+            indent = call_match.group("indent")
+            instrumented_lines.append(
+                f'{indent}Ace_debug_app_relu("{node_name}", "{relu_variant}", '
+                f"&{input_var}, &{result_var}, -1, {mask_len}, -1, {dump_len});\n"
+            )
+            nodes.append(
+                {
+                    "node": node_name,
+                    "api": relu_variant,
+                    "mask_len": mask_len,
+                    "level_hint": "-1",
+                    "relu_meta": "-1",
+                }
+            )
+            pending_node = None
+            continue
+
+        bootstrap_match = BOOTSTRAP_WITH_RELU_CALL_PATTERN.match(line)
+        if bootstrap_match is None:
+            continue
+
+        call_count += 1
+        node_name = pending_node or f"/debug/AppRelu/{call_count}"
+        result_var = bootstrap_match.group("result")
+        level_hint = bootstrap_match.group("level")
+        mask_len = bootstrap_match.group("mask_len")
+        relu_range = bootstrap_match.group("relu_range")
+        indent = bootstrap_match.group("indent")
+        input_var = bootstrap_match.group("input")
+        instrumented_lines.append(
+            f'{indent}Ace_debug_app_relu("{node_name}", "Bootstrap_with_relu", '
+            f"&{input_var}, &{result_var}, {level_hint}, {mask_len}, {relu_range}, {dump_len});\n"
+        )
+        nodes.append(
+            {
+                "node": node_name,
+                "api": "Bootstrap_with_relu",
+                "mask_len": mask_len,
+                "level_hint": level_hint,
+                "relu_meta": relu_range,
+            }
+        )
+        pending_node = None
+
+    if call_count == 0:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: no App_relu or Bootstrap_with_relu calls were found."
+        )
+
+    with open(inc_path, "w") as handle:
+        handle.write("".join(instrumented_lines))
+
+    return {"already_instrumented": False, "call_count": call_count, "nodes": nodes}
 
 
 def apply_runtime_env_overrides(env, args):
@@ -628,6 +824,23 @@ def parse_args():
             "from --root. Implies --capture-timing."
         ),
     )
+    parser.add_argument(
+        "--debug-app-relu",
+        action="store_true",
+        help=(
+            "Instrument generated *.onnx.inc files to print every ReLU output "
+            "and a final call count summary before linking."
+        ),
+    )
+    parser.add_argument(
+        "--debug-app-relu-dump-len",
+        type=int,
+        default=DEFAULT_APP_RELU_DEBUG_DUMP_LEN,
+        help=(
+            "Number of decrypted slots to dump for each App_relu output when "
+            f"`--debug-app-relu` is enabled. Default: {DEFAULT_APP_RELU_DEBUG_DUMP_LEN}"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -641,6 +854,8 @@ def main():
         raise ValueError("`--num` must be greater than 0.")
     if args.pre_encode_count is not None and args.pre_encode_count < 0:
         raise ValueError("`--pre-encode-count` must be >= 0.")
+    if args.debug_app_relu_dump_len <= 0:
+        raise ValueError("`--debug-app-relu-dump-len` must be greater than 0.")
     if args.timing_json:
         args.capture_timing = True
     repo_root = ace_compile.resolve_path(args.root)
@@ -734,6 +949,11 @@ def main():
         print("Timing capture: enabled")
     if timing_json:
         print(f"Timing JSON: {timing_json}")
+    if args.debug_app_relu:
+        print(
+            "App ReLU debug instrumentation: enabled "
+            f"(dump_len={args.debug_app_relu_dump_len})"
+        )
 
     exit_code = 0
     timing_results = {}
@@ -775,6 +995,27 @@ def main():
                 raise FileNotFoundError(
                     f"Generated include file not found for {model}: {output_file}"
                 )
+
+            if args.debug_app_relu:
+                debug_info = instrument_app_relu_debug(
+                    output_file, args.debug_app_relu_dump_len
+                )
+                if debug_info["already_instrumented"]:
+                    print(
+                        f"App ReLU debug already instrumented for {model}: "
+                        f"{debug_info['call_count']} calls"
+                    )
+                else:
+                    print(
+                        f"App ReLU debug instrumented for {model}: "
+                        f"{debug_info['call_count']} calls"
+                    )
+                    for index, entry in enumerate(debug_info["nodes"], start=1):
+                        print(
+                            f"  [APP_RELU {index:02d}] {entry['node']} -> "
+                            f"{entry['api']} (mask_len={entry['mask_len']}, "
+                            f"level_hint={entry['level_hint']}, relu_meta={entry['relu_meta']})"
+                        )
 
             if not args.skip_link:
                 generated_driver = create_driver_file(model, main_inc)

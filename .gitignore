@@ -1,10 +1,13 @@
 cifar/*
 
-
+logs/*
 release/*
+debug/*
+build/*
 ace_cmplr/*
 __pycache__/*
-
+tmptrace/*
+tmp_sync_placeholder/*
 doc/*
 backend/*
 scripts/__pycache__/*

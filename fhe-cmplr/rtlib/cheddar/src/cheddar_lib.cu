@@ -127,6 +127,32 @@ public:
     Encrypt_plain(res, plain);
   }
 
+  static void Apply_clear_relu(std::vector<double>& vec, size_t len) {
+    size_t active = std::min(len, vec.size());
+    for (size_t idx = 0; idx < active; ++idx) {
+      vec[idx] = std::max(vec[idx], 0.0);
+    }
+  }
+
+  static bool Enable_bwr_clear_debug() {
+    const char* flag = std::getenv("ACE_DEBUG_BWR_CLEAR");
+    return flag != nullptr && flag[0] != '\0' && std::strcmp(flag, "0") != 0;
+  }
+
+  static void Dump_bwr_clear_debug(const char* stage, size_t call_index,
+                                   const std::vector<double>& vec,
+                                   size_t len) {
+    size_t dump_len = std::min<size_t>(8, std::min(len, vec.size()));
+    std::cout << "[DEBUG][BWR_CLEAR][" << call_index << "] " << stage << ": [";
+    for (size_t idx = 0; idx < dump_len; ++idx) {
+      if (idx != 0) {
+        std::cout << ", ";
+      }
+      std::cout << vec[idx];
+    }
+    std::cout << "]" << std::endl;
+  }
+
   void App_relu(Ciphertext* res, const Ciphertext* op, size_t len,
                 LEVEL_T consumed_levels) {
     LEVEL_T input_level = Level_hint(op);
@@ -139,9 +165,7 @@ public:
     std::vector<double> vec;
     Decrypt(op, vec);
     size_t active = std::min(len, vec.size());
-    for (size_t idx = 0; idx < active; ++idx) {
-      vec[idx] = std::max(vec[idx], 0.0);
-    }
+    Apply_clear_relu(vec, active);
 
     Ciphertext relu_ct;
     Encrypt_double(&relu_ct, vec.data(), active, 1, input_level);
@@ -451,66 +475,32 @@ public:
   }
 
   void Bootstrap(Ciphertext* res, const Ciphertext* op1, int level, int slot) {
-    FMT_ASSERT(boot_requested_ && boot_context_ != nullptr,
-               "CHEDDAR bootstrap was invoked without bootstrap setup");
-
-    int requested_slots = slot > 0 ? slot : Slots_hint(op1);
-    if (requested_slots <= 0) {
-      requested_slots = full_slots_;
-    }
-
-    bool zero_input = Is_zero(op1);
-    Ciphertext input;
-    if (zero_input) {
-      Ensure_materialized_zero(&input, Level_hint(op1), Scale_hint(op1),
-                               requested_slots);
-    } else {
-      input = *op1;
-      input.inner.SetNumSlots(requested_slots);
-    }
-
-    while (Logical_level(input) > param_->default_encryption_level_) {
-      Ciphertext dropped;
-      Mod_switch(&dropped, &input);
-      input = std::move(dropped);
-    }
-
-    Ciphertext booted;
-    boot_context_->Boot(booted.inner, input.inner, ui_->GetEvkMap());
-    booted.is_zero = false;
-
-    if (level > 0) {
-      int target_level = std::min<int>(level, max_logical_level_);
-      FMT_ASSERT(Logical_level(booted) >= target_level,
-                 "CHEDDAR bootstrap result level %d is lower than requested "
-                 "level %d",
-                 Logical_level(booted), target_level);
-      while (Logical_level(booted) > target_level) {
-        Ciphertext dropped;
-        Mod_switch(&dropped, &booted);
-        booted = std::move(dropped);
-      }
-    }
-
-    *res = std::move(booted);
-    if (zero_input) {
-      res->is_zero = true;
-      res->zero_level = Logical_level(*res);
-      res->zero_scale = res->inner.GetScale();
-      res->zero_slots = res->inner.GetNumSlots();
-    } else {
-      res->is_zero = false;
-    }
+    Run_bootstrap(res, op1, level, slot, false);
   }
 
   void Bootstrap_with_relu(Ciphertext* res, const Ciphertext* op1, int level,
                            int slot, double relu_value_range) {
     (void)relu_value_range;
-    Bootstrap(res, op1, level, slot);
-    size_t relu_len =
-        slot > 0 ? static_cast<size_t>(slot)
-                 : static_cast<size_t>(Degree() / 2);
-    App_relu(res, res, relu_len, 0);
+    Run_bootstrap(res, op1, level, slot, false);
+    Ciphertext booted(*res);
+    int        output_level = Level_hint(&booted);
+    int        active_slots = Slots_hint(&booted);
+
+    std::vector<double> vec;
+    Decrypt(&booted, vec);
+    size_t active = std::min<size_t>(active_slots, vec.size());
+    if (active_slots > 0 && active_slots < full_slots_) {
+      double restore_factor =
+          static_cast<double>(full_slots_) / static_cast<double>(active_slots);
+      for (size_t idx = 0; idx < active; ++idx) {
+        vec[idx] *= restore_factor;
+      }
+    }
+    Apply_clear_relu(vec, active);
+
+    Ciphertext relu_ct;
+    Encrypt_double(&relu_ct, vec.data(), active, 1, output_level);
+    *res = std::move(relu_ct);
   }
 
   void Rotate_add_reduce(Ciphertext* res, const Ciphertext* op,
@@ -933,6 +923,66 @@ public:
 private:
   CHEDDAR_CONTEXT() { Initialize(); }
 
+  void Run_bootstrap(Ciphertext* res, const Ciphertext* op1, int level,
+                     int slot, bool use_slim_boot) {
+    FMT_ASSERT(boot_requested_ && boot_context_ != nullptr,
+               "CHEDDAR bootstrap was invoked without bootstrap setup");
+
+    int requested_slots = slot;
+    if (requested_slots == 0) {
+      requested_slots = full_slots_;
+    }
+    FMT_ASSERT(requested_slots > 0 && requested_slots <= full_slots_,
+               "invalid CHEDDAR bootstrap slot count: %d", requested_slots);
+
+    bool zero_input = Is_zero(op1);
+    Ciphertext input;
+    if (zero_input) {
+      Ensure_materialized_zero(&input, Level_hint(op1), Scale_hint(op1),
+                               requested_slots);
+    } else {
+      input = *op1;
+      input.inner.SetNumSlots(requested_slots);
+    }
+
+    while (Logical_level(input) > param_->default_encryption_level_) {
+      Ciphertext dropped;
+      Mod_switch(&dropped, &input);
+      input = std::move(dropped);
+    }
+
+    Ciphertext booted;
+    if (use_slim_boot) {
+      boot_context_->SlimBoot(booted.inner, input.inner, ui_->GetEvkMap());
+    } else {
+      boot_context_->Boot(booted.inner, input.inner, ui_->GetEvkMap());
+    }
+    booted.is_zero = false;
+
+    if (level > 0) {
+      int target_level = std::min<int>(level, max_logical_level_);
+      FMT_ASSERT(Logical_level(booted) >= target_level,
+                 "CHEDDAR bootstrap result level %d is lower than requested "
+                 "level %d",
+                 Logical_level(booted), target_level);
+      while (Logical_level(booted) > target_level) {
+        Ciphertext dropped;
+        Mod_switch(&dropped, &booted);
+        booted = std::move(dropped);
+      }
+    }
+
+    *res = std::move(booted);
+    if (zero_input) {
+      res->is_zero = true;
+      res->zero_level = Logical_level(*res);
+      res->zero_scale = res->inner.GetScale();
+      res->zero_slots = res->inner.GetNumSlots();
+    } else {
+      res->is_zero = false;
+    }
+  }
+
   void Initialize() {
     const CKKS_PARAMS* prog_param = Get_context_params();
     FMT_ASSERT(prog_param != nullptr, "missing CKKS params");
@@ -1020,6 +1070,15 @@ private:
     pow2_rotation_keys_ = Use_pow2_rotation_keys();
     if (boot_requested_) {
       Ensure_bootstrap_slot(full_slots_);
+      if (full_slots_ >= 16384) {
+        Ensure_bootstrap_slot(16384);
+      }
+      if (full_slots_ >= 8192) {
+        Ensure_bootstrap_slot(8192);
+      }
+      if (full_slots_ >= 4096) {
+        Ensure_bootstrap_slot(4096);
+      }
     }
 
     std::unordered_set<int> prepared_rots;

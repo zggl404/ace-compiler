@@ -32,18 +32,8 @@ public:
 
   //! @brief Store data to trace | perf file
   ~REPORT(void) {
-    // write trace data on the bottom
-    for (int i = 0; i < _report["performace"].size(); i++) {
-      std::string driver = _report["performace"][i]["driver_name"].asString();
-      std::string phase  = _report["performace"][i]["phase_name"].asString();
-      std::string pass   = _report["performace"][i]["pass_name"].asString();
-      std::string unit   = _report["performace"][i]["time_unit"].asString();
-      double      delta  = _report["performace"][i]["phase_time"].asDouble();
-      double      total  = _report["performace"][i]["cpu_time"].asDouble();
-
-      AIR_TRACE(_tfile, "[%s][%s][%s] : phase_time = %s / %s(%s)", driver,
-                phase, pass, delta, total, unit);
-    }
+    Dump_trace();
+    Dump_perf();
   }
 
   void Add_node(std::string driver, std::string phase, std::string pass,
@@ -72,6 +62,29 @@ public:
   void Print() const { Print(std::cout, true); }
 
 private:
+  void Dump_trace() const {
+    std::ostream& os = _tfile.Tfile();
+    for (Json::ArrayIndex i = 0; i < _report["performace"].size(); ++i) {
+      const Json::Value& node   = _report["performace"][i];
+      std::string        driver = node["driver_name"].asString();
+      std::string        phase  = node["phase_name"].asString();
+      std::string        pass   = node["pass_name"].asString();
+      std::string        unit   = node["time_unit"].asString();
+      double             delta  = node["phase_time"].asDouble();
+      double             total  = node["cpu_time"].asDouble();
+
+      Templ_print(os, "[%s][%s][%s] : phase_time = %s / %s(%s)", driver, phase,
+                  pass, delta, total, unit);
+    }
+    os.flush();
+  }
+
+  void Dump_perf() const {
+    std::ostream& os = _pfile.Tfile();
+    os << _report.toStyledString() << std::endl;
+    os.flush();
+  }
+
   TFILE&      _tfile;   // Trace file
   TFILE&      _pfile;   // Perf file
   Json::Value _report;  // json data
@@ -105,7 +118,7 @@ void PERF::Taken(std::string driver, std::string phase, std::string pass) {
   Set_clock_start(curr);
 }
 
-void PERF::Print(std::ostream& os, bool rot) const { _data->Print(); }
+void PERF::Print(std::ostream& os, bool rot) const { _data->Print(os, rot); }
 
 void PERF::Print() const { Print(std::cout, true); }
 
