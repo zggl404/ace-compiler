@@ -1068,12 +1068,12 @@ private:
 
     boot_requested_ = Need_bts();
     if (boot_requested_) {
-      static constexpr int kBootNumCtSLevels = 3;
-      static constexpr int kBootNumStCLevels = 3;
+      FMT_ASSERT(profile.num_cts_levels > 0 && profile.num_stc_levels > 0,
+                 "CHEDDAR profile must provide positive CtS/StC levels");
       boot_context_ = BootContext::Create(
           *param_,
-          BootParameter(param_->max_level_, kBootNumCtSLevels,
-                        kBootNumStCLevels, 5, profile.eval_mod_mode));
+          BootParameter(param_->max_level_, profile.num_cts_levels,
+                        profile.num_stc_levels, 5, profile.eval_mod_mode));
       boot_context_->PrepareEvalMod();
       context_ = boot_context_;
     } else {
@@ -1122,14 +1122,15 @@ private:
         "mul_depth = %zu, _input_level = %zu, _first_mod_size = %zu, "
         "_scaling_mod_size = %zu, _num_q_parts = %zu, _num_rot_idx = %zu, "
         "cheddar_profile_scale = %d, cheddar_levels = %d, boot = %d, "
-        "rot_key_mode = %s, evalmod_mode = %s\n",
+        "rot_key_mode = %s, evalmod_mode = %s, cts = %d, stc = %d\n",
         prog_param->_provider, prog_param->_poly_degree, prog_param->_sec_level,
         prog_param->_mul_depth, prog_param->_input_level,
         prog_param->_first_mod_size, prog_param->_scaling_mod_size,
         prog_param->_num_q_parts, prog_param->_num_rot_idx, profile_scale_bits_,
         max_logical_level_, boot_requested_ ? 1 : 0,
         pow2_rotation_keys_ ? "pow2" : "full",
-        Evalmod_mode_name(profile.eval_mod_mode));
+        Evalmod_mode_name(profile.eval_mod_mode), profile.num_cts_levels,
+        profile.num_stc_levels);
   }
 
   const CheddarProfileSpec& Select_profile(int required_levels) const {
