@@ -52,7 +52,20 @@ using EvkMap = ::cheddar::EvkMap<Word>;
 using BootContext = ::cheddar::BootContext<Word>;
 using BootContextPtr = std::shared_ptr<BootContext>;
 using BootParameter = ::cheddar::BootParameter;
+using EvalModMode = ::cheddar::EvalModMode;
 using EvkRequest = ::cheddar::EvkRequest;
+
+const char* Evalmod_mode_name(EvalModMode mode) {
+  switch (mode) {
+    case EvalModMode::kLegacy:
+      return "legacy";
+    case EvalModMode::kLattigoArcSine:
+      return "lattigo_arcsine";
+    case EvalModMode::kRbootArcSine:
+      return "rboot_arcsine";
+  }
+  return "legacy";
+}
 
 class CHEDDAR_CONTEXT {
 public:
@@ -1060,7 +1073,7 @@ private:
       boot_context_ = BootContext::Create(
           *param_,
           BootParameter(param_->max_level_, kBootNumCtSLevels,
-                        kBootNumStCLevels));
+                        kBootNumStCLevels, 5, profile.eval_mod_mode));
       boot_context_->PrepareEvalMod();
       context_ = boot_context_;
     } else {
@@ -1109,13 +1122,14 @@ private:
         "mul_depth = %zu, _input_level = %zu, _first_mod_size = %zu, "
         "_scaling_mod_size = %zu, _num_q_parts = %zu, _num_rot_idx = %zu, "
         "cheddar_profile_scale = %d, cheddar_levels = %d, boot = %d, "
-        "rot_key_mode = %s\n",
+        "rot_key_mode = %s, evalmod_mode = %s\n",
         prog_param->_provider, prog_param->_poly_degree, prog_param->_sec_level,
         prog_param->_mul_depth, prog_param->_input_level,
         prog_param->_first_mod_size, prog_param->_scaling_mod_size,
         prog_param->_num_q_parts, prog_param->_num_rot_idx, profile_scale_bits_,
         max_logical_level_, boot_requested_ ? 1 : 0,
-        pow2_rotation_keys_ ? "pow2" : "full");
+        pow2_rotation_keys_ ? "pow2" : "full",
+        Evalmod_mode_name(profile.eval_mod_mode));
   }
 
   const CheddarProfileSpec& Select_profile(int required_levels) const {
