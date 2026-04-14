@@ -257,6 +257,25 @@ static void Ace_debug_app_relu(const char* node_name, const char* relu_api,
   }}
 }}
 
+static void Ace_debug_app_relu_pending(const char* node_name,
+                                       const char* relu_api,
+                                       const char* stmt_repr,
+                                       CIPHERTEXT* input_ct,
+                                       int32_t level_hint,
+                                       uint32_t mask_len,
+                                       int32_t relu_meta,
+                                       uint32_t dump_len) {{
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  printf(
+      "[DEBUG][APP_RELU][PENDING] node=%s api=%s stmt=%s mask_len=%u level_hint=%d relu_meta=%d dump_len=%u\\n",
+      node_name, relu_api, stmt_repr, mask_len, level_hint, relu_meta,
+      actual_dump_len);
+  if (input_ct != NULL) {{
+    Ace_debug_cipher_stage(node_name, "pending_input", input_ct, mask_len,
+                           actual_dump_len);
+  }}
+}}
+
 static void Ace_debug_app_relu_summary(void) {{
   printf("[DEBUG][APP_RELU] total_calls=%d\\n", g_ace_app_relu_debug_counter);
 }}
@@ -357,6 +376,16 @@ def instrument_app_relu_debug(inc_path, dump_len):
         relu_range = bootstrap_match.group("relu_range")
         indent = bootstrap_match.group("indent")
         input_var = bootstrap_match.group("input")
+        stmt_repr = (
+            f'Bootstrap_with_relu(&{result_var}, &{input_var}, '
+            f'{level_hint}, {mask_len}, {relu_range});'
+        ).replace("\\", "\\\\").replace('"', '\\"')
+        instrumented_lines.insert(
+            len(instrumented_lines) - 1,
+            f'{indent}Ace_debug_app_relu_pending("{node_name}", '
+            f'"Bootstrap_with_relu", "{stmt_repr}", '
+            f"&{input_var}, {level_hint}, {mask_len}, {relu_range}, {dump_len});\n",
+        )
         instrumented_lines.append(
             f'{indent}Ace_debug_app_relu("{node_name}", "Bootstrap_with_relu", '
             f"&{input_var}, &{result_var}, {level_hint}, {mask_len}, {relu_range}, {dump_len});\n"

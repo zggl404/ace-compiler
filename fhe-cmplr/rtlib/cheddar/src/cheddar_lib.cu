@@ -35,6 +35,7 @@
 using Word = uint32_t;
 #include "cheddar_param_profiles.inc"
 
+
 namespace {
 
 using CipherInner = fhe::rt::cheddar::CipherInner;
@@ -492,29 +493,27 @@ public:
   }
 
   void Bootstrap_with_relu(Ciphertext* res, const Ciphertext* op1, int level,
-                           int slot, double relu_value_range) {
-    (void)relu_value_range;
-    Run_bootstrap(res, op1, level, slot, false);
-    Ciphertext booted(*res);
-    int        output_level = Level_hint(&booted);
-    int        active_slots = Slots_hint(&booted);
+                         int slot, double relu_value_range) {
+  (void)relu_value_range;
 
-    std::vector<double> vec;
-    Decrypt(&booted, vec);
-    size_t active = std::min<size_t>(active_slots, vec.size());
-    if (active_slots > 0 && active_slots < full_slots_) {
-      double restore_factor =
-          static_cast<double>(full_slots_) / static_cast<double>(active_slots);
-      for (size_t idx = 0; idx < active; ++idx) {
-        vec[idx] *= restore_factor;
-      }
-    }
-    Apply_clear_relu(vec, active);
-
-    Ciphertext relu_ct;
-    Encrypt_double(&relu_ct, vec.data(), active, 1, output_level);
-    *res = std::move(relu_ct);
+  int requested_slots = slot;
+  if (requested_slots <= 0 || requested_slots >= full_slots_) {
+    requested_slots = full_slots_;
   }
+
+  if (requested_slots < full_slots_) {
+    Plaintext slot_mask;
+    Encode_double_mask(&slot_mask, 1.0, static_cast<size_t>(requested_slots),
+                       1, Level_hint(op1));
+    Ciphertext masked;
+    Mul(&masked, op1, &slot_mask);
+    Rescale(&masked,&masked);
+    Run_bootstrap(res, &masked, level, 0, true);
+    return;
+  }
+
+  Run_bootstrap(res, op1, level, 0, true);
+}
 
   void Rotate_add_reduce(Ciphertext* res, const Ciphertext* op,
                          uint32_t step_count, uint32_t rotate_self,
@@ -958,11 +957,11 @@ private:
       input.inner.SetNumSlots(requested_slots);
     }
 
-    while (Logical_level(input) > param_->default_encryption_level_) {
-      Ciphertext dropped;
-      Mod_switch(&dropped, &input);
-      input = std::move(dropped);
-    }
+    // while (Logical_level(input) > param_->default_encryption_level_) {
+    //   Ciphertext dropped;
+    //   Mod_switch(&dropped, &input);
+    //   input = std::move(dropped);
+    // }
 
     Ciphertext booted;
     if (use_slim_boot) {
@@ -1083,15 +1082,6 @@ private:
     pow2_rotation_keys_ = Use_pow2_rotation_keys();
     if (boot_requested_) {
       Ensure_bootstrap_slot(full_slots_);
-      if (full_slots_ >= 16384) {
-        Ensure_bootstrap_slot(16384);
-      }
-      if (full_slots_ >= 8192) {
-        Ensure_bootstrap_slot(8192);
-      }
-      if (full_slots_ >= 4096) {
-        Ensure_bootstrap_slot(4096);
-      }
     }
 
     std::unordered_set<int> prepared_rots;

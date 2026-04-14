@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -58,6 +59,12 @@ def parse_args(repo_root):
         action="append",
         default=[],
         help="Compile only the specified model key. Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="Repeat each model compile this many times and report the mean timing. Default: 1.",
     )
     parser.add_argument(
         "--backend",
@@ -197,14 +204,52 @@ def format_seconds(value):
     return f"{value:.6f}"
 
 
+def mean_or_none(values):
+    filtered = [value for value in values if value is not None]
+    if not filtered:
+        return None
+    return sum(filtered) / len(filtered)
+
+
+def aggregate_model_rows(model, rows, phase_order):
+    ok_rows = [row for row in rows if row["status"] == "ok"]
+    ok_count = len(ok_rows)
+    repeat = len(rows)
+    if ok_count == repeat:
+        status = "ok"
+    elif ok_count == 0:
+        status = f"failed(0/{repeat})"
+    else:
+        status = f"partial({ok_count}/{repeat})"
+
+    phase_map = {}
+    for phase in phase_order:
+        phase_map[phase] = mean_or_none(
+            row.get("phase_map", {}).get(phase) for row in ok_rows
+        )
+
+    return {
+        "model": model,
+        "status": status,
+        "repeat": repeat,
+        "ok_runs": ok_count,
+        "total_sec": mean_or_none(row.get("total_sec") for row in ok_rows),
+        "wall_sec": mean_or_none(row.get("wall_sec") for row in ok_rows),
+        "phase_map": phase_map,
+        "run_dir": rows[0].get("run_dir", "") if rows else "",
+    }
+
+
 def print_summary(rows, phase_order):
-    headers = ["model", "status", "total_sec", "wall_sec", *phase_order]
+    headers = ["model", "status", "repeat", "ok_runs", "total_sec", "wall_sec", *phase_order]
     widths = {header: len(header) for header in headers}
     formatted_rows = []
     for row in rows:
         formatted = {
             "model": row["model"],
             "status": row["status"],
+            "repeat": str(row.get("repeat", "")),
+            "ok_runs": str(row.get("ok_runs", "")),
             "total_sec": format_seconds(row.get("total_sec")),
             "wall_sec": format_seconds(row.get("wall_sec")),
         }
@@ -221,10 +266,12 @@ def print_summary(rows, phase_order):
         print(" | ".join(formatted[header].ljust(widths[header]) for header in headers))
 
 
-def write_summary_files(summary_dir, rows, phase_order):
+def write_summary_files(summary_dir, rows, raw_rows, phase_order):
     summary_json = summary_dir / "summary.json"
     summary_tsv = summary_dir / "summary.tsv"
     summary_txt = summary_dir / "summary.txt"
+    raw_json = summary_dir / "raw_runs.json"
+    raw_tsv = summary_dir / "raw_runs.tsv"
 
     summary_json.write_text(
         json.dumps(
@@ -238,7 +285,9 @@ def write_summary_files(summary_dir, rows, phase_order):
         + "\n"
     )
 
-    headers = ["model", "status", "total_sec", "wall_sec", *phase_order, "t_file"]
+    raw_json.write_text(json.dumps(raw_rows, indent=2) + "\n")
+
+    headers = ["model", "status", "repeat", "ok_runs", "total_sec", "wall_sec", *phase_order, "run_dir"]
     with summary_tsv.open("w") as f:
         f.write("\t".join(headers) + "\n")
         for row in rows:
@@ -246,15 +295,47 @@ def write_summary_files(summary_dir, rows, phase_order):
             values = [
                 row["model"],
                 row["status"],
+                str(row.get("repeat", "")),
+                str(row.get("ok_runs", "")),
+                format_seconds(row.get("total_sec")),
+                format_seconds(row.get("wall_sec")),
+                *[format_seconds(phase_map.get(phase)) for phase in phase_order],
+                row.get("run_dir", ""),
+            ]
+            f.write("\t".join(values) + "\n")
+
+    raw_headers = [
+        "model",
+        "run_index",
+        "status",
+        "total_sec",
+        "wall_sec",
+        *phase_order,
+        "t_file",
+        "json_file",
+        "stdout_file",
+        "stderr_file",
+    ]
+    with raw_tsv.open("w") as f:
+        f.write("\t".join(raw_headers) + "\n")
+        for row in raw_rows:
+            phase_map = row.get("phase_map", {})
+            values = [
+                row["model"],
+                str(row.get("run_index", "")),
+                row["status"],
                 format_seconds(row.get("total_sec")),
                 format_seconds(row.get("wall_sec")),
                 *[format_seconds(phase_map.get(phase)) for phase in phase_order],
                 row.get("t_file", ""),
+                row.get("json_file", ""),
+                row.get("stdout_file", ""),
+                row.get("stderr_file", ""),
             ]
             f.write("\t".join(values) + "\n")
 
     lines = []
-    headers_no_file = ["model", "status", "total_sec", "wall_sec", *phase_order]
+    headers_no_file = ["model", "status", "repeat", "ok_runs", "total_sec", "wall_sec", *phase_order]
     widths = {header: len(header) for header in headers_no_file}
     materialized = []
     for row in rows:
@@ -262,6 +343,8 @@ def write_summary_files(summary_dir, rows, phase_order):
         materialized_row = {
             "model": row["model"],
             "status": row["status"],
+            "repeat": str(row.get("repeat", "")),
+            "ok_runs": str(row.get("ok_runs", "")),
             "total_sec": format_seconds(row.get("total_sec")),
             "wall_sec": format_seconds(row.get("wall_sec")),
         }
@@ -281,6 +364,8 @@ def write_summary_files(summary_dir, rows, phase_order):
 def main():
     repo_root = resolve_repo_root(__file__)
     args = parse_args(repo_root)
+    if args.repeat <= 0:
+        raise SystemExit("--repeat must be > 0")
     repo_root = resolve_path(repo_root, args.root)
     compiler = resolve_path(repo_root, args.compiler)
     model_dir = resolve_path(repo_root, args.model_dir)
@@ -304,14 +389,17 @@ def main():
         raise SystemExit(f"Unknown model(s): {', '.join(missing)}")
 
     summary_rows = []
+    raw_rows = []
     phase_order = []
     exit_code = 0
+    stop_requested = False
 
     print(f"ACE root: {repo_root}")
     print(f"Compiler: {compiler}")
     print(f"Model dir: {model_dir}")
     print(f"Work dir: {work_dir}")
     print(f"Models: {', '.join(models)}")
+    print(f"Repeat: {args.repeat}")
 
     for model in models:
         model_args = argparse.Namespace(
@@ -339,64 +427,96 @@ def main():
         output_file = output_dir / f"{model}.onnx.inc"
         t_file = work_dir / f"{input_stem}.t"
         json_file = work_dir / f"{input_stem}.json"
-        stdout_file = stdout_dir / f"{model}.stdout.log"
-        stderr_file = stderr_dir / f"{model}.stderr.log"
-
-        if t_file.exists():
-            t_file.unlink()
-        if json_file.exists():
-            json_file.unlink()
+        run_dir = work_dir / "runs" / model
+        run_dir.mkdir(parents=True, exist_ok=True)
 
         compile_options = ace_compile.build_compile_options(model, model_args, str(repo_root))
         command = [str(compiler), *compile_options, str(input_file), "-o", str(output_file)]
         print(f"\n[{model}] command: {' '.join(command)}")
 
-        start = time.perf_counter()
-        completed = subprocess.run(
-            command,
-            cwd=str(work_dir),
-            capture_output=True,
-            text=True,
-        )
-        wall_sec = time.perf_counter() - start
-        stdout_file.write_text(completed.stdout)
-        stderr_file.write_text(completed.stderr)
+        model_rows = []
+        for run_index in range(1, args.repeat + 1):
+            if t_file.exists():
+                t_file.unlink()
+            if json_file.exists():
+                json_file.unlink()
 
-        phases = []
-        total_sec = None
-        if t_file.exists():
-            phases, total_sec = parse_timing_file(t_file)
-        phase_map = {item["phase"]: item["phase_time_sec"] for item in phases}
-        for phase in phase_map:
-            if phase not in phase_order:
-                phase_order.append(phase)
+            run_suffix = f".run_{run_index:03d}" if args.repeat > 1 else ""
+            stdout_file = stdout_dir / f"{model}{run_suffix}.stdout.log"
+            stderr_file = stderr_dir / f"{model}{run_suffix}.stderr.log"
+            archived_t_file = run_dir / f"run_{run_index:03d}.t"
+            archived_json_file = run_dir / f"run_{run_index:03d}.json"
 
-        status = "ok" if completed.returncode == 0 else f"failed({completed.returncode})"
-        row = {
-            "model": model,
-            "input_file": str(input_file),
-            "status": status,
-            "command": command,
-            "wall_sec": wall_sec,
-            "total_sec": total_sec,
-            "phase_map": phase_map,
-            "t_file": str(t_file) if t_file.exists() else "",
-            "stdout_file": str(stdout_file),
-            "stderr_file": str(stderr_file),
-        }
-        summary_rows.append(row)
+            print(f"[{model}] run {run_index}/{args.repeat}")
+            start = time.perf_counter()
+            completed = subprocess.run(
+                command,
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+            )
+            wall_sec = time.perf_counter() - start
+            stdout_file.write_text(completed.stdout)
+            stderr_file.write_text(completed.stderr)
 
-        if completed.returncode == 0:
-            print(f"[{model}] ok total_sec={format_seconds(total_sec)} wall_sec={format_seconds(wall_sec)}")
-        else:
-            print(f"[{model}] failed returncode={completed.returncode} wall_sec={format_seconds(wall_sec)}")
-            exit_code = completed.returncode
-            if args.fail_fast:
-                break
+            phases = []
+            total_sec = None
+            archived_t_path = ""
+            archived_json_path = ""
+            if t_file.exists():
+                phases, total_sec = parse_timing_file(t_file)
+                shutil.copy2(t_file, archived_t_file)
+                archived_t_path = str(archived_t_file)
+            if json_file.exists():
+                shutil.copy2(json_file, archived_json_file)
+                archived_json_path = str(archived_json_file)
+
+            phase_map = {item["phase"]: item["phase_time_sec"] for item in phases}
+            for phase in phase_map:
+                if phase not in phase_order:
+                    phase_order.append(phase)
+
+            status = "ok" if completed.returncode == 0 else f"failed({completed.returncode})"
+            row = {
+                "model": model,
+                "run_index": run_index,
+                "input_file": str(input_file),
+                "status": status,
+                "command": command,
+                "wall_sec": wall_sec,
+                "total_sec": total_sec,
+                "phase_map": phase_map,
+                "t_file": archived_t_path,
+                "json_file": archived_json_path,
+                "stdout_file": str(stdout_file),
+                "stderr_file": str(stderr_file),
+                "run_dir": str(run_dir),
+            }
+            raw_rows.append(row)
+            model_rows.append(row)
+
+            if completed.returncode == 0:
+                print(
+                    f"[{model}] run {run_index}/{args.repeat} ok "
+                    f"total_sec={format_seconds(total_sec)} wall_sec={format_seconds(wall_sec)}"
+                )
+            else:
+                print(
+                    f"[{model}] run {run_index}/{args.repeat} failed "
+                    f"returncode={completed.returncode} wall_sec={format_seconds(wall_sec)}"
+                )
+                exit_code = completed.returncode
+                if args.fail_fast:
+                    stop_requested = True
+                    break
+
+        summary_rows.append(aggregate_model_rows(model, model_rows, phase_order))
+        if stop_requested:
+            break
 
     print()
     print_summary(summary_rows, phase_order)
-    write_summary_files(work_dir, summary_rows, phase_order)
+    write_summary_files(work_dir, summary_rows, raw_rows, phase_order)
     print(f"\nSummary files written under: {work_dir}")
     return exit_code
 

@@ -1,0 +1,461 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+
+DEFAULT_MODELS = [
+    "resnet20_cifar10",
+    "resnet32_cifar10",
+    "resnet44_cifar10",
+    "resnet56_cifar10",
+    "resnet110_cifar10",
+]
+
+MODEL_CLASS_COUNT = {
+    "resnet20_cifar10": 10,
+    "resnet32_cifar10": 10,
+    "resnet44_cifar10": 10,
+    "resnet56_cifar10": 10,
+    "resnet110_cifar10": 10,
+}
+
+
+def resolve_repo_root(script_file):
+    return Path(script_file).resolve().parents[1]
+
+
+def build_default_work_dir(repo_root):
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    return repo_root / "logs" / "runtime_metrics" / timestamp
+
+
+def parse_args(repo_root):
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compile selected ResNet CIFAR10 models with ace_compile.py, run the "
+            "generated Cheddar binaries, and summarize runtime timing metrics."
+        )
+    )
+    parser.add_argument(
+        "--root",
+        default=str(repo_root),
+        help="ACE repository root. Defaults to the parent of this script.",
+    )
+    parser.add_argument(
+        "--work-dir",
+        default=None,
+        help="Directory used to store per-model logs and summary files.",
+    )
+    parser.add_argument(
+        "--model",
+        dest="models",
+        action="append",
+        default=[],
+        help="Run only the specified model. Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--icl",
+        type=int,
+        default=7,
+        help="Pass --icl=<value> to ace_compile.py. Default: 7.",
+    )
+    parser.add_argument(
+        "--bil",
+        type=int,
+        default=3,
+        help="Pass --bil <value> to ace_compile.py. Default: 3.",
+    )
+    parser.add_argument(
+        "--rot-key-mode",
+        default="pow2",
+        help="Set CHEDDAR_ROT_KEY_MODE for runtime. Default: pow2.",
+    )
+    parser.add_argument(
+        "--cifar10",
+        default="/root/cifar-10-batches-bin",
+        help="CIFAR-10 binary file or its parent directory. Default: /root/cifar-10-batches-bin.",
+    )
+    parser.add_argument(
+        "--index",
+        type=int,
+        default=0,
+        help="Start image index passed to the runtime driver. Default: 0.",
+    )
+    parser.add_argument(
+        "--num",
+        type=int,
+        default=1,
+        help="Number of images to run. Default: 1.",
+    )
+    parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Stop immediately when compile or run fails.",
+    )
+    return parser.parse_args()
+
+
+def parse_rtlib_timing_report(report_text):
+    entries = {}
+    if not report_text:
+        return entries
+
+    for raw_line in report_text.splitlines():
+        parts = raw_line.split("\t")
+        if len(parts) != 4:
+            continue
+
+        name = parts[0].strip()
+        count_text = parts[1].strip()
+        exclusive_ms_text = parts[2].strip()
+        avg_ms_text = parts[3].strip()
+        if not name or name == "RTLib functions" or count_text == "sub total":
+            continue
+        if not count_text.isdigit():
+            continue
+
+        entry = {"count": int(count_text)}
+        try:
+            entry["exclusive_ms"] = float(exclusive_ms_text)
+        except ValueError:
+            pass
+        try:
+            entry["avg_ms"] = float(avg_ms_text)
+        except ValueError:
+            pass
+        entries[name] = entry
+
+    return entries
+
+
+def format_float(value, digits=3):
+    if value is None:
+        return ""
+    return f"{value:.{digits}f}"
+
+
+def write_text(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def resolve_cifar10_input(path_value):
+    path = Path(path_value)
+    if path.is_dir():
+        candidate = path / "test_batch.bin"
+        if candidate.is_file():
+            return candidate
+    if path.is_file():
+        return path
+    raise FileNotFoundError(f"CIFAR-10 input not found: {path_value}")
+
+
+def run_command(command, cwd, env=None):
+    started = time.monotonic()
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    elapsed = time.monotonic() - started
+    return completed, elapsed
+
+
+def build_compile_command(model, args):
+    return [
+        sys.executable,
+        "scripts/ace_compile.py",
+        "--model",
+        model,
+        "--skip-link",
+        "--sm",
+        f"--icl={args.icl}",
+        "--bwr",
+        "--bil",
+        str(args.bil),
+    ]
+
+
+def build_driver_source(model, main_inc):
+    class_count = MODEL_CLASS_COUNT[model]
+    return """//-*-c-*-
+//=============================================================================
+//
+// Auto-generated by scripts/collect_resnet_runtime_metrics.py.
+// It reuses the shared CIFAR runtime main.
+//
+//=============================================================================
+
+#define CIFAR_CLASS_COUNT {class_count}
+#include "{main_inc}"
+#include "{model}_gpu.onnx.inc"
+""".format(
+        class_count=class_count,
+        main_inc=str(main_inc),
+        model=model,
+    )
+
+
+def create_driver_file(model, main_inc):
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"{model}_gpu_"))
+    driver_path = temp_dir / f"{model}_gpu.cu"
+    driver_path.write_text(build_driver_source(model, main_inc), encoding="utf-8")
+    return driver_path
+
+
+def build_target(repo_root, model, driver_file, output_file):
+    example_dir = output_file.parent
+    example_dir.mkdir(parents=True, exist_ok=True)
+    synced_driver = example_dir / driver_file.name
+    shutil.copy2(driver_file, synced_driver)
+
+    build_dir = repo_root / "release" / "rtlib" / "build"
+    command = [
+        "cmake",
+        "--build",
+        str(build_dir),
+        "--target",
+        f"{model}_gpu",
+        "--",
+        "-j",
+    ]
+    return run_command(command, cwd=repo_root)
+
+
+def build_run_command(model, cifar10_input, index, num):
+    end = index + num - 1
+    return [
+        f"./release/rtlib/build/example/{model}_gpu",
+        str(cifar10_input),
+        str(index),
+        str(end),
+    ]
+
+
+def summarize_row(model, compile_rc, compile_wall_sec, run_rc, run_wall_sec, timing):
+    main_graph = timing.get("MAIN_GRAPH", {})
+    bootstrap = timing.get("FHE_BOOTSTRAP", {})
+    rescale = timing.get("FHE_RESCALE", {})
+    return {
+        "model": model,
+        "compile_returncode": compile_rc,
+        "compile_wall_sec": compile_wall_sec,
+        "run_returncode": run_rc,
+        "run_wall_sec": run_wall_sec,
+        "main_graph_ms": main_graph.get("exclusive_ms"),
+        "main_graph_count": main_graph.get("count"),
+        "bootstrap_count": bootstrap.get("count"),
+        "bootstrap_ms": bootstrap.get("exclusive_ms"),
+        "rescale_count": rescale.get("count"),
+        "rescale_ms": rescale.get("exclusive_ms"),
+    }
+
+
+def print_summary(rows):
+    headers = [
+        "model",
+        "compile_rc",
+        "compile_sec",
+        "run_rc",
+        "run_sec",
+        "main_graph_ms",
+        "bootstrap_count",
+        "bootstrap_ms",
+        "rescale_count",
+        "rescale_ms",
+    ]
+    formatted_rows = []
+    widths = {header: len(header) for header in headers}
+
+    for row in rows:
+        formatted = {
+            "model": row["model"],
+            "compile_rc": str(row["compile_returncode"]),
+            "compile_sec": format_float(row["compile_wall_sec"]),
+            "run_rc": str(row["run_returncode"]),
+            "run_sec": format_float(row["run_wall_sec"]),
+            "main_graph_ms": format_float(row.get("main_graph_ms")),
+            "bootstrap_count": "" if row.get("bootstrap_count") is None else str(row["bootstrap_count"]),
+            "bootstrap_ms": format_float(row.get("bootstrap_ms")),
+            "rescale_count": "" if row.get("rescale_count") is None else str(row["rescale_count"]),
+            "rescale_ms": format_float(row.get("rescale_ms")),
+        }
+        for key, value in formatted.items():
+            widths[key] = max(widths[key], len(value))
+        formatted_rows.append(formatted)
+
+    print(" | ".join(header.ljust(widths[header]) for header in headers))
+    print("-+-".join("-" * widths[header] for header in headers))
+    for row in formatted_rows:
+        print(" | ".join(row[header].ljust(widths[header]) for header in headers))
+
+
+def write_summary_files(work_dir, rows):
+    json_path = work_dir / "summary.json"
+    tsv_path = work_dir / "summary.tsv"
+    txt_path = work_dir / "summary.txt"
+
+    json_path.write_text(json.dumps({"rows": rows}, indent=2) + "\n", encoding="utf-8")
+
+    headers = [
+        "model",
+        "compile_returncode",
+        "compile_wall_sec",
+        "run_returncode",
+        "run_wall_sec",
+        "main_graph_ms",
+        "main_graph_count",
+        "bootstrap_count",
+        "bootstrap_ms",
+        "rescale_count",
+        "rescale_ms",
+    ]
+    with tsv_path.open("w", encoding="utf-8") as handle:
+        handle.write("\t".join(headers) + "\n")
+        for row in rows:
+            handle.write(
+                "\t".join(
+                    [
+                        row["model"],
+                        str(row["compile_returncode"]),
+                        format_float(row["compile_wall_sec"], 6),
+                        str(row["run_returncode"]),
+                        format_float(row["run_wall_sec"], 6),
+                        format_float(row.get("main_graph_ms"), 6),
+                        "" if row.get("main_graph_count") is None else str(row["main_graph_count"]),
+                        "" if row.get("bootstrap_count") is None else str(row["bootstrap_count"]),
+                        format_float(row.get("bootstrap_ms"), 6),
+                        "" if row.get("rescale_count") is None else str(row["rescale_count"]),
+                        format_float(row.get("rescale_ms"), 6),
+                    ]
+                )
+                + "\n"
+            )
+
+    lines = []
+    for row in rows:
+        lines.append(
+            f"{row['model']}: compile_rc={row['compile_returncode']}, "
+            f"compile_sec={format_float(row['compile_wall_sec'])}, "
+            f"run_rc={row['run_returncode']}, run_sec={format_float(row['run_wall_sec'])}, "
+            f"main_graph_ms={format_float(row.get('main_graph_ms'))}, "
+            f"bootstrap_count={row.get('bootstrap_count', '')}, "
+            f"bootstrap_ms={format_float(row.get('bootstrap_ms'))}, "
+            f"rescale_count={row.get('rescale_count', '')}, "
+            f"rescale_ms={format_float(row.get('rescale_ms'))}"
+        )
+    txt_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def main():
+    repo_root = resolve_repo_root(__file__)
+    args = parse_args(repo_root)
+    repo_root = Path(args.root).resolve()
+    work_dir = Path(args.work_dir).resolve() if args.work_dir else build_default_work_dir(repo_root)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    cifar10_input = resolve_cifar10_input(args.cifar10)
+    main_inc = repo_root / "fhe-cmplr" / "rtlib" / "phantom" / "example" / "resnet_cifar.main.inc"
+
+    models = args.models or list(DEFAULT_MODELS)
+    rows = []
+
+    for model in models:
+        print(f"[RUN] model={model}")
+        model_dir = work_dir / model
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        compile_command = build_compile_command(model, args)
+        compile_result, compile_wall_sec = run_command(compile_command, cwd=repo_root)
+        write_text(model_dir / "compile.stdout.log", compile_result.stdout)
+        write_text(model_dir / "compile.stderr.log", compile_result.stderr)
+
+        run_rc = -1
+        run_wall_sec = None
+        timing = {}
+        build_rc = -1
+        build_wall_sec = None
+        driver_file = None
+
+        if compile_result.returncode == 0:
+            driver_file = create_driver_file(model, main_inc)
+            output_file = repo_root / "fhe-cmplr" / "rtlib" / "cheddar" / "example" / f"{model}_gpu.onnx.inc"
+            build_result, build_wall_sec = build_target(
+                repo_root, model, driver_file, output_file
+            )
+            write_text(model_dir / "build.stdout.log", build_result.stdout)
+            write_text(model_dir / "build.stderr.log", build_result.stderr)
+            build_rc = build_result.returncode
+
+            if build_result.returncode == 0:
+                run_env = os.environ.copy()
+                run_env["CHEDDAR_ROT_KEY_MODE"] = args.rot_key_mode
+                run_env["RTLIB_TIMING_OUTPUT"] = "stdout"
+
+                run_command_list = build_run_command(model, cifar10_input, args.index, args.num)
+                run_result, run_wall_sec = run_command(run_command_list, cwd=repo_root, env=run_env)
+                write_text(model_dir / "run.stdout.log", run_result.stdout)
+                write_text(model_dir / "run.stderr.log", run_result.stderr)
+                run_rc = run_result.returncode
+                timing = parse_rtlib_timing_report(run_result.stdout)
+            if args.fail_fast and (build_rc != 0 or run_rc != 0):
+                rows.append(
+                    summarize_row(
+                        model,
+                        compile_result.returncode,
+                        compile_wall_sec,
+                        run_rc,
+                        run_wall_sec,
+                        timing,
+                    )
+                )
+                break
+        elif args.fail_fast:
+            rows.append(
+                summarize_row(
+                    model,
+                    compile_result.returncode,
+                    compile_wall_sec,
+                    run_rc,
+                    run_wall_sec,
+                    timing,
+                )
+            )
+            break
+
+        rows.append(
+            summarize_row(
+                model,
+                compile_result.returncode,
+                compile_wall_sec,
+                run_rc,
+                run_wall_sec,
+                timing,
+            )
+        )
+        if build_wall_sec is not None:
+            rows[-1]["build_returncode"] = build_rc
+            rows[-1]["build_wall_sec"] = build_wall_sec
+        if driver_file is not None:
+            try:
+                driver_file.unlink(missing_ok=True)
+                driver_file.parent.rmdir()
+            except OSError:
+                pass
+
+    print_summary(rows)
+    write_summary_files(work_dir, rows)
+    print(f"\nSummary directory: {work_dir}")
+
+
+if __name__ == "__main__":
+    main()
