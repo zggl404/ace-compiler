@@ -118,8 +118,7 @@ Notes:
 - `cheddar` enables the CUDA/CHEDDAR build path and also requires CUDA arch setting.
   - Pass CUDA arch as the 3rd argument (for example: `80`, `86`, `89`, `90`), or set `CMAKE_CUDA_ARCHITECTURES`.
   - The script auto-detects `nvcc`; you can also set `CUDACXX=/path/to/nvcc` manually.
-  - By default the runtime looks for a local checkout in `<repo>/backend/cheddar-fhe`.
-  - If that local checkout is missing, CMake automatically clones `https://github.com/zggl404/cheddar-fhe.git`.
+  - By default CMake automatically clones `https://github.com/zggl404/cheddar-fhe.git`.
   - You can override that with:
     - `RTLIB_CHEDDAR_SOURCE_DIR` (local CHEDDAR source tree), or
     - `RTLIB_CHEDDAR_REPO_URL` (an accessible git URL mirror).

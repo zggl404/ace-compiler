@@ -5,23 +5,36 @@
 #
 #=============================================================================
 
+function(_validate_cheddar_source_dir source_dir result_var)
+  set(is_valid FALSE)
+  if(IS_DIRECTORY "${source_dir}" AND EXISTS "${source_dir}/CMakeLists.txt")
+    set(is_valid TRUE)
+  endif()
+  set(${result_var} ${is_valid} PARENT_SCOPE)
+endfunction()
+
 function(build_external_cheddar)
   if(TARGET cheddar)
     set(CHEDDAR_TARGET cheddar PARENT_SCOPE)
     return()
   endif()
 
-  set(CHEDDAR_DEFAULT_SOURCE_DIR "${PROJECT_SOURCE_DIR}/../../backend/cheddar-fhe")
   set(CHEDDAR_URL "https://github.com/zggl404/cheddar-fhe.git")
   set(CHEDDAR_URL_SSH "git@github.com:zggl404/cheddar-fhe.git")
   set(CHEDDAR_GIT_TAG "main")
 
   if(DEFINED ENV{RTLIB_CHEDDAR_SOURCE_DIR} AND
-     IS_DIRECTORY "$ENV{RTLIB_CHEDDAR_SOURCE_DIR}")
+     NOT "$ENV{RTLIB_CHEDDAR_SOURCE_DIR}" STREQUAL "")
+    _validate_cheddar_source_dir("$ENV{RTLIB_CHEDDAR_SOURCE_DIR}" cheddar_env_source_valid)
+    if(NOT cheddar_env_source_valid)
+      message(FATAL_ERROR
+        "RTLIB_CHEDDAR_SOURCE_DIR does not point to a valid CHEDDAR source tree: "
+        "$ENV{RTLIB_CHEDDAR_SOURCE_DIR}")
+    endif()
     set(CHEDDAR_SOURCE_DIR "$ENV{RTLIB_CHEDDAR_SOURCE_DIR}")
-  elseif(IS_DIRECTORY "${CHEDDAR_DEFAULT_SOURCE_DIR}")
-    set(CHEDDAR_SOURCE_DIR "${CHEDDAR_DEFAULT_SOURCE_DIR}")
-  else()
+  endif()
+
+  if(NOT DEFINED CHEDDAR_SOURCE_DIR)
     include(FetchContent)
 
     if(EXTERNAL_URL_SSH)
