@@ -1,96 +1,59 @@
-# Introduction
+# ACE + Cheddar：H20 构建
 
-<b>ANT-ACE</b> is a Fully Homomorphic Encryption (FHE) Compiler Framework designed for automating Neural Network (NN) Inference. ANT-ACE accepts a pre-trained ONNX model as input and directly generates C/C++ programs to perform NN inference on encrypted data.
+需要 Git、Docker 和网络连接。获取代码：
 
-FHE represents a revolutionary cryptographic technology that enables direct computations on encrypted data without the need for decryption. This powerful technique allows for the manipulation of sensitive data while ensuring that the computing party remains unaware of the actual information, yet still produces valuable encrypted output.
-
-<div align="center"><i>Decrypt(Homo_Add(Encrypt(a), Encrypt(b))) == Add(a, b)</i></div>
-<div align="center"><i>Decrypt(Homo_Mult(Encrypt(a), Encrypt(b))) == Mult(a, b)</i></div>
-
-ANT-ACE is tailored for Privacy-Preserving Machine Learning (PPML) Inference Applications. In this setup, ML inference operates in the cloud, enabling clients to upload their data and receive inference results. Typically, ML inference services transfer both data and results in plaintext, risking exposure to privacy breaches. Although traditional symmetric encryption secures data during transmission, it does not prevent privacy leaks within the cloud infrastructure. There is a risk that service providers might access the data, either inadvertently or with malicious intent. However, using homomorphic encryption allows ML inference to be performed directly on encrypted user data. This method ensures that sensitive user data is shielded from unauthorized access at all stages of the cloud-based inference process.
-
-<p align="center"><img src="scripts/ace-ppml.png" width="40%"></p>
-
-ANT-ACE takes a pre-trained ML model as input and compiles it into an FHE program directly for both the server side and client side. This makes ANT-ACE easily integrable into any existing ML framework, such as ONNX, PyTorch, TensorFlow, and others. In this way, the development of FHE applications is greatly simplified. As a result, developers won't need to understand the sophisticated mathematical foundations behind FHE, grasp the intricacies of effectively using FHE libraries, or manually manage trade-offs between correctness, security, and performance involving security parameter selection and complex optimizations regarding homomorphic operations such as noise and scale management. This significantly simplifies the development process for FHE applications.
-
-<p align="center"><img src="scripts/ace-ml-integ.png" width="80%"></p>
-
-Currently, ANT-ACE is designed with a compiler infrastructure that supports five levels of abstraction (i.e., five IRs) to compile pre-trained ML models operating on multi-dimensional tensors into low-level polynomial operations. These five phases successively translate pre-trained models into C/C++ programs by automatically performing various analyses and optimizations to make trade-offs between correctness, security, and performance.
-
-<p align="center"><img src="scripts/ace-arch.png" width="90%"></p>
-
-
-The ANT-ACE compiler framework marks an initial step in our FHE compiler technology research. We have developed fundamental capabilities for an FHE compiler focused on privacy-preserving machine learning inference, showcased through multiple abstraction levels that automate ONNX model inference using CKKS-encrypted data on CPUs. Future extensions of ANT-ACE will support various input formats and FHE schemes across different computing architectures, including GPUs, enhanced by contributions from open-source communities.
-</div>
-</div>
-
-# Repository Overview
-- **air-infra:** Contains the base components of the ACE compiler.
-- **fhe-cmplr:** Houses FHE-related components of the ACE compiler.
-- **FHE-MP-CNN:** Directory with EXPERT-implemented source code.
-- **model:** Stores pre-trained ONNX models.
-- **nn-addon:** Includes ONNX-related components for the ACE compiler.
-- **scripts:** Scripts for building and running ACE and EXPERT tests.
-- **README.md:** This README file.
-- **Dockerfile:** File used to build the Docker image.
-- **requirements.txt:** Specifies Python package requirements.
-
-# Build ANT-ACE Compiler
-
-## 1. Preparing a Docker environment to Build and Test the ANT-ACE Compiler
-
-It's recommended to use a Docker environment to Build and Test the ANT-ACE Compiler. We provide the [*Dockerfile*](https://github.com/ant-research/ace-compiler/blob/main/Dockerfile) to build the Docker image. The docker image is based on Ubuntu 20.04. You may set up your own environment on other Linux platforms with necessary Linux and Python packages listed in [*Dockerfile*](https://github.com/ant-research/ace-compiler/blob/main/Dockerfile) and [*requirements.txt*](https://github.com/ant-research/ace-compiler/blob/main/requirements.txt). We recommended to pull the pre-built docker image (opencc/ace:latest) from Docker Hub:
-
-```
-mkdir ace-compiler && cd ace-compiler
-docker pull opencc/ace:latest
-docker run -it --name ace -v "$(pwd)":/app --privileged opencc/ace:latest bash
-```
-A local directory `ace-compiler` is created and mounted in the docker container. The container will launch and automatically enters the `/app` directory:
-```
-root@xxxxxx:/app#
-```
-Alternatively, if you encounter issues pulling the pre-built image, you can build the image from the [*Dockerfile*](https://github.com/ace-compiler/ace-compiler/blob/main/Dockerfile):
-```
-git clone https://github.com/ace-compiler/ace-compiler.git
-cd ace-compiler
-docker build -t ace:latest .
-docker run -it --name ace -v "$(pwd)":/app --privileged ace:latest bash
+```bash
+git clone --single-branch --branch ace_cheddar git@github.com:zggl404/ace-compiler.git ace_cheddar
+cd ace_cheddar
 ```
 
-## 2. Building the ACE Compiler
-To build the ACE compiler, navigate to the `/app` directory within the container and run:
-```
-/app/scripts/build_cmplr.sh Release
-```
-Upon successful completion, you will see:
-```
-Info: build project succeeded. FHE compiler executable can be found in /app/ace_cmplr/bin/fhe_cmplr
-root@xxxxxx:/app#
-```
-The ACE compiler will be built under `/app/release` and installed in the `/app/ace_cmplr` directory.
+## 1. 构建镜像
 
-For debug purpose, run
-```
-/app/scripts/build_cmplr.sh Debug
-```
-The ACE compiler will be built under `/app/debug`.
+在 `ace_cheddar/` 目录执行：
 
-## 3. Building and run ResNet20-CIFAR model
-To build the ResNet20-CIFAR model, navigate to the `/app/release` directory within the container and run:
-```
-cd /app/release
-/app/scripts/build_resnet20_cifar10.sh test
-```
-'test' is just a configuration name and can be replaced by any other string. Upon successful completion, you will see:
-```
-[INFO]: build resnet20_cifar10 succeeded.
-root@xxxxxx:/app/release#
+```bash
+docker build --platform linux/amd64 --build-arg BUILD_JOBS=4 -t ace-cheddar:h20 .
 ```
 
-To run this model with first 10 images in CIFAR-10 dataset, run:
-```
-./dataset/resnet20_cifar10.test test_batch.bin 0 9
-```
-where 'test_batch.bin' is the path to CIFAR-10 data file, 0 and 9 is the index of start and end image. 
+构建会自动复制源码和测试集，安装依赖并编译 ACE 与 Cheddar。
+默认使用 32 位 Cheddar，CUDA 目标为 H20 的 `sm_90`。
 
+需要 64 位时改用：
+
+```bash
+docker build --platform linux/amd64 --build-arg BUILD_JOBS=4 \
+  --build-arg CHEDDAR_WORD_BITS=64 -t ace-cheddar:h20-64 .
+```
+
+## 2. 编译 ResNet20
+
+进入容器；64 位构建将镜像名改为 `ace-cheddar:h20-64`：
+
+```bash
+docker run --rm --platform linux/amd64 -it ace-cheddar:h20
+```
+
+在容器内执行：
+
+```bash
+python3 scripts/ace_resnet_cifar10_infer.py \
+  --compiler release/driver/fhe_cmplr \
+  --build-dir release \
+  --backend cheddar \
+  --cheddar-word-bits "$CHEDDAR_WORD_BITS" \
+  --model resnet20 \
+  --ckks=-CKKS:q0=60:sf=50:N=65536:bes=55:bnl=19:bmr=10 \
+  --vec=-VEC:conv_parl:ssf \
+  --sbm --rot-key-mode full --omp-threads 8 \
+  --cifar10 /app/cifar/test_batch.bin \
+  --num 1 --skip-run
+```
+
+`--skip-run` 只生成代码、编译和链接，不执行推理。生成的可执行文件为：
+
+```text
+/app/ace-compiler/release/rtlib/build/example/resnet20_cifar10_gpu
+```
+
+编译其他模型时，将 `--model resnet20` 改为 `resnet32`、`resnet44`、
+`resnet56` 或 `resnet110`。仅 SSF 配置需删除 `--sbm`，并将 `bnl=19` 改为 `bnl=21`。

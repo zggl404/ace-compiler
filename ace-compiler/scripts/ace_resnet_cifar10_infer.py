@@ -1,0 +1,1685 @@
+#!/usr/bin/env python3
+#
+# Copyright (c) Ant Group Co., Ltd
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+import argparse
+import json
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import ace_compile
+
+
+SUPPORTED_RESNET_MODELS = [
+    "resnet20_cifar10",
+    "resnet32_cifar10",
+    "resnet32_cifar100",
+    "resnet44_cifar10",
+    "resnet56_cifar10",
+    "resnet110_cifar10",
+]
+
+MODEL_RUNTIME_CONFIG = {
+    "resnet20_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet32_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet32_cifar100": {"class_count": 100, "dataset": "cifar100"},
+    "resnet44_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet56_cifar10": {"class_count": 10, "dataset": "cifar10"},
+    "resnet110_cifar10": {"class_count": 10, "dataset": "cifar10"},
+}
+
+MODEL_ALIASES = {
+    "20": "resnet20_cifar10",
+    "32": "resnet32_cifar10",
+    "32_100": "resnet32_cifar100",
+    "32_cifar100": "resnet32_cifar100",
+    "32-cifar100": "resnet32_cifar100",
+    "32c100": "resnet32_cifar100",
+    "44": "resnet44_cifar10",
+    "56": "resnet56_cifar10",
+    "110": "resnet110_cifar10",
+    "resnet20": "resnet20_cifar10",
+    "resnet32": "resnet32_cifar10",
+    "resnet32_100": "resnet32_cifar100",
+    "resnet32-cifar100": "resnet32_cifar100",
+    "resnet32c100": "resnet32_cifar100",
+    "cifar100": "resnet32_cifar100",
+    "resnet44": "resnet44_cifar10",
+    "resnet56": "resnet56_cifar10",
+    "resnet110": "resnet110_cifar10",
+}
+
+DEFAULT_MAIN_INC = os.path.join(
+    "fhe-cmplr", "rtlib", "phantom", "example", "resnet_cifar.main.inc"
+)
+DEFAULT_CIFAR10 = "cifar-10-batches-bin"
+DEFAULT_CIFAR100 = "cifar-100-binary"
+DEFAULT_ROT_KEY_MODE = "pow2"
+DEFAULT_ENCODE_MODE = "ondemand"
+DEFAULT_PRE_ENCODE_COUNT = 64
+DEFAULT_TOP_TIMING_COUNT = 5
+DEFAULT_APP_RELU_DEBUG_DUMP_LEN = 8
+
+APP_RELU_DEBUG_HELPER_MARKER = "ACE_APP_RELU_DEBUG_HELPER"
+MAIN_GRAPH_ANCHOR = "bool Main_graph() {\n"
+APP_RELU_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)(?P<result>\w+)\s*=\s*"
+    r"(?P<variant>App_relu(?:_\d+)?)\("
+    r"(?P<lhs>[^,]+),\s*(?P<rhs>[^,]+),\s*(?P<mask_len>\d+)\);\s*$"
+)
+BOOTSTRAP_WITH_RELU_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)Bootstrap_with_relu\(\s*&(?P<result>\w+),\s*&(?P<input>\w+),\s*"
+    r"(?P<level>\d+),\s*(?P<mask_len>\d+),\s*(?P<relu_range>\d+)\);\s*$"
+)
+BOOTSTRAP_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)Bootstrap\(\s*&(?P<result>\w+),\s*&(?P<input>\w+),\s*"
+    r"(?P<level>\d+),\s*(?P<slot>\d+)\);\s*$"
+)
+ADD_CIPH_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)Add_ciph\(\s*&(?P<result>\w+),\s*&(?P<lhs>\w+),\s*"
+    r"&(?P<rhs>\w+)\);\s*$"
+)
+COPY_CIPH_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)Copy_ciph\(\s*&(?P<result>\w+),\s*&(?P<input>\w+)\);\s*$"
+)
+RESCALE_CIPH_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)Rescale_ciph\(\s*&(?P<result>\w+),\s*&(?P<input>\w+)\);\s*$"
+)
+ADD_PLAIN_CALL_PATTERN = re.compile(
+    r"^(?P<indent>\s*)Add_plain\(\s*&(?P<result>\w+),\s*&(?P<input>\w+),\s*"
+    r"&(?P<plain>\w+)\);\s*$"
+)
+APP_RELU_NODE_PATTERN = re.compile(r"^\s*//\s*(?P<node>/.+/Relu)\s*$")
+GRAPH_NODE_PATTERN = re.compile(r"^\s*//\s*(?P<node>/.*)\s*$")
+
+
+def get_default_link_dir(backend):
+    return os.path.join("fhe-cmplr", "rtlib", backend, "example")
+
+
+def normalize_model_name(model):
+    normalized = MODEL_ALIASES.get(model, model)
+    if normalized not in SUPPORTED_RESNET_MODELS:
+        raise ValueError(
+            "Unsupported model '{}'. Available models: {}".format(
+                model, ", ".join(SUPPORTED_RESNET_MODELS)
+            )
+        )
+    return normalized
+
+
+def normalize_models(models):
+    if not models:
+        return list(SUPPORTED_RESNET_MODELS)
+
+    normalized = []
+    seen = set()
+    for model in models:
+        resolved = normalize_model_name(model)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        normalized.append(resolved)
+    return normalized
+
+
+def resolve_cifar_input(dataset_arg, repo_root, dataset):
+    resolved = ace_compile.resolve_path(dataset_arg, repo_root)
+    if os.path.isfile(resolved):
+        return resolved
+
+    if os.path.isdir(resolved):
+        candidates = {
+            "cifar10": ("test_batch.bin", "test.bin"),
+            "cifar100": ("test.bin", "test_batch.bin"),
+        }[dataset]
+        for candidate_name in candidates:
+            candidate = os.path.join(resolved, candidate_name)
+            if os.path.isfile(candidate):
+                return candidate
+        raise FileNotFoundError(
+            "{} directory does not contain {}: {}".format(
+                dataset,
+                " or ".join(candidates),
+                resolved,
+            )
+        )
+
+    raise FileNotFoundError(
+        "{} input not found: {}. Pass the binary test file or its parent directory.".format(
+            dataset, resolved
+        )
+    )
+
+
+def get_model_class_count(model):
+    return MODEL_RUNTIME_CONFIG[model]["class_count"]
+
+
+def get_model_dataset(model):
+    return MODEL_RUNTIME_CONFIG[model]["dataset"]
+
+
+def build_driver_source(model, main_inc, class_count):
+    main_inc = os.path.abspath(main_inc)
+    return """//-*-c-*-
+//=============================================================================
+//
+// Auto-generated by scripts/ace_resnet_cifar10_infer.py.
+// It reuses the shared CIFAR-10 runtime main from the Phantom example.
+//
+//=============================================================================
+
+#define CIFAR_CLASS_COUNT {class_count}
+#include "{main_inc}"
+#include "{model}_gpu.onnx.inc"
+""".format(main_inc=main_inc, model=model, class_count=class_count)
+
+
+def create_driver_file(model, main_inc):
+    temp_dir = tempfile.mkdtemp(prefix=f"{model}_gpu_")
+    driver_path = os.path.join(temp_dir, f"{model}_gpu.cu")
+    class_count = get_model_class_count(model)
+    with open(driver_path, "w") as handle:
+        handle.write(build_driver_source(model, main_inc, class_count))
+    return driver_path
+
+
+def build_target(build_script, build_dir, driver_file, output_file, model):
+    env = os.environ.copy()
+    if build_dir:
+        env["ACE_BUILD_DIR"] = build_dir
+
+    command = [build_script, driver_file, output_file]
+    return ace_compile.run_command(command, f"Build target {model}", env=env)
+
+
+def find_example_executable(build_dir, model):
+    exe_name = f"{model}_gpu"
+    candidates = [
+        os.path.join(build_dir, "example", exe_name),
+        os.path.join(build_dir, "rtlib", "build", "example", exe_name),
+    ]
+    for candidate in candidates:
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+
+    for root, _, files in os.walk(build_dir):
+        if exe_name not in files:
+            continue
+        if "example" not in root.split(os.sep):
+            continue
+        candidate = os.path.join(root, exe_name)
+        if os.access(candidate, os.X_OK):
+            return candidate
+
+    raise FileNotFoundError(
+        "Built executable not found for {} under {}".format(model, build_dir)
+    )
+
+
+def build_app_relu_debug_helper():
+    return """// {marker}
+static int32_t g_ace_app_relu_debug_counter = 0;
+static int32_t g_ace_bootstrap_debug_counter = 0;
+
+static void Ace_reset_app_relu_debug_counter(void) {{
+  g_ace_app_relu_debug_counter = 0;
+  g_ace_bootstrap_debug_counter = 0;
+}}
+
+static void Ace_debug_cipher_stage(const char* node_name, const char* stage_name,
+                                   CIPHERTEXT* ct, uint32_t mask_len,
+                                   uint32_t dump_len) {{
+  char     label[512];
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  snprintf(label, sizeof(label), "%s/%s", node_name, stage_name);
+  Dump_cipher_msg(label, ct, actual_dump_len);
+}}
+
+static void Ace_debug_cipher_edges(const char* node_name,
+                                   const char* stage_name, CIPHERTEXT* ct,
+                                   uint32_t mask_len, uint32_t dump_len) {{
+  uint32_t actual_mask_len = mask_len > 0 ? mask_len : Exact_slots(ct);
+  uint32_t actual_dump_len =
+      dump_len < actual_mask_len ? dump_len : actual_mask_len;
+  uint32_t last_start = actual_mask_len > actual_dump_len
+                            ? actual_mask_len - actual_dump_len
+                            : 0;
+  double* msg = Get_msg(ct);
+  printf("[%s/%s/first_%u]: [", node_name, stage_name, actual_dump_len);
+  for (uint32_t idx = 0; idx < actual_dump_len; ++idx) {{
+    if (idx > 0) {{
+      printf(", ");
+    }}
+    printf("%.10g", msg[idx]);
+  }}
+  printf("]\\n");
+
+  printf("[%s/%s/last_%u]: [", node_name, stage_name, actual_dump_len);
+  for (uint32_t idx = last_start; idx < actual_mask_len; ++idx) {{
+    if (idx > last_start) {{
+      printf(", ");
+    }}
+    printf("%.10g", msg[idx]);
+  }}
+  printf("]\\n");
+  free(msg);
+}}
+
+static void Ace_debug_plain_relu(const char* node_name, CIPHERTEXT* output_ct,
+                                 uint32_t mask_len, uint32_t dump_len) {{
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  double* plain_vals = Get_msg(output_ct);
+  printf("[%s/plain_relu]: [", node_name);
+  for (uint32_t idx = 0; idx < actual_dump_len; ++idx) {{
+    double relu_val = plain_vals[idx] > 0.0 ? plain_vals[idx] : 0.0;
+    if (idx > 0) {{
+      printf(", ");
+    }}
+    printf("%.6g", relu_val);
+  }}
+  printf("]\\n");
+  free(plain_vals);
+}}
+
+static void Ace_debug_app_relu(const char* node_name, const char* relu_api,
+                               CIPHERTEXT* input_ct, CIPHERTEXT* output_ct,
+                               int32_t level_hint, uint32_t mask_len,
+                               int32_t relu_meta, uint32_t dump_len) {{
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  ++g_ace_app_relu_debug_counter;
+  printf(
+      "[DEBUG][APP_RELU][%d] node=%s api=%s mask_len=%u level=%d level_hint=%d relu_meta=%d dump_len=%u\\n",
+      g_ace_app_relu_debug_counter, node_name, relu_api, mask_len,
+      (int)Level(output_ct), level_hint, relu_meta, actual_dump_len);
+  if (relu_api != NULL && relu_api[0] == 'B') {{
+    Ace_debug_cipher_edges(node_name, "after_bootstrap_relu", output_ct,
+                           mask_len, actual_dump_len);
+  }} else if (input_ct != NULL) {{
+    Ace_debug_cipher_edges(node_name, "before_scale", input_ct, mask_len,
+                           actual_dump_len);
+    Ace_debug_cipher_edges(node_name, "after_relu", output_ct, mask_len,
+                           actual_dump_len);
+  }} else {{
+    Ace_debug_cipher_edges(node_name, "after_relu", output_ct, mask_len,
+                           actual_dump_len);
+  }}
+  if (relu_api != NULL && relu_api[0] != 'B' && level_hint >= 0 &&
+      relu_meta >= 0) {{
+    Ace_debug_plain_relu(node_name, output_ct, mask_len, actual_dump_len);
+  }}
+}}
+
+static void Ace_debug_app_relu_pending(const char* node_name,
+                                       const char* relu_api,
+                                       const char* stmt_repr,
+                                       CIPHERTEXT* input_ct,
+                                       int32_t level_hint,
+                                       uint32_t mask_len,
+                                       int32_t relu_meta,
+                                       uint32_t dump_len) {{
+  uint32_t actual_dump_len = dump_len < mask_len ? dump_len : mask_len;
+  printf(
+      "[DEBUG][APP_RELU][PENDING] node=%s api=%s stmt=%s mask_len=%u level_hint=%d relu_meta=%d dump_len=%u\\n",
+      node_name, relu_api, stmt_repr, mask_len, level_hint, relu_meta,
+      actual_dump_len);
+  if (input_ct != NULL) {{
+    Ace_debug_cipher_edges(node_name, "before_bootstrap_relu", input_ct,
+                           mask_len, actual_dump_len);
+  }}
+}}
+
+static void Ace_debug_bootstrap_pending(const char* node_name,
+                                        CIPHERTEXT* input_ct,
+                                        int32_t level_hint, uint32_t slot,
+                                        uint32_t dump_len) {{
+  uint32_t actual_slots = slot > 0 ? slot : Exact_slots(input_ct);
+  uint32_t actual_dump_len =
+      dump_len < actual_slots ? dump_len : actual_slots;
+  printf(
+      "[DEBUG][BOOTSTRAP][PENDING] node=%s slot=%u level_hint=%d dump_len=%u\\n",
+      node_name, actual_slots, level_hint, actual_dump_len);
+  Ace_debug_cipher_edges(node_name, "before_bootstrap", input_ct, actual_slots,
+                         actual_dump_len);
+}}
+
+static void Ace_debug_bootstrap(const char* node_name, CIPHERTEXT* output_ct,
+                                int32_t level_hint, uint32_t slot,
+                                uint32_t dump_len) {{
+  uint32_t actual_slots = slot > 0 ? slot : Exact_slots(output_ct);
+  uint32_t actual_dump_len =
+      dump_len < actual_slots ? dump_len : actual_slots;
+  ++g_ace_bootstrap_debug_counter;
+  printf(
+      "[DEBUG][BOOTSTRAP][%d] node=%s slot=%u level=%d level_hint=%d dump_len=%u\\n",
+      g_ace_bootstrap_debug_counter, node_name, actual_slots,
+      (int)Level(output_ct), level_hint, actual_dump_len);
+  Ace_debug_cipher_edges(node_name, "after_bootstrap", output_ct, actual_slots,
+                         actual_dump_len);
+}}
+
+static void Ace_debug_cipher_probe(const char* node_name,
+                                   const char* stage_name, CIPHERTEXT* ct,
+                                   uint32_t mask_len, uint32_t dump_len) {{
+  uint32_t actual_mask_len = mask_len > 0 ? mask_len : Exact_slots(ct);
+  uint32_t actual_dump_len =
+      dump_len < actual_mask_len ? dump_len : actual_mask_len;
+  printf(
+      "[DEBUG][CIPHER_PROBE] node=%s stage=%s mask_len=%u level=%d dump_len=%u\\n",
+      node_name, stage_name, actual_mask_len, (int)Level(ct),
+      actual_dump_len);
+  Ace_debug_cipher_edges(node_name, stage_name, ct, actual_mask_len,
+                         actual_dump_len);
+}}
+
+static void Ace_debug_app_relu_summary(void) {{
+  printf("[DEBUG][APP_RELU] total_calls=%d\\n", g_ace_app_relu_debug_counter);
+  printf("[DEBUG][BOOTSTRAP] total_calls=%d\\n",
+         g_ace_bootstrap_debug_counter);
+}}
+""".format(marker=APP_RELU_DEBUG_HELPER_MARKER)
+
+
+def ensure_debug_helper(content, inc_path):
+    if APP_RELU_DEBUG_HELPER_MARKER in content:
+        return content
+
+    if MAIN_GRAPH_ANCHOR not in content:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: failed to find Main_graph() anchor."
+        )
+
+    helper_block = build_app_relu_debug_helper() + "\n"
+    content = content.replace(
+        MAIN_GRAPH_ANCHOR,
+        helper_block + MAIN_GRAPH_ANCHOR,
+        1,
+    )
+
+    content = content.replace(
+        MAIN_GRAPH_ANCHOR,
+        MAIN_GRAPH_ANCHOR + "  Ace_reset_app_relu_debug_counter();\n",
+        1,
+    )
+
+    summary_anchor = "  return true;\n}\n\nint Get_input_count() {\n"
+    if summary_anchor not in content:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: failed to find Main_graph() epilogue."
+        )
+    return content.replace(
+        summary_anchor,
+        "  Ace_debug_app_relu_summary();\n" + summary_anchor,
+        1,
+    )
+
+
+def instrument_app_relu_debug(inc_path, dump_len):
+    if dump_len <= 0:
+        raise ValueError("App ReLU debug dump length must be greater than 0.")
+
+    with open(inc_path, "r") as handle:
+        content = handle.read()
+
+    existing_calls = max(content.count("Ace_debug_app_relu(") - 1, 0)
+    if existing_calls > 0:
+        return {
+            "already_instrumented": True,
+            "call_count": existing_calls,
+            "nodes": [],
+        }
+
+    content = ensure_debug_helper(content, inc_path)
+
+    instrumented_lines = []
+    nodes = []
+    pending_node = None
+    call_count = 0
+
+    for line in content.splitlines(keepends=True):
+        node_match = APP_RELU_NODE_PATTERN.match(line)
+        if node_match:
+            pending_node = node_match.group("node")
+            instrumented_lines.append(line)
+            continue
+
+        call_match = APP_RELU_CALL_PATTERN.match(line)
+        instrumented_lines.append(line)
+        if call_match is not None:
+            call_count += 1
+            node_name = pending_node or f"/debug/AppRelu/{call_count}"
+            relu_variant = call_match.group("variant")
+            result_var = call_match.group("result")
+            input_var = call_match.group("lhs").strip()
+            mask_len = call_match.group("mask_len")
+            indent = call_match.group("indent")
+            instrumented_lines.append(
+                f'{indent}Ace_debug_app_relu("{node_name}", "{relu_variant}", '
+                f"&{input_var}, &{result_var}, -1, {mask_len}, -1, {dump_len});\n"
+            )
+            nodes.append(
+                {
+                    "node": node_name,
+                    "api": relu_variant,
+                    "mask_len": mask_len,
+                    "level_hint": "-1",
+                    "relu_meta": "-1",
+                }
+            )
+            pending_node = None
+            continue
+
+        bootstrap_match = BOOTSTRAP_WITH_RELU_CALL_PATTERN.match(line)
+        if bootstrap_match is None:
+            continue
+
+        call_count += 1
+        node_name = pending_node or f"/debug/AppRelu/{call_count}"
+        result_var = bootstrap_match.group("result")
+        level_hint = bootstrap_match.group("level")
+        mask_len = bootstrap_match.group("mask_len")
+        relu_range = bootstrap_match.group("relu_range")
+        indent = bootstrap_match.group("indent")
+        input_var = bootstrap_match.group("input")
+        stmt_repr = (
+            f'Bootstrap_with_relu(&{result_var}, &{input_var}, '
+            f'{level_hint}, {mask_len}, {relu_range});'
+        ).replace("\\", "\\\\").replace('"', '\\"')
+        instrumented_lines.insert(
+            len(instrumented_lines) - 1,
+            f'{indent}Ace_debug_app_relu_pending("{node_name}", '
+            f'"Bootstrap_with_relu", "{stmt_repr}", '
+            f"&{input_var}, {level_hint}, {mask_len}, {relu_range}, {dump_len});\n",
+        )
+        instrumented_lines.append(
+            f'{indent}Ace_debug_app_relu("{node_name}", "Bootstrap_with_relu", '
+            f"&{input_var}, &{result_var}, {level_hint}, {mask_len}, {relu_range}, {dump_len});\n"
+        )
+        nodes.append(
+            {
+                "node": node_name,
+                "api": "Bootstrap_with_relu",
+                "mask_len": mask_len,
+                "level_hint": level_hint,
+                "relu_meta": relu_range,
+            }
+        )
+        pending_node = None
+
+    if call_count == 0:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: no App_relu or Bootstrap_with_relu calls were found."
+        )
+
+    with open(inc_path, "w") as handle:
+        handle.write("".join(instrumented_lines))
+
+    return {"already_instrumented": False, "call_count": call_count, "nodes": nodes}
+
+
+def find_next_graph_node(lines, start_index, max_distance=10):
+    upper_bound = min(len(lines), start_index + max_distance + 1)
+    for index in range(start_index + 1, upper_bound):
+        match = GRAPH_NODE_PATTERN.match(lines[index])
+        if match:
+            return match.group("node")
+    return None
+
+
+def instrument_bootstrap_debug(inc_path, dump_len):
+    if dump_len <= 0:
+        raise ValueError("Bootstrap debug dump length must be greater than 0.")
+
+    with open(inc_path, "r") as handle:
+        content = handle.read()
+
+    existing_calls = max(content.count("Ace_debug_bootstrap(") - 1, 0)
+    if existing_calls > 0:
+        return {
+            "already_instrumented": True,
+            "call_count": existing_calls,
+            "nodes": [],
+        }
+
+    content = ensure_debug_helper(content, inc_path)
+    lines = content.splitlines(keepends=True)
+    instrumented_lines = []
+    nodes = []
+    call_count = 0
+    last_graph_node = None
+    in_main_graph = False
+
+    for index, line in enumerate(lines):
+        if line == MAIN_GRAPH_ANCHOR:
+            in_main_graph = True
+            last_graph_node = None
+            instrumented_lines.append(line)
+            continue
+
+        if in_main_graph and line.strip() == "return true;":
+            in_main_graph = False
+            instrumented_lines.append(line)
+            continue
+
+        if in_main_graph:
+            node_match = GRAPH_NODE_PATTERN.match(line)
+            if node_match:
+                last_graph_node = node_match.group("node")
+
+        call_match = BOOTSTRAP_CALL_PATTERN.match(line) if in_main_graph else None
+        if call_match is None:
+            instrumented_lines.append(line)
+            continue
+
+        call_count += 1
+        result_var = call_match.group("result")
+        input_var = call_match.group("input")
+        level_hint = call_match.group("level")
+        slot = call_match.group("slot")
+        indent = call_match.group("indent")
+        next_graph_node = find_next_graph_node(lines, index)
+        node_name = next_graph_node or last_graph_node or f"/debug/Bootstrap/{call_count}"
+        debug_node = f"{node_name}/standalone_bootstrap"
+        instrumented_lines.append(
+            f'{indent}Ace_debug_bootstrap_pending("{debug_node}", '
+            f"&{input_var}, {level_hint}, {slot}, {dump_len});\n"
+        )
+        instrumented_lines.append(line)
+        instrumented_lines.append(
+            f'{indent}Ace_debug_bootstrap("{debug_node}", '
+            f"&{result_var}, {level_hint}, {slot}, {dump_len});\n"
+        )
+        nodes.append(
+            {
+                "node": debug_node,
+                "level_hint": level_hint,
+                "slot": slot,
+            }
+        )
+
+    if call_count == 0:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: no standalone Bootstrap calls were found."
+        )
+
+    with open(inc_path, "w") as handle:
+        handle.write("".join(instrumented_lines))
+
+    return {"already_instrumented": False, "call_count": call_count, "nodes": nodes}
+
+
+def graph_node_mask_len(node_name):
+    if node_name.startswith("/layer1/") or node_name == "/relu/Relu":
+        return 16384
+    if node_name.startswith("/layer2/"):
+        return 8192
+    if node_name.startswith("/layer3/"):
+        return 4096
+    return 0
+
+
+def instrument_layer2_debug(inc_path, dump_len):
+    if dump_len <= 0:
+        raise ValueError("Layer2 debug dump length must be greater than 0.")
+
+    with open(inc_path, "r") as handle:
+        content = handle.read()
+
+    if 'Ace_debug_cipher_probe("/layer2/' in content:
+        return {
+            "already_instrumented": True,
+            "call_count": content.count('Ace_debug_cipher_probe("/layer2/'),
+            "nodes": [],
+        }
+
+    content = ensure_debug_helper(content, inc_path)
+    lines = content.splitlines(keepends=True)
+    instrumented_lines = []
+    nodes = []
+    call_count = 0
+    current_node = None
+    in_main_graph = False
+
+    for line in lines:
+        if line == MAIN_GRAPH_ANCHOR:
+            in_main_graph = True
+            current_node = None
+            instrumented_lines.append(line)
+            continue
+
+        if in_main_graph and line.strip() == "return true;":
+            in_main_graph = False
+            instrumented_lines.append(line)
+            continue
+
+        if in_main_graph:
+            node_match = GRAPH_NODE_PATTERN.match(line)
+            if node_match:
+                current_node = node_match.group("node")
+
+        add_match = ADD_CIPH_CALL_PATTERN.match(line) if in_main_graph else None
+        if (
+            add_match is None
+            or current_node is None
+            or not current_node.startswith("/layer2/")
+            or not current_node.endswith("/Add")
+        ):
+            instrumented_lines.append(line)
+            continue
+
+        call_count += 1
+        indent = add_match.group("indent")
+        result_var = add_match.group("result")
+        lhs_var = add_match.group("lhs")
+        rhs_var = add_match.group("rhs")
+        mask_len = graph_node_mask_len(current_node)
+        instrumented_lines.append(
+            f'{indent}Ace_debug_cipher_probe("{current_node}/lhs", '
+            f'"before_add", &{lhs_var}, {mask_len}, {dump_len});\n'
+        )
+        instrumented_lines.append(
+            f'{indent}Ace_debug_cipher_probe("{current_node}/rhs", '
+            f'"before_add", &{rhs_var}, {mask_len}, {dump_len});\n'
+        )
+        instrumented_lines.append(line)
+        instrumented_lines.append(
+            f'{indent}Ace_debug_cipher_probe("{current_node}", '
+            f'"after_add_raw", &{result_var}, {mask_len}, {dump_len});\n'
+        )
+        nodes.append(
+            {
+                "node": current_node,
+                "lhs": lhs_var,
+                "rhs": rhs_var,
+                "result": result_var,
+                "mask_len": str(mask_len),
+            }
+        )
+
+    if call_count == 0:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: no layer2 Add_ciph calls were found."
+        )
+
+    with open(inc_path, "w") as handle:
+        handle.write("".join(instrumented_lines))
+
+    return {"already_instrumented": False, "call_count": call_count, "nodes": nodes}
+
+
+def instrument_layer2_conv1_debug(inc_path, dump_len):
+    if dump_len <= 0:
+        raise ValueError("Layer2 conv1 debug dump length must be greater than 0.")
+
+    with open(inc_path, "r") as handle:
+        content = handle.read()
+
+    if 'Ace_debug_cipher_probe("/layer2/layer2.0/conv1/Conv/' in content:
+        return {
+            "already_instrumented": True,
+            "call_count": content.count(
+                'Ace_debug_cipher_probe("/layer2/layer2.0/conv1/Conv/'
+            ),
+            "nodes": [],
+        }
+
+    content = ensure_debug_helper(content, inc_path)
+    lines = content.splitlines(keepends=True)
+    instrumented_lines = []
+    nodes = []
+    call_count = 0
+    current_node = None
+    in_main_graph = False
+    in_target = False
+    saw_input_copy = False
+
+    def add_probe(indent, stage_name, var_name, mask_len):
+        nonlocal call_count
+        call_count += 1
+        nodes.append(
+            {
+                "node": "/layer2/layer2.0/conv1/Conv",
+                "stage": stage_name,
+                "var": var_name,
+                "mask_len": str(mask_len),
+            }
+        )
+        instrumented_lines.append(
+            f'{indent}Ace_debug_cipher_probe("/layer2/layer2.0/conv1/Conv/'
+            f'{stage_name}", "{stage_name}", &{var_name}, {mask_len}, '
+            f"{dump_len});\n"
+        )
+
+    for line in lines:
+        if line == MAIN_GRAPH_ANCHOR:
+            in_main_graph = True
+            current_node = None
+            in_target = False
+            instrumented_lines.append(line)
+            continue
+
+        if in_main_graph and line.strip() == "return true;":
+            in_main_graph = False
+            in_target = False
+            instrumented_lines.append(line)
+            continue
+
+        if in_main_graph:
+            node_match = GRAPH_NODE_PATTERN.match(line)
+            if node_match:
+                current_node = node_match.group("node")
+                in_target = current_node == "/layer2/layer2.0/conv1/Conv"
+                if in_target:
+                    saw_input_copy = False
+
+        copy_match = COPY_CIPH_CALL_PATTERN.match(line) if in_target else None
+        add_match = ADD_CIPH_CALL_PATTERN.match(line) if in_target else None
+        rescale_match = RESCALE_CIPH_CALL_PATTERN.match(line) if in_target else None
+        add_plain_match = ADD_PLAIN_CALL_PATTERN.match(line) if in_target else None
+
+        instrumented_lines.append(line)
+
+        if not in_target:
+            continue
+
+        if copy_match and not saw_input_copy:
+            saw_input_copy = True
+            add_probe(
+                copy_match.group("indent"),
+                "conv_input",
+                copy_match.group("result"),
+                16384,
+            )
+            continue
+
+        if add_match and add_match.group("result").startswith("input_dup_"):
+            add_probe(
+                add_match.group("indent"),
+                "after_input_duplicate",
+                add_match.group("result"),
+                16384,
+            )
+            continue
+
+        if rescale_match:
+            result_var = rescale_match.group("result")
+            input_var = rescale_match.group("input")
+            indent = rescale_match.group("indent")
+            if result_var.startswith("result_n8_"):
+                add_probe(indent, "after_conv_rescale", result_var, 16384)
+                continue
+            if result_var.startswith("comb_row_result9_"):
+                add_probe(indent, "after_comb_row", result_var, 8192)
+                continue
+            if result_var.startswith("comb_rc_result9_"):
+                add_probe(indent, "after_comb_rc", result_var, 8192)
+                continue
+            if result_var.startswith("ss_result9_") or input_var.startswith(
+                "ss_result9_"
+            ):
+                add_probe(indent, "after_slot_sum_rescale", result_var, 8192)
+                continue
+
+        if add_plain_match and add_plain_match.group("result").startswith(
+            "result_n8_"
+        ):
+            add_probe(
+                add_plain_match.group("indent"),
+                "after_bn_bias",
+                add_plain_match.group("result"),
+                16384,
+            )
+
+    if call_count == 0:
+        raise ValueError(
+            f"Cannot instrument {inc_path}: no layer2.0 conv1 calls were found."
+        )
+
+    with open(inc_path, "w") as handle:
+        handle.write("".join(instrumented_lines))
+
+    return {"already_instrumented": False, "call_count": call_count, "nodes": nodes}
+
+
+def apply_runtime_env_overrides(env, args):
+    env.setdefault("RTLIB_BTS_EVEN_POLY", "1")
+    env.setdefault("RT_BTS_CLEAR_IMAG", "1")
+
+    if args.backend == "cheddar":
+        env["CHEDDAR_ROT_KEY_MODE"] = args.rot_key_mode
+        if args.encode_mode == "pre":
+            pre_encode_count = (
+                DEFAULT_PRE_ENCODE_COUNT
+                if args.pre_encode_count is None
+                else args.pre_encode_count
+            )
+            env["PT_PRE_ENCODE_COUNT"] = str(pre_encode_count)
+        else:
+            env.pop("PT_PRE_ENCODE_COUNT", None)
+
+    if args.omp_threads is not None:
+        env["OMP_NUM_THREADS"] = str(args.omp_threads)
+
+    return env
+
+
+def parse_time_output(time_output):
+    if not time_output:
+        return None
+
+    parts = time_output.strip().split()
+    if len(parts) < 2:
+        return {"raw": time_output.strip()}
+
+    result = {"raw": time_output.strip()}
+    try:
+        result["wall_time_sec"] = float(parts[0])
+    except ValueError:
+        pass
+    try:
+        result["max_rss_kb"] = int(parts[1])
+    except ValueError:
+        pass
+    return result
+
+
+def parse_rtlib_timing_report(report_text):
+    if not report_text:
+        return None
+
+    entries = []
+    for line in report_text.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 4:
+            continue
+
+        name = parts[0].strip()
+        if not name or name == "RTLib functions":
+            continue
+
+        entry = {
+            "name": name,
+            "count_text": parts[1].strip(),
+            "exclusive_ms_text": parts[2].strip(),
+            "avg_ms_text": parts[3].strip(),
+        }
+        if entry["count_text"] == "sub total":
+            entry["kind"] = "subtotal"
+        elif entry["count_text"].isdigit():
+            entry["kind"] = "metric"
+            entry["count"] = int(entry["count_text"])
+        else:
+            entry["kind"] = "other"
+
+        try:
+            entry["exclusive_ms"] = float(entry["exclusive_ms_text"])
+        except ValueError:
+            pass
+        try:
+            entry["avg_ms"] = float(entry["avg_ms_text"])
+        except ValueError:
+            pass
+
+        entries.append(entry)
+
+    if not entries:
+        return None
+    return {"entries": entries}
+
+
+def load_timing_file(path, parser):
+    if not path or not os.path.isfile(path):
+        return None
+
+    with open(path, "r") as handle:
+        content = handle.read()
+    return parser(content)
+
+
+def get_top_rtlib_entries(rtlib_timing, limit=DEFAULT_TOP_TIMING_COUNT):
+    if not rtlib_timing:
+        return []
+
+    entries = [
+        entry
+        for entry in rtlib_timing["entries"]
+        if entry.get("kind") == "metric"
+        and "exclusive_ms" in entry
+        and entry["name"] != "MAIN_GRAPH"
+    ]
+    entries.sort(key=lambda entry: entry["exclusive_ms"], reverse=True)
+    return entries[:limit]
+
+
+def find_rtlib_entry(rtlib_timing, name):
+    if not rtlib_timing:
+        return None
+
+    for entry in rtlib_timing["entries"]:
+        if entry.get("kind") == "metric" and entry["name"] == name:
+            return entry
+    return None
+
+
+def print_timing_summary(model, timing_info):
+    system_timing = timing_info.get("system")
+    rtlib_timing = timing_info.get("rtlib")
+
+    if system_timing and "wall_time_sec" in system_timing:
+        wall_time = system_timing["wall_time_sec"]
+        max_rss = system_timing.get("max_rss_kb")
+        if max_rss is None:
+            print(f"[TIMING] {model}: wall_time_sec={wall_time:.3f}")
+        else:
+            print(
+                f"[TIMING] {model}: wall_time_sec={wall_time:.3f}, "
+                f"max_rss_kb={max_rss}"
+            )
+
+    main_graph = find_rtlib_entry(rtlib_timing, "MAIN_GRAPH")
+    if main_graph is not None:
+        print(
+            f"[TIMING] {model}: rtlib MAIN_GRAPH exclusive_ms="
+            f"{main_graph['exclusive_ms']:.3f}, count={main_graph['count']}, "
+            f"avg_ms={main_graph.get('avg_ms', 0.0):.3f}"
+        )
+
+    top_entries = get_top_rtlib_entries(rtlib_timing)
+    if top_entries:
+        print(f"[TIMING] {model}: top rtlib events by exclusive time")
+        for entry in top_entries:
+            print(
+                f"  - {entry['name']}: exclusive_ms={entry['exclusive_ms']:.3f}, "
+                f"count={entry['count']}, avg_ms={entry.get('avg_ms', 0.0):.3f}"
+            )
+
+
+def run_inference(executable, cifar10_bin, index, num, args):
+    if num <= 0:
+        raise ValueError("--num must be greater than 0")
+
+    end = index + num - 1
+    command = [executable, cifar10_bin, str(index), str(end)]
+    env = apply_runtime_env_overrides(os.environ.copy(), args)
+    time_output_file = None
+    rtlib_timing_file = None
+    timing_info = None
+
+    if args.capture_timing:
+        time_fd, time_output_file = tempfile.mkstemp(prefix="ace_time_", suffix=".txt")
+        os.close(time_fd)
+        rtlib_fd, rtlib_timing_file = tempfile.mkstemp(
+            prefix="ace_rtlib_", suffix=".txt"
+        )
+        os.close(rtlib_fd)
+        env["RTLIB_TIMING_OUTPUT"] = rtlib_timing_file
+        if ace_compile.TIME_EXE is not None:
+            timed_command = [
+                ace_compile.TIME_EXE,
+                "-f",
+                "%e %M",
+                "-o",
+                time_output_file,
+                *command,
+            ]
+        else:
+            timed_command = command
+    else:
+        timed_command = ace_compile.build_timed_command(command)
+
+    print("Run command: {}".format(shlex.join(timed_command)))
+    ret = subprocess.run(timed_command, env=env)
+
+    if args.capture_timing:
+        timing_info = {
+            "system": load_timing_file(time_output_file, parse_time_output),
+            "rtlib": load_timing_file(rtlib_timing_file, parse_rtlib_timing_report),
+        }
+        print_timing_summary(os.path.basename(executable), timing_info)
+        if time_output_file and os.path.exists(time_output_file):
+            os.remove(time_output_file)
+        if rtlib_timing_file and os.path.exists(rtlib_timing_file):
+            os.remove(rtlib_timing_file)
+
+    if ret.returncode == 0:
+        print("Run {} : SUCCESS!".format(os.path.basename(executable)))
+    else:
+        print("Run {} : FAILED!".format(os.path.basename(executable)))
+    return {"returncode": ret.returncode, "timing": timing_info}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compile CUDA backend ResNet CIFAR targets and run real CIFAR-10/CIFAR-100 "
+            "inference with the shared Phantom CIFAR runtime main."
+        )
+    )
+    parser.add_argument(
+        "--root",
+        default=ace_compile.get_default_repo_root(),
+        help="ACE repository root. Defaults to ACE_ROOT or the directory of this script.",
+    )
+    parser.add_argument(
+        "--compiler",
+        help="Path to fhe_cmplr. Relative paths are resolved from --root.",
+    )
+    parser.add_argument(
+        "--model-dir",
+        help="Directory containing ONNX models. Relative paths are resolved from --root.",
+    )
+    parser.add_argument(
+        "--link-dir",
+        help=(
+            "Directory for generated *.onnx.inc files. "
+            "Building targets requires the default example directory for the selected backend."
+        ),
+    )
+    parser.add_argument(
+        "--backend",
+        default="cheddar",
+        choices=ace_compile.CUDA_BACKENDS,
+        help=(
+            "Compilation backend used for `-P2C:lib=...`, the default generated "
+            "`.onnx.inc` directory, and the executable build directory. "
+            "Default: cheddar."
+        ),
+    )
+    parser.add_argument(
+        "--build-script",
+        help="Path to scripts/build_target_gpu.sh. Relative paths are resolved from --root.",
+    )
+    parser.add_argument(
+        "--build-dir",
+        help="Build directory passed to scripts/build_target_gpu.sh through ACE_BUILD_DIR.",
+    )
+    parser.add_argument(
+        "--main-inc",
+        default=DEFAULT_MAIN_INC,
+        help=(
+            "Path to the shared CIFAR runtime main inc file. Default: "
+            f"{DEFAULT_MAIN_INC}"
+        ),
+    )
+    parser.add_argument(
+        "--model",
+        action="append",
+        dest="models",
+        help=(
+            "Model to run. Supports resnet20/resnet32/resnet44/resnet56/resnet110, "
+            "resnet32_cifar100, or the full *_cifar10/*_cifar100 names. "
+            "Can be passed multiple times."
+        ),
+    )
+    parser.add_argument(
+        "--input-name",
+        help="Override the ONNX input filename for all selected models.",
+    )
+    parser.add_argument(
+        "--vec",
+        default=ace_compile.DEFAULT_VEC_OPTION,
+        help=f"Vectorization option passed to fhe_cmplr. Default: {ace_compile.DEFAULT_VEC_OPTION}",
+    )
+    parser.add_argument(
+        "--sihe",
+        action="append",
+        dest="sihe_options",
+        default=[],
+        help=(
+            "Additional SIHE option. Can be passed multiple times. Accepts either "
+            "`foo:bar` or `-SIHE:foo:bar`. Model-specific ReLU SIHE options are "
+            "appended automatically."
+        ),
+    )
+    parser.add_argument(
+        "--bwr",
+        action="store_true",
+        help="Append `bwr` to the SIHE options for every selected model.",
+    )
+    parser.add_argument(
+        "--ckks",
+        default=ace_compile.DEFAULT_CKKS_OPTION,
+        help=f"CKKS option passed to fhe_cmplr. Default: {ace_compile.DEFAULT_CKKS_OPTION}",
+    )
+    parser.add_argument(
+        "--icl",
+        type=int,
+        help=(
+            "Set `icl=<val>` in the CKKS options to control the input ciphertext level. "
+            "Overrides any existing `icl=` already present in `--ckks`."
+        ),
+    )
+    parser.add_argument(
+        "--bil",
+        type=int,
+        help=(
+            "Set `bil=<val>` in the CKKS options to control the minimum bootstrap "
+            "input ciphertext level. Overrides any existing `bil=` already present "
+            "in `--ckks`."
+        ),
+    )
+    parser.add_argument(
+        "--bootstrap-evalmod-mode",
+        choices=("legacy", "arcsine", "rboot_arcsine"),
+        help=(
+            "Select the Cheddar bootstrap EvalMod planner mode. Defaults to "
+            "rboot_arcsine with --bwr and legacy otherwise."
+        ),
+    )
+    parser.add_argument(
+        "--cheddar-word-bits",
+        type=int,
+        choices=(32, 64),
+        default=32,
+        help=(
+            "Select the Cheddar runtime coefficient word size. The linked "
+            "runtime must be built with the same RTLIB_CHEDDAR_WORD_BITS value."
+        ),
+    )
+    parser.add_argument(
+        "--sbm",
+        action="store_true",
+        help="Append `sbm` to the CKKS options for every selected model.",
+    )
+    parser.add_argument(
+        "--sm",
+        action="store_true",
+        help="Append `sm` to the CKKS options for every selected model.",
+    )
+    parser.add_argument(
+        "--p2c",
+        help="P2C option passed to fhe_cmplr. Default: -P2C:lib=<backend>",
+    )
+    parser.add_argument(
+        "--df",
+        default=ace_compile.DEFAULT_DF_TEMPLATE,
+        help=(
+            "Set or override `df=...` in the P2C option for every selected model. "
+            f"Supports `{{model}}` in the path. Default: {ace_compile.DEFAULT_DF_TEMPLATE}"
+        ),
+    )
+    parser.add_argument(
+        "--compiler-option",
+        action="append",
+        dest="compiler_options",
+        default=[],
+        help="Extra compiler option appended after vec/sihe/ckks/p2c. Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="Keep compiler-generated intermediate .t and .json files.",
+    )
+    parser.add_argument(
+        "--skip-compile",
+        action="store_true",
+        help="Skip ONNX compilation and reuse existing generated *.onnx.inc files.",
+    )
+    parser.add_argument(
+        "--skip-link",
+        action="store_true",
+        help="Skip building the backend executable and reuse an existing one.",
+    )
+    parser.add_argument(
+        "--skip-run",
+        action="store_true",
+        help="Only compile/build, skip the final CIFAR-10 inference execution.",
+    )
+    parser.add_argument(
+        "--fusion",
+        action="store_true",
+        help=(
+            "Append `-CKKS:fus` during compilation. The CKKS fusion pass is "
+            "effective on the Phantom and Cheddar backends."
+        ),
+    )
+    parser.add_argument(
+        "--gpu-fusion",
+        action="store_true",
+        help="Append `-CKKS:gpu_fusion` during compilation.",
+    )
+    parser.add_argument(
+        "--cifar10",
+        default=DEFAULT_CIFAR10,
+        help="Path to CIFAR-10 test_batch.bin, or the directory that contains it.",
+    )
+    parser.add_argument(
+        "--cifar100",
+        default=DEFAULT_CIFAR100,
+        help="Path to CIFAR-100 test.bin, or the directory that contains it.",
+    )
+    parser.add_argument(
+        "-i",
+        "--index",
+        type=int,
+        default=0,
+        help="Index of the starting CIFAR-10 image.",
+    )
+    parser.add_argument(
+        "-n",
+        "--num",
+        type=int,
+        default=1,
+        help="Number of CIFAR-10 images to run for each model.",
+    )
+    parser.add_argument(
+        "--omp-threads",
+        type=int,
+        help="Override OMP_NUM_THREADS when running inference.",
+    )
+    parser.add_argument(
+        "--rot-key-mode",
+        choices=("pow2", "full"),
+        default=DEFAULT_ROT_KEY_MODE,
+        help=(
+            "CHEDDAR rotation key strategy for runtime key preparation. "
+            f"Default: {DEFAULT_ROT_KEY_MODE}"
+        ),
+    )
+    parser.add_argument(
+        "--encode-mode",
+        choices=("ondemand", "pre"),
+        default=DEFAULT_ENCODE_MODE,
+        help=(
+            "Plaintext encoding mode for CHEDDAR runtime. "
+            "`ondemand` leaves data unencoded until used; `pre` triggers runtime "
+            f"pre-encoding. Default: {DEFAULT_ENCODE_MODE}"
+        ),
+    )
+    parser.add_argument(
+        "--pre-encode-count",
+        type=int,
+        help=(
+            "Maximum number of rt-data entries to pre-encode when "
+            "`--encode-mode pre` is used. Set 0 for uncapped best effort. "
+            f"Default when pre-encode is enabled: {DEFAULT_PRE_ENCODE_COUNT}"
+        ),
+    )
+    parser.add_argument(
+        "--keep-driver",
+        action="store_true",
+        help="Keep the generated temporary *_gpu.cu wrapper in the backend example directory.",
+    )
+    parser.add_argument(
+        "--capture-timing",
+        action="store_true",
+        help=(
+            "Capture and summarize runtime execution timing, including wall-clock "
+            "time and parsed rtlib timing."
+        ),
+    )
+    parser.add_argument(
+        "--timing-json",
+        help=(
+            "Write captured timing summaries as JSON. Relative paths are resolved "
+            "from --root. Implies --capture-timing."
+        ),
+    )
+    parser.add_argument(
+        "--debug-app-relu",
+        action="store_true",
+        help=(
+            "Instrument generated *.onnx.inc files to print every ReLU output "
+            "and a final call count summary before linking."
+        ),
+    )
+    parser.add_argument(
+        "--debug-app-relu-dump-len",
+        type=int,
+        default=DEFAULT_APP_RELU_DEBUG_DUMP_LEN,
+        help=(
+            "Number of decrypted slots to dump for each App_relu output when "
+            f"`--debug-app-relu` is enabled. Default: {DEFAULT_APP_RELU_DEBUG_DUMP_LEN}"
+        ),
+    )
+    parser.add_argument(
+        "--debug-bootstrap",
+        action="store_true",
+        help=(
+            "Instrument generated standalone Bootstrap calls to print decrypted "
+            "input/output edge slots. Uses --debug-app-relu-dump-len."
+        ),
+    )
+    parser.add_argument(
+        "--debug-layer2",
+        action="store_true",
+        help=(
+            "Instrument layer2 residual Add nodes to print lhs/rhs and raw Add "
+            "output edge slots. Uses --debug-app-relu-dump-len."
+        ),
+    )
+    parser.add_argument(
+        "--debug-layer2-conv1",
+        action="store_true",
+        help=(
+            "Instrument layer2.0 conv1 internal boundaries to locate the first "
+            "sbm/bwr divergence. Uses --debug-app-relu-dump-len."
+        ),
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    if args.sbm and args.sm:
+        raise ValueError("`--sbm` and `--sm` cannot be enabled at the same time.")
+    if args.bil is not None and args.bil < 1:
+        raise ValueError("`--bil` must be greater than or equal to 1.")
+    if args.num <= 0:
+        raise ValueError("`--num` must be greater than 0.")
+    if args.pre_encode_count is not None and args.pre_encode_count < 0:
+        raise ValueError("`--pre-encode-count` must be >= 0.")
+    if args.debug_app_relu_dump_len <= 0:
+        raise ValueError("`--debug-app-relu-dump-len` must be greater than 0.")
+    if args.timing_json:
+        args.capture_timing = True
+    repo_root = ace_compile.resolve_path(args.root)
+    compiler = ace_compile.resolve_path(
+        args.compiler or ace_compile.get_default_compiler(repo_root), repo_root
+    )
+    model_dir = ace_compile.resolve_path(args.model_dir or "model", repo_root)
+    link_dir = ace_compile.resolve_path(
+        args.link_dir or get_default_link_dir(args.backend), repo_root
+    )
+    build_script = ace_compile.resolve_path(
+        args.build_script or os.path.join("scripts", "build_target_gpu.sh"), repo_root
+    )
+    build_dir = ace_compile.resolve_path(args.build_dir or "release", repo_root)
+    main_inc = ace_compile.resolve_path(args.main_inc, repo_root)
+    default_link_dir = ace_compile.resolve_path(
+        get_default_link_dir(args.backend), repo_root
+    )
+    timing_json = ace_compile.resolve_path(args.timing_json, repo_root)
+
+    if not os.path.isfile(main_inc):
+        raise FileNotFoundError(f"Main inc file not found: {main_inc}")
+
+    if args.p2c is None:
+        args.p2c = f"-P2C:lib={args.backend}"
+
+    if not args.skip_link and os.path.normpath(link_dir) != os.path.normpath(default_link_dir):
+        raise ValueError(
+            "Building {} executables requires --link-dir to be {} "
+            "because scripts/build_target_gpu.sh copies the wrapper there.".format(
+                args.backend, default_link_dir
+            )
+        )
+
+    models = normalize_models(args.models)
+
+    cifar_inputs = {}
+    if not args.skip_run:
+        datasets = {get_model_dataset(model) for model in models}
+        if "cifar10" in datasets:
+            cifar_inputs["cifar10"] = resolve_cifar_input(
+                args.cifar10, repo_root, "cifar10"
+            )
+        if "cifar100" in datasets:
+            cifar_inputs["cifar100"] = resolve_cifar_input(
+                args.cifar100, repo_root, "cifar100"
+            )
+
+    print(f"ACE root: {repo_root}")
+    print(f"Compiler: {compiler}")
+    print(f"Backend: {args.backend}")
+    print(f"Model dir: {model_dir}")
+    print(f"Link dir: {link_dir}")
+    print(f"Build script: {build_script}")
+    print(f"Build dir: {build_dir}")
+    print(f"Main inc: {main_inc}")
+    print(f"Models: {', '.join(models)}")
+    print(f"Compiler vec option: {args.vec}")
+    print(f"Compiler ckks option: {args.ckks}")
+    if args.icl is not None:
+        print(f"Compiler icl: {args.icl}")
+    if args.bil is not None:
+        print(f"Compiler bil: {args.bil}")
+    print(f"Compiler p2c option: {args.p2c}")
+    if args.backend == "cheddar":
+        print(f"Cheddar word bits: {args.cheddar_word_bits}")
+    if args.df:
+        print(f"Compiler df template: {args.df}")
+    if args.bootstrap_evalmod_mode:
+        print(f"Compiler bootstrap EvalMod mode: {args.bootstrap_evalmod_mode}")
+    if args.sbm:
+        print("Compiler sbm: enabled")
+    if args.sm:
+        print("Compiler sm: enabled")
+    if args.bwr:
+        print("Compiler bwr: enabled")
+    if args.fusion:
+        print("Compiler fusion: requested")
+    if args.gpu_fusion:
+        print("Compiler gpu-fusion: requested")
+    if args.sihe_options:
+        print(f"User SIHE options: {args.sihe_options}")
+    if args.compiler_options:
+        print(f"Extra compiler options: {args.compiler_options}")
+    if "cifar10" in cifar_inputs:
+        print(f"CIFAR-10 file: {cifar_inputs['cifar10']}")
+    if "cifar100" in cifar_inputs:
+        print(f"CIFAR-100 file: {cifar_inputs['cifar100']}")
+    if cifar_inputs:
+        print(f"Infer images: [{args.index}, {args.index + args.num - 1}]")
+    print(f"Rotation key mode: {args.rot_key_mode}")
+    print(f"Encode mode: {args.encode_mode}")
+    if args.encode_mode == "pre":
+        pre_encode_count = (
+            DEFAULT_PRE_ENCODE_COUNT
+            if args.pre_encode_count is None
+            else args.pre_encode_count
+        )
+        print(f"Pre-encode count: {pre_encode_count}")
+    if args.omp_threads is not None:
+        print(f"OMP threads override: {args.omp_threads}")
+    if args.capture_timing:
+        print("Timing capture: enabled")
+    if timing_json:
+        print(f"Timing JSON: {timing_json}")
+    if args.debug_app_relu:
+        print(
+            "App ReLU debug instrumentation: enabled "
+            f"(dump_len={args.debug_app_relu_dump_len})"
+        )
+    if args.debug_bootstrap:
+        print(
+            "Standalone Bootstrap debug instrumentation: enabled "
+            f"(dump_len={args.debug_app_relu_dump_len})"
+        )
+    if args.debug_layer2:
+        print(
+            "Layer2 Add debug instrumentation: enabled "
+            f"(dump_len={args.debug_app_relu_dump_len})"
+        )
+    if args.debug_layer2_conv1:
+        print(
+            "Layer2.0 conv1 debug instrumentation: enabled "
+            f"(dump_len={args.debug_app_relu_dump_len})"
+        )
+
+    exit_code = 0
+    timing_results = {}
+
+    for model in models:
+        print()
+        print("=" * 80)
+        print(f"Processing {model}")
+        print("=" * 80)
+
+        input_file = os.path.join(
+            model_dir, ace_compile.get_model_input_filename(model, model_dir, args)
+        )
+        model_dataset = get_model_dataset(model)
+        output_file = os.path.join(link_dir, f"{model}_gpu.onnx.inc")
+        generated_driver = None
+        copied_driver = os.path.join(link_dir, f"{model}_gpu.cu")
+        copied_driver_existed = os.path.exists(copied_driver)
+
+        try:
+            if not args.skip_compile:
+                compile_options = ace_compile.build_compile_options(model, args, repo_root)
+                print(
+                    f"Resolved compile options for {model}: "
+                    f"{shlex.join(compile_options)}"
+                )
+                compile_ret = ace_compile.compile_model(
+                    compiler,
+                    model,
+                    input_file,
+                    output_file,
+                    compile_options,
+                    keep=args.keep,
+                )
+                if compile_ret.returncode != 0:
+                    exit_code = compile_ret.returncode
+                    continue
+            elif not os.path.isfile(output_file):
+                raise FileNotFoundError(
+                    f"Generated include file not found for {model}: {output_file}"
+                )
+
+            if args.debug_app_relu:
+                debug_info = instrument_app_relu_debug(
+                    output_file, args.debug_app_relu_dump_len
+                )
+                if debug_info["already_instrumented"]:
+                    print(
+                        f"App ReLU debug already instrumented for {model}: "
+                        f"{debug_info['call_count']} calls"
+                    )
+                else:
+                    print(
+                        f"App ReLU debug instrumented for {model}: "
+                        f"{debug_info['call_count']} calls"
+                    )
+                    for index, entry in enumerate(debug_info["nodes"], start=1):
+                        print(
+                            f"  [APP_RELU {index:02d}] {entry['node']} -> "
+                            f"{entry['api']} (mask_len={entry['mask_len']}, "
+                            f"level_hint={entry['level_hint']}, relu_meta={entry['relu_meta']})"
+                        )
+
+            if args.debug_bootstrap:
+                debug_info = instrument_bootstrap_debug(
+                    output_file, args.debug_app_relu_dump_len
+                )
+                if debug_info["already_instrumented"]:
+                    print(
+                        f"Standalone Bootstrap debug already instrumented for {model}: "
+                        f"{debug_info['call_count']} calls"
+                    )
+                else:
+                    print(
+                        f"Standalone Bootstrap debug instrumented for {model}: "
+                        f"{debug_info['call_count']} calls"
+                    )
+                    for index, entry in enumerate(debug_info["nodes"], start=1):
+                        print(
+                            f"  [BOOTSTRAP {index:02d}] {entry['node']} "
+                            f"(slot={entry['slot']}, level_hint={entry['level_hint']})"
+                        )
+
+            if args.debug_layer2:
+                debug_info = instrument_layer2_debug(
+                    output_file, args.debug_app_relu_dump_len
+                )
+                if debug_info["already_instrumented"]:
+                    print(
+                        f"Layer2 Add debug already instrumented for {model}: "
+                        f"{debug_info['call_count']} probe calls"
+                    )
+                else:
+                    print(
+                        f"Layer2 Add debug instrumented for {model}: "
+                        f"{debug_info['call_count']} Add nodes"
+                    )
+                    for index, entry in enumerate(debug_info["nodes"], start=1):
+                        print(
+                            f"  [LAYER2_ADD {index:02d}] {entry['node']} "
+                            f"lhs={entry['lhs']} rhs={entry['rhs']} "
+                            f"result={entry['result']} mask_len={entry['mask_len']}"
+                        )
+
+            if args.debug_layer2_conv1:
+                debug_info = instrument_layer2_conv1_debug(
+                    output_file, args.debug_app_relu_dump_len
+                )
+                if debug_info["already_instrumented"]:
+                    print(
+                        f"Layer2.0 conv1 debug already instrumented for {model}: "
+                        f"{debug_info['call_count']} probe calls"
+                    )
+                else:
+                    print(
+                        f"Layer2.0 conv1 debug instrumented for {model}: "
+                        f"{debug_info['call_count']} probes"
+                    )
+                    for index, entry in enumerate(debug_info["nodes"], start=1):
+                        print(
+                            f"  [LAYER2_CONV1 {index:02d}] {entry['stage']} "
+                            f"var={entry['var']} mask_len={entry['mask_len']}"
+                        )
+
+            if not args.skip_link:
+                generated_driver = create_driver_file(model, main_inc)
+                build_ret = build_target(
+                    build_script,
+                    build_dir,
+                    generated_driver,
+                    output_file,
+                    model,
+                )
+                if build_ret.returncode != 0:
+                    exit_code = build_ret.returncode
+                    continue
+
+            executable = None
+            if not args.skip_link or not args.skip_run:
+                executable = find_example_executable(build_dir, model)
+                print(f"Executable: {executable}")
+
+            if not args.skip_run:
+                run_info = run_inference(
+                    executable,
+                    cifar_inputs[model_dataset],
+                    args.index,
+                    args.num,
+                    args,
+                )
+                if run_info["timing"] is not None:
+                    timing_results[model] = run_info["timing"]
+                if run_info["returncode"] != 0:
+                    exit_code = run_info["returncode"]
+        except (FileNotFoundError, ValueError) as err:
+            print(err, file=sys.stderr)
+            exit_code = 1
+        finally:
+            if generated_driver:
+                shutil.rmtree(os.path.dirname(generated_driver), ignore_errors=True)
+            if (
+                not args.keep_driver
+                and not copied_driver_existed
+                and os.path.exists(copied_driver)
+            ):
+                os.remove(copied_driver)
+
+    if timing_json and timing_results:
+        timing_dir = os.path.dirname(timing_json)
+        if timing_dir:
+            os.makedirs(timing_dir, exist_ok=True)
+        with open(timing_json, "w") as handle:
+            json.dump(timing_results, handle, indent=2, sort_keys=True)
+        print(f"Timing JSON written to: {timing_json}")
+
+    return exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
